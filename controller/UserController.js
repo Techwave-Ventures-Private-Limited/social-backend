@@ -1,6 +1,7 @@
 const User = require("../modules/user");
 const Education = require("../modules/education");
 const Experience = require("../modules/experience");
+const About = require("../modules/about");
 const mongoose = require("mongoose");
 
 function parseDate(val) {
@@ -21,6 +22,13 @@ exports.getUser = async(req,res) => {
         } 
 
         const user = await User.findById(userId)
+            .populate({
+                path: 'about',
+                populate: [
+                    { path: 'education' },
+                    { path: 'experience' }
+                ]
+            })
             .populate('education')
             .populate('experience')
             .lean();
@@ -57,23 +65,29 @@ exports.updateUser = async(req,res) => {
             })
         }
 
-   
         const {
-            name, headline, bio, location, email, phone, website,
-            education = [], experience = [], skills = []
+            name, bio, education = [], experience = [],
+            skills = [], headline = "", location = "", phone = "", website = ""
         } = req.body;
 
-        
         user.name = name || user.name;
-        user.headline = headline || user.headline;
         user.bio = bio || user.bio;
-        user.location = location || user.location;
-        user.email = email || user.email;
-        user.phone = phone || user.phone;
-        user.website = website || user.website;
-        user.skills = skills || user.skills;
 
-        // Handle education
+       
+        let about = null;
+        if (user.about) {
+            about = await About.findById(user.about);
+        }
+        if (!about) {
+            about = new About();
+        }
+        about.skills = skills;
+        about.headline = headline;
+        about.location = location;
+        about.phone = phone;
+        about.website = website;
+
+        
         const educationIds = [];
         for (const edu of education) {
             let eduDoc;
@@ -104,9 +118,10 @@ exports.updateUser = async(req,res) => {
             }
             educationIds.push(eduDoc._id);
         }
+        about.education = educationIds;
         user.education = educationIds;
 
-        // Handle experience
+     
         const experienceIds = [];
         for (const exp of experience) {
             let expDoc;
@@ -135,8 +150,11 @@ exports.updateUser = async(req,res) => {
             }
             experienceIds.push(expDoc._id);
         }
+        about.experience = experienceIds;
         user.experience = experienceIds;
 
+        await about.save();
+        user.about = about._id;
         await user.save();
 
         return res.status(200).json({
