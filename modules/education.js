@@ -11,6 +11,10 @@ const educationSchema = new mongoose.Schema({
     fos: {
         type:String
     },
+     degree:{
+        type:String,
+        
+    },
     startDate:{
         type:Date
     },
