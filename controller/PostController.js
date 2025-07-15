@@ -244,3 +244,20 @@ exports.getCommentsForPost = async(req,res) => {
         })
     }
 }
+
+exports.getAllPosts = async(req,res) => {
+    try{
+
+        const posts  = Post.find();
+        return res.status(200).json({
+            success:true,
+            body : posts
+        })
+
+    } catch(err) {
+        return res.status(500).json({
+            success:false,
+            message:err.message
+        })
+    }
+} 

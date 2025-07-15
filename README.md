@@ -114,15 +114,13 @@ This repository contains API documentation for the **Social App** backend, expor
 
 ---
 
-### 7. Get Post with postId
+### 7. Get Post 
 
 * **Endpoint:** `GET /post/:postId`
 
----
-
-### 8. Get post for user 
-
 * **Endpoint:** `GET /post/user`
+
+* **Endpoint:** `GET /post/allPosts`
 
 ---
 ---
