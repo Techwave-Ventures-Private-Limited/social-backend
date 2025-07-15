@@ -1,15 +1,22 @@
 const Post = require("../modules/post");
 const User = require("../modules/user");
-const {uploadImageToCloudinary} = require("../utils/imageUploader");
+const { uploadImageToCloudinary, uploadMultipleImagesToCloudinary } = require("../utils/imageUploader");
 const Comment = require("../modules/comments");
 
 exports.createPost = async(req,res) => {
     try{
-
-        const {discription, media, postType} = req.body;
+        const {discription, postType} = req.body;
         const userId = req.userId;
 
-        const file = req.files.media;
+        // Accept multiple files (media)
+        let files = req.files && req.files.media;
+        if (!files) {
+            return res.status(400).json({
+                success: false,
+                message: "No media files uploaded"
+            });
+        }
+        files = Array.isArray(files) ? files : [files];
 
         if(!discription || !postType) {
             return res.status(400).json({
@@ -25,16 +32,21 @@ exports.createPost = async(req,res) => {
                 message : "User does not exists"
             })
         }
-        
-        const image = await uploadImageToCloudinary(
-            file,
+        // Upload all images
+        const images = await uploadMultipleImagesToCloudinary(
+            files,
             process.env.FOLDER_NAME,
             1000,
             1000
-        )
-        const imageUrl = image.secure_url;
+        );
+        const imageUrls = images.map(img => img.secure_url);
 
-        const createdPost = await Post.create({discription, media  : imageUrl, postType, userId});
+        const createdPost = await Post.create({
+            discription,
+            media: imageUrls,
+            postType,
+            userId
+        });
 
         user.posts.push(createdPost._id);
         await user.save();
@@ -43,7 +55,7 @@ exports.createPost = async(req,res) => {
             success: true,
             message : "Post Created Successfully",
             body : createdPost
-        })
+        });
 
     } catch(err) {
         return res.status(500).json({

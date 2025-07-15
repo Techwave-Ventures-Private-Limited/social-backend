@@ -11,3 +11,10 @@ exports.uploadImageToCloudinary = async (file, folder, height, quality) => {
   options.resource_type = "auto"
   return await cloudinary.uploader.upload(file.tempFilePath, options)
 }
+
+exports.uploadMultipleImagesToCloudinary = async (files, folder, height, quality) => {
+  const uploadPromises = files.map(file =>
+    exports.uploadImageToCloudinary(file, folder, height, quality)
+  );
+  return Promise.all(uploadPromises);
+}

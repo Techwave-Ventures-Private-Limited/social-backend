@@ -57,7 +57,7 @@ const userSchema = new mongoose.Schema({
     following:[{
         type: mongoose.Schema.Types.ObjectId,
         ref:"User",
-        default: [] //show their stories
+        default: [] 
     }],
     about:{
         type:mongoose.Schema.Types.ObjectId,
