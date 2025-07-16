@@ -11,6 +11,6 @@ router.post("/like", auth, likePost);
 router.post("/comment", auth, commentPost);
 router.post("/save", auth , savePost);
 router.get("/comment/:postId", auth, getCommentsForPost);
-router.get("/allPosts", auth, getAllPosts);
+router.get("/all/allPosts", auth, getAllPosts);
 
 module.exports = router;

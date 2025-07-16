@@ -120,7 +120,10 @@ This repository contains API documentation for the **Social App** backend, expor
 
 * **Endpoint:** `GET /post/user`
 
-* **Endpoint:** `GET /post/allPosts`
+* **Endpoint:** `GET /post/all/allPosts/?filter`
+
+EX :- `/post/all/allPosts/?filter=0` --> all without filter
+      `/post/all/allPosts/?filter=1` --> lastest posts
 
 ---
 ---
