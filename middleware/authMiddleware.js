@@ -5,7 +5,7 @@ exports.auth = async (req,res,next)=>{
 
     try{
         //console.log("Flow til here")
-        const token = req.cookies.token || req.headers.token;
+        const token = req.cookies.token || req.headers.token || req.headers.token.split(' ')[1];
         console.log(process.env.JWT_SECRET)
 
         if(!token){
@@ -16,8 +16,8 @@ exports.auth = async (req,res,next)=>{
         }
 
         try{
-            const  decode = jwt.verify(req.headers.token.split(' ')[1],process.env.JWT_SECRET);
-            console.log(decode)
+            const  decode = jwt.verify(token,process.env.JWT_SECRET);
+            //console.log(decode)
             req.userId = decode.id;
         }
         catch(err){
