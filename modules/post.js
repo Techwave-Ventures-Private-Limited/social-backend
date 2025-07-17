@@ -6,9 +6,9 @@ const postSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    media:{
+    media:[{
         type : String
-    },
+    }],
     postType:{
         type: String,
         enum: ['public', 'private'],
