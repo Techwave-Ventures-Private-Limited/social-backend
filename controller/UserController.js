@@ -1,4 +1,8 @@
 const User = require("../modules/user");
+const Education = require("../modules/education");
+const Experience = require("../modules/experience");
+const About = require("../modules/about");
+const mongoose = require("mongoose");
 const { uploadImageToCloudinary } = require("../utils/imageUploader");
 
 exports.getUser = async(req,res) => {
