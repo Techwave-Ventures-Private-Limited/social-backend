@@ -114,12 +114,19 @@ This repository contains API documentation for the **Social App** backend, expor
 
 ---
 
-### 7. Get Posts
+### 7. Get Post 
 
-* **Endpoint:** `GET /post/getPost`
+* **Endpoint:** `GET /post/:postId`
+
+* **Endpoint:** `GET /post/user`
+
+* **Endpoint:** `GET /post/all/allPosts/?filter`
+
+EX :- `/post/all/allPosts/?filter=0` --> all without filter
+      `/post/all/allPosts/?filter=1` --> lastest posts
 
 ---
-
+---
 ### 8. Like Post
 
 * **Endpoint:** `POST /post/like`
