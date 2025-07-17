@@ -26,13 +26,13 @@ const postSchema = new mongoose.Schema({
     userId : {
         type: String
     },
-    createAt:{
+    createdAt:{
         type:Date,
-        default:Date.now()
+        default:Date.now
     },
     updatedAt: {
         type:Date,
-        default:Date.now()
+        default:Date.now
     }
 
 })

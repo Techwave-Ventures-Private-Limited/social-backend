@@ -74,7 +74,18 @@ const userSchema = new mongoose.Schema({
     updatedAt: {
         type:Date,
         default:Date.now()
-    }
+    },
+    education: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Education",
+        default: []
+    }],
+    experience: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Experience",
+        default: []
+    }],
+   
 
 })
 
