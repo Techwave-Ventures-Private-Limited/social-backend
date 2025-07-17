@@ -3,12 +3,7 @@ const Education = require("../modules/education");
 const Experience = require("../modules/experience");
 const About = require("../modules/about");
 const mongoose = require("mongoose");
-
-function parseDate(val) {
-    if (!val || val === "Present") return undefined;
-    const d = new Date(val);
-    return isNaN(d.getTime()) ? undefined : d;
-}
+const { uploadImageToCloudinary } = require("../utils/imageUploader");
 
 exports.getUser = async(req,res) => {
     try{
@@ -168,6 +163,44 @@ exports.updateUser = async(req,res) => {
             success: false,
             message: err.message
         })
+    }
+}
+
+exports.uploadProfileImage = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const file = req.files && req.files.profileImage;
+
+        if (!file) {
+            return res.status(400).json({
+                success: false,
+                message: "No profile image file uploaded"
+            });
+        }
+
+        const image = await uploadImageToCloudinary(
+            file,
+            process.env.FOLDER_NAME || "profile_images",
+            400, // height (optional)
+            80   // quality (optional)
+        );
+
+        const user = await User.findByIdAndUpdate(
+            userId,
+            { profileImage: image.secure_url },
+            { new: true }
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: "Profile image uploaded successfully",
+            body: user
+        });
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
     }
 }
 
