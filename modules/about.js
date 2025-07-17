@@ -27,6 +27,22 @@ const aboutSchema = new mongoose.Schema({
     updatedAt: {
         type:Date,
         default:Date.now()
+    },
+    headline: {
+        type: String,
+        default: ""
+    },
+    location: {
+        type: String,
+        default: ""
+    },
+    phone: {
+        type: String,
+        default: ""
+    },
+    website: {
+        type: String,
+        default: ""
     }
 
 })

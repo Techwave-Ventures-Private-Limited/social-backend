@@ -6,9 +6,9 @@ const postSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    media:{
+    media:[{
         type : String
-    },
+    }],
     postType:{
         type: String,
         enum: ['public', 'private'],
@@ -26,13 +26,13 @@ const postSchema = new mongoose.Schema({
     userId : {
         type: String
     },
-    createAt:{
+    createdAt:{
         type:Date,
-        default:Date.now()
+        default:Date.now
     },
     updatedAt: {
         type:Date,
-        default:Date.now()
+        default:Date.now
     }
 
 })

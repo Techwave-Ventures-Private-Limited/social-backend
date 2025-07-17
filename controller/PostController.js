@@ -1,17 +1,25 @@
 const Post = require("../modules/post");
 const User = require("../modules/user");
-const {uploadImageToCloudinary} = require("../utils/imageUploader");
 const Comment = require("../modules/comments");
+const { uploadMultipleImagesToCloudinary } = require("../utils/imageUploader");
 
-exports.createPost = async(req,res) => {
-    try{
+exports.createPost = async (req, res) => {
+    try {
 
-        const {discription, media, postType} = req.body;
+        const { discription, postType } = req.body;
         const userId = req.userId;
 
-        const file = req.files.media;
+        // Accept multiple files (media)
+        let files = req.files && req.files.media;
+        if (!files) {
+            return res.status(400).json({
+                success: false,
+                message: "No media files uploaded"
+            });
+        }
+        files = Array.isArray(files) ? files : [files];
 
-        if(!discription || !postType) {
+        if (!discription || !postType) {
             return res.status(400).json({
                 success: false,
                 message: "Discription and postType are required"
@@ -19,49 +27,53 @@ exports.createPost = async(req,res) => {
         }
 
         const user = await User.findById(userId);
-        if(!user) {
+        if (!user) {
             return res.status(400).json({
-                success:false,
-                message : "User does not exists"
+                success: false,
+                message: "User does not exists"
             })
         }
-        
-        const image = await uploadImageToCloudinary(
-            file,
+
+        const images = await uploadMultipleImagesToCloudinary(
+            files,
             process.env.FOLDER_NAME,
             1000,
             1000
         )
-        const imageUrl = image.secure_url;
+        const imageUrls = images.map(img => img.secure_url);
 
-        const createdPost = await Post.create({discription, media  : imageUrl, postType, userId});
-
+        const createdPost = await Post.create({
+            discription,
+            media: imageUrls,
+            postType,
+            userId
+        });
         user.posts.push(createdPost._id);
         await user.save();
 
         return res.status(200).json({
             success: true,
-            message : "Post Created Successfully",
-            body : createdPost
+            message: "Post Created Successfully",
+            body: createdPost
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
         })
     }
-} 
+}
 
-exports.getPost = async(req,res) => {
+exports.getPost = async (req, res) => {
     try {
 
-        const {postId} = req.params;
+        const { postId } = req.params;
 
-        if(!postId) {
+        if (!postId) {
             return res.status(400).json({
-                success:false,
-                message : "PostId required"
+                success: false,
+                message: "PostId required"
             })
         }
 
@@ -70,55 +82,55 @@ exports.getPost = async(req,res) => {
         return res.status(200).json({
             success: true,
             message: "Post found",
-            body : post
+            body: post
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
-            message : err.message
+            message: err.message
         })
     }
 }
 
-exports.getUserPosts = async(req,res) => {
-    try{
+exports.getUserPosts = async (req, res) => {
+    try {
 
         const userId = req.userId;
 
-        if(!userId) {
+        if (!userId) {
             return res.status(400).json({
-                success:false,
-                message:"Userid required"
+                success: false,
+                message: "Userid required"
             })
         }
 
-        const posts = await Post.find({userId : userId});
+        const posts = await Post.find({ userId: userId });
 
         return res.status(200).json({
-            success:true,
-            mesasge:"Post found",
+            success: true,
+            mesasge: "Post found",
             body: posts
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
-            message : err.message
+            message: err.message
         })
     }
 }
 
-exports.likePost = async(req,res) => {
-    try{
+exports.likePost = async (req, res) => {
+    try {
 
         const postId = req.body.postId;
-        const post = await  Post.findById(postId);
+        const post = await Post.findById(postId);
 
-        if(!post) {
+        if (!post) {
             return res.status(400).json({
-                success:false,
-                message:"Post not found"
+                success: false,
+                message: "Post not found"
             })
         }
 
@@ -126,60 +138,60 @@ exports.likePost = async(req,res) => {
         await post.save();
 
         return res.status(200).json({
-            success:true,
-            message:"Post liked",
+            success: true,
+            message: "Post liked",
             body: post
         })
 
-    }  catch(err) {
+    } catch (err) {
         return res.status(500).json({
-            success:false,
-            message:err.message
+            success: false,
+            message: err.message
         })
     }
 }
 
-exports.commentPost = async(req,res) =>{
-    try{
-        const {postId, text } = req.body;
+exports.commentPost = async (req, res) => {
+    try {
+        const { postId, text } = req.body;
 
-        if(!postId || !text) {
+        if (!postId || !text) {
             return res.json({
-                success:false,
-                message:"PostId and text required"
+                success: false,
+                message: "PostId and text required"
             })
         }
 
         const post = await Post.findById(postId);
-        if(!post) {
+        if (!post) {
             return res.status(400).json({
-                success:false,
-                message:"Post Not found"
+                success: false,
+                message: "Post Not found"
             })
         }
 
-        const comment = await Comment.create({text, postId});
+        const comment = await Comment.create({ text, postId });
 
         post.comments.push(comment._id);
         await post.save();
 
         return res.status(200).json({
-            success:true,
-            message:"Comment created ",
+            success: true,
+            message: "Comment created ",
             body: comment,
-            post : post
+            post: post
         })
 
-    } catch(err){
+    } catch (err) {
         return res.status(500).json({
-            success:false,
-            message:err.message
+            success: false,
+            message: err.message
         })
     }
 }
 
-exports.savePost = async(req,res) => {
-    try{
+exports.savePost = async (req, res) => {
+    try {
 
         const userId = req.userId;
         const postId = req.body.postId;
@@ -187,60 +199,84 @@ exports.savePost = async(req,res) => {
         const post = await Post.findById(postId);
         const user = await User.findById(userId);
 
-        if(!user) {
+        if (!user) {
             return res.status(400).json({
-                success:false,
-                message:"User does not exists"
+                success: false,
+                message: "User does not exists"
             })
-        } 
+        }
 
-        
-        if(!post) {
+
+        if (!post) {
             return res.status(400).json({
-                success:false,
-                message:"Post does not exists"
+                success: false,
+                message: "Post does not exists"
             })
-        } 
+        }
 
         user.savedPost.push(post._id);
         await user.save();
 
         return res.status(200).json({
-            success:true,
-            message:"Post saved",
-            body : user
+            success: true,
+            message: "Post saved",
+            body: user
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
-            success:false,
-            message:err.message
+            success: false,
+            message: err.message
         })
     }
 }
 
-exports.getCommentsForPost = async(req,res) => {
-    try{
-        const  {postId} = req.params;
+exports.getCommentsForPost = async (req, res) => {
+    try {
+        const { postId } = req.params;
 
-        if(!postId) {
+        if (!postId) {
             return res.status(400).json({
-                success:false,
-                message:"PostId required"
+                success: false,
+                message: "PostId required"
             })
         }
 
-        const comments = await Comment.find({postId: postId});
+        const comments = await Comment.find({ postId: postId });
 
         return res.status(200).json({
-            success:true,
-            message:"Comments found",
+            success: true,
+            message: "Comments found",
             body: comments
         })
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
-            success:false,
-            message:err.message
+            success: false,
+            message: err.message
         })
     }
 }
+
+exports.getAllPosts = async (req, res) => {
+    try {
+
+        const filter = req.query.filter;
+        let posts;
+        if (filter == 0) {
+            posts = await Post.find();
+        }
+        else if (filter == 1) {
+            posts = await Post.find().sort({ createdAt: -1 })
+        }
+        return res.status(200).json({
+            success: true,
+            body: posts
+        })
+
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+} 
