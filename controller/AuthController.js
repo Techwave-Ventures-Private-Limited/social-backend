@@ -48,7 +48,8 @@ exports.signup = async(req,res)=>{
         console.log(savedUser)
         return res.status(201).json({
             success:true,
-            savedUser
+            savedUser,
+             emailVerityToken:emailVerificationToken
         })
 
     } catch(err){
