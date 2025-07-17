@@ -9,6 +9,7 @@ const authRouter = require("./route/authRoute");
 const userRouter = require("./route/userRoute");
 const postRouter = require("./route/postRoute");
 const eventRouter = require("./route/eventRoute");
+const profileRoute = require("./route/profileRoute");
 
 const {cloudinaryConnect} = require("./config/cloudinary");
 
@@ -38,6 +39,7 @@ app.use("/auth", authRouter);
 app.use("/user", userRouter);
 app.use("/post", postRouter);
 app.use("/event", eventRouter);
+app.use("/profile", profileRoute);
 app.use("/hailing",(req,res)=>{
     return res.status(200).json({
         success:true,
