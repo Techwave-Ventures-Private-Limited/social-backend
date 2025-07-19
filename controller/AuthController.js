@@ -1,64 +1,69 @@
 const User = require("../modules/user.js");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+require("dotenv").config();
+exports.signup = async (req, res) => {
+  try {
+    const { name, email, password, confirmPassword } = req.body;
 
-exports.signup = async(req,res)=>{
-    try{
-
-        const {name, email ,password , confirmPassword} = req.body;
-        console.log("TIl here")
-        const user = await User.findOne({email});
-        console.log(user);
-        if(user){
-            console.log("goingi here")
-            return res.status(409).json({message:"User already exists"})
-        }
-        console.log("not ehre")
-
-        if(password !== confirmPassword){
-            return res.status(409).json({
-                success:false,
-                message:"Password does not match"
-            })
-        }
-
-        const hashedPassword = await bcrypt.hash(password,10);
-        console.log("got here")
-
-        //here we can create a verification token
-        const emailVerificationToken = jwt.sign({
-            email:email
-        },
-        process.env.JWT_SECRET, 
-        {
-            expiresIn: "5d",
-        }
-        );
-         
-        const savedUser = await User.create({
-            name:name,
-            email:email,
-            password:hashedPassword,
-            emailVerityToken:emailVerificationToken
-        })
-
-        //after user is saved we need to send a email to user to verify its email using emailVerifyToken and we need to create a url which will authenticate the email
-      
-
-        console.log(savedUser)
-        return res.status(201).json({
-            success:true,
-            savedUser,
-             emailVerityToken:emailVerificationToken
-        })
-
-    } catch(err){
-        return res.status(500).json({
-            success:false,
-            message:err.message
-        })
+    if (!name || !email || !password || !confirmPassword) {
+      return res.status(400).json({ message: "All fields are required" });
     }
-}
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ message: "Passwords do not match" });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({ message: "User already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Step 1: Create a temporary token (without userId)
+    let emailVerificationToken = jwt.sign(
+      { email },
+      process.env.JWT_SECRET,
+      { expiresIn: "365d" }
+    );
+
+    // Step 2: Create the user with token (required in schema)
+    const savedUser = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      emailVerityToken: emailVerificationToken,
+    });
+
+    // Step 3: Regenerate token with userId
+    emailVerificationToken = jwt.sign(
+      {
+        email,
+        id: savedUser._id,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "5d",
+      }
+    );
+
+    // Step 4: Save updated token
+    savedUser.emailVerityToken = emailVerificationToken;
+    await savedUser.save();
+
+    return res.status(201).json({
+      message: "User registered successfully",
+      userId: savedUser._id,
+      emailVerificationToken,
+    });
+  } catch (error) {
+    console.error("Signup Error:", error);
+    return res.status(500).json({ message: "Server error", error });
+  }
+};
+
+
 
 
 exports.login = async(req,res) =>{
