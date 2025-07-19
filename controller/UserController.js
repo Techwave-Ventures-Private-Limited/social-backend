@@ -169,7 +169,7 @@ exports.updateUser = async(req,res) => {
 exports.uploadProfileImage = async (req, res) => {
     try {
         const userId = req.userId;
-        const file = req.files && req.files.profileImage;
+        const file = req.files && req.files.image;
 
         if (!file) {
             return res.status(400).json({
