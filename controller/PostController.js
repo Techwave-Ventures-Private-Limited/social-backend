@@ -147,6 +147,36 @@ exports.likePost = async (req, res) => {
     }
 }
 
+exports.unlikePost = async (req, res) => {
+    try {
+
+        const postId = req.body.postId;
+        const post = await Post.findById(postId);
+
+        if (!post) {
+            return res.status(400).json({
+                success: false,
+                message: "Post not found"
+            })
+        }
+
+        post.likes = post.likes - 1;
+        await post.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Post unliked",
+            body: post
+        })
+
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
+
 exports.commentPost = async (req, res) => {
     try {
         const { postId, text } = req.body;
