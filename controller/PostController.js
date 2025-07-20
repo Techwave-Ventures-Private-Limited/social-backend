@@ -14,6 +14,7 @@ exports.createPost = async (req, res) => {
         let imageUrls;
         if (files) {
             files = Array.isArray(files) ? files : [files];
+            console.log(files);
             const images = await uploadMultipleImagesToCloudinary(
                 files,
                 process.env.FOLDER_NAME,
