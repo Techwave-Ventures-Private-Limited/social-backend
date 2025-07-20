@@ -11,13 +11,17 @@ exports.createPost = async (req, res) => {
 
         // Accept multiple files (media)
         let files = req.files && req.files.media;
-        if (!files) {
-            return res.status(400).json({
-                success: false,
-                message: "No media files uploaded"
-            });
+        let imageUrls;
+        if (files) {
+            files = Array.isArray(files) ? files : [files];
+            const images = await uploadMultipleImagesToCloudinary(
+                files,
+                process.env.FOLDER_NAME,
+                1000,
+                1000
+            )
+            imageUrls = images.map(img => img.secure_url);
         }
-        files = Array.isArray(files) ? files : [files];
 
         if (!discription || !postType) {
             return res.status(400).json({
@@ -33,14 +37,6 @@ exports.createPost = async (req, res) => {
                 message: "User does not exists"
             })
         }
-
-        const images = await uploadMultipleImagesToCloudinary(
-            files,
-            process.env.FOLDER_NAME,
-            1000,
-            1000
-        )
-        const imageUrls = images.map(img => img.secure_url);
 
         const createdPost = await Post.create({
             discription,
