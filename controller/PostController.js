@@ -8,7 +8,7 @@ exports.createPost = async (req, res) => {
 
         const { discription, postType } = req.body;
         const userId = req.userId;
-
+        console.log("User request to upload a post", req.body)
         // Accept multiple files (media)
         let files = req.files && req.files.media;
         let imageUrls;
