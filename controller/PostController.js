@@ -258,6 +258,25 @@ exports.savePost = async (req, res) => {
     }
 }
 
+exports.getSavedPost = async(req,res) => {
+    try{
+
+        const userId = req.userId;
+
+        const user = await User.findById(userId).populate('savedPost');
+        return res.json({
+            success:true,
+            body: user.savedPost
+        })
+
+    } catch(err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
+
 exports.getCommentsForPost = async (req, res) => {
     try {
         const { postId } = req.params;
