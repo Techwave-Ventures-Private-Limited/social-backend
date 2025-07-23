@@ -243,11 +243,32 @@ exports.getCommentsForPost = async (req, res) => {
         }
 
         const comments = await Comment.find({ postId: postId });
+        const userId = req.userId;
+        const user = await User.findById(userId);
+
+        // Format each comment as requested
+        const formattedComments = await Promise.all(comments.map(async (comment) => {
+            // If you want to support per-comment author, you need to store userId in comment schema
+            // For now, use the current user as author
+            return {
+                id: comment._id,
+                author: {
+                    id: user._id,
+                    name: user.name,
+                    avatar: user.profileImage || null
+                },
+                content: comment.text,
+                createdAt: comment.createAt ? comment.createAt.toISOString() : new Date().toISOString(),
+                likes: comment.likes || 0,
+                isLiked: false, // No per-user like tracking
+                replies: []
+            };
+        }));
 
         return res.status(200).json({
             success: true,
             message: "Comments found",
-            body: comments
+            body: formattedComments
         })
     } catch (err) {
         return res.status(500).json({
