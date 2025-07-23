@@ -21,4 +21,4 @@ const uploadMultipleImagesToCloudinary = async (files, folder, height, quality) 
   return uploadedImages;
 };
 
-module.exports = { uploadMultipleImagesToCloudinary };
+module.exports = { uploadMultipleImagesToCloudinary, uploadImageToCloudinary };

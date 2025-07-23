@@ -86,8 +86,8 @@ exports.updateUser = async(req,res) => {
         const educationIds = [];
         for (const edu of education) {
             let eduDoc;
-            const startDate = parseDate(edu.startYear);
-            const endDate = parseDate(edu.endYear);
+            const startDate = edu.startYear ? new Date(edu.startYear) : null;
+            const endDate = edu.endYear ? new Date(edu.endYear) : null;
             if (edu.id && mongoose.Types.ObjectId.isValid(edu.id)) {
                 eduDoc = await Education.findByIdAndUpdate(
                     edu.id,
@@ -120,8 +120,8 @@ exports.updateUser = async(req,res) => {
         const experienceIds = [];
         for (const exp of experience) {
             let expDoc;
-            const startDate = parseDate(exp.startDate);
-            const endDate = parseDate(exp.endDate);
+            const startDate = exp.startYear ? new Date(exp.startYear) : null;
+            const endDate = exp.endYear ? new Date(exp.endYear) : null;
             if (exp.id && mongoose.Types.ObjectId.isValid(exp.id)) {
                 expDoc = await Experience.findByIdAndUpdate(
                     exp.id,
@@ -169,7 +169,7 @@ exports.updateUser = async(req,res) => {
 exports.uploadProfileImage = async (req, res) => {
     try {
         const userId = req.userId;
-        const file = req.files && req.files.profileImage;
+        const file = req.files && req.files.image;
 
         if (!file) {
             return res.status(400).json({

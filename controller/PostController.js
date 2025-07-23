@@ -8,16 +8,21 @@ exports.createPost = async (req, res) => {
 
         const { discription, postType } = req.body;
         const userId = req.userId;
-
+        console.log("User request to upload a post", req.body)
         // Accept multiple files (media)
         let files = req.files && req.files.media;
-        if (!files) {
-            return res.status(400).json({
-                success: false,
-                message: "No media files uploaded"
-            });
+        let imageUrls;
+        if (files) {
+            files = Array.isArray(files) ? files : [files];
+            console.log(files);
+            const images = await uploadMultipleImagesToCloudinary(
+                files,
+                process.env.FOLDER_NAME,
+                1000,
+                1000
+            )
+            imageUrls = images.map(img => img.secure_url);
         }
-        files = Array.isArray(files) ? files : [files];
 
         if (!discription || !postType) {
             return res.status(400).json({
@@ -33,14 +38,6 @@ exports.createPost = async (req, res) => {
                 message: "User does not exists"
             })
         }
-
-        const images = await uploadMultipleImagesToCloudinary(
-            files,
-            process.env.FOLDER_NAME,
-            1000,
-            1000
-        )
-        const imageUrls = images.map(img => img.secure_url);
 
         const createdPost = await Post.create({
             discription,
@@ -151,6 +148,36 @@ exports.likePost = async (req, res) => {
     }
 }
 
+exports.unlikePost = async (req, res) => {
+    try {
+
+        const postId = req.body.postId;
+        const post = await Post.findById(postId);
+
+        if (!post) {
+            return res.status(400).json({
+                success: false,
+                message: "Post not found"
+            })
+        }
+
+        post.likes = post.likes - 1;
+        await post.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Post unliked",
+            body: post
+        })
+
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
+
 exports.commentPost = async (req, res) => {
     try {
         const { postId, text } = req.body;
@@ -224,6 +251,25 @@ exports.savePost = async (req, res) => {
         })
 
     } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
+
+exports.getSavedPost = async(req,res) => {
+    try{
+
+        const userId = req.userId;
+
+        const user = await User.findById(userId).populate('savedPost');
+        return res.json({
+            success:true,
+            body: user.savedPost
+        })
+
+    } catch(err) {
         return res.status(500).json({
             success: false,
             message: err.message

@@ -160,10 +160,15 @@ EX :- `/post/all/allPosts/?filter=0` --> all without filter
 
 ---
 
-### 11. Save Post (Unclear API)
+### 11. Save Post 
 
-* **Endpoint:** `GET /post/savePost`
-
+* **Endpoint:** `POST /post/save`
+```json
+{
+  "postId": "685691110f598dbd55acec11",
+}
+```
+* ** Endpoint: **  `GET /get/save` fetch saved post for a user
 ---
 
 ## 🎫 Ticket & Event APIs
