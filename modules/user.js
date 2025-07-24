@@ -85,8 +85,15 @@ const userSchema = new mongoose.Schema({
         ref: "Experience",
         default: []
     }],
-   
-
+    stories: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Story",
+        default: []
+    }],
+    streak: {
+        type: Number,
+        default:0 
+    }
 })
 
 module.exports = mongoose.model("User",userSchema);

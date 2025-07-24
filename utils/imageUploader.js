@@ -1,12 +1,17 @@
 const cloudinary = require("cloudinary").v2
 
- uploadImageToCloudinary = async (file, folder, height, quality) => {
+const uploadImageToCloudinary = async (file, folder, height, quality, expiresAt) => {
   const options = { folder }
   if(height){
     options.height = height;
   }
   if(quality){
     options.quality = quality;
+  }
+  if (expiresAt) {
+    options.context = {
+      expires_at: new Date(expiresAt).toISOString()
+    }
   }
   options.resource_type = "auto"
   return await cloudinary.uploader.upload(file.tempFilePath, options)
@@ -21,4 +26,23 @@ const uploadMultipleImagesToCloudinary = async (files, folder, height, quality) 
   return uploadedImages;
 };
 
-module.exports = { uploadMultipleImagesToCloudinary, uploadImageToCloudinary };
+const uploadVideoToCloudinary = async (file, folder, quality, expiresAt) => {
+  const options = {
+    folder,
+    resource_type: "video"
+  };
+
+  if (quality) {
+    options.quality = quality;
+  }
+  if (expiresAt) {
+    options.context = {
+      expires_at: new Date(expiresAt).toISOString()
+    }
+  }
+
+  return await cloudinary.uploader.upload(file.tempFilePath, options);
+};
+
+
+module.exports = { uploadMultipleImagesToCloudinary, uploadImageToCloudinary, uploadVideoToCloudinary };
