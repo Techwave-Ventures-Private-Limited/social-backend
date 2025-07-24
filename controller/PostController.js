@@ -124,6 +124,16 @@ exports.likePost = async (req, res) => {
         const postId = req.body.postId;
         const post = await Post.findById(postId);
 
+        const userId = req.userId;
+        const user = await User.findById(userId);
+
+        if (!userId) {
+            return res.status(400).json({
+                success:false,
+                message:"User not found"
+            })
+        }
+
         if (!post) {
             return res.status(400).json({
                 success: false,
@@ -133,6 +143,9 @@ exports.likePost = async (req, res) => {
 
         post.likes = post.likes + 1;
         await post.save();
+
+        user.likedPost.push(post._id);
+        await user.save();
 
         return res.status(200).json({
             success: true,
@@ -429,8 +442,7 @@ exports.getAllPosts = async (req, res) => {
                 );
             }
 
-            // isLiked is always false (no per-user like tracking)
-            let isLiked = false;
+            let isLiked = currentUser.likedPost.includes(post._id);
 
             // Map author (user) to full User interface
             const author = post.userId;
