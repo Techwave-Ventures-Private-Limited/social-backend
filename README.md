@@ -213,6 +213,26 @@ speakerspeakers:
 
 ---
 
+---
+
+### 15. Create Story 
+
+* **Endpoint:** `POST /user/upload/story`
+
+```
+FormData --> one or multiple 
+{
+  media : File
+}
+```
+---
+
+---
+### 16. Get Story of following users
+
+* **EndPoint:** `GET /user/story`
+---
+
 ## 🧪 Testing & Environment
 
 * The collection uses environment variables like `{{local}}` and `{{base_URL}}`. Be sure to set them in your Postman environment before running the APIs.
