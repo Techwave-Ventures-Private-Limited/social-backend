@@ -197,7 +197,7 @@ exports.commentPost = async (req, res) => {
             })
         }
 
-        const comment = await Comment.create({ text, postId });
+        const comment = await Comment.create({ text, postId, userId: req.userId });
 
         post.comments.push(comment._id);
         await post.save();
@@ -288,39 +288,97 @@ exports.getCommentsForPost = async (req, res) => {
             })
         }
 
-        const comments = await Comment.find({ postId: postId });
-        const userId = req.userId;
-        const user = await User.findById(userId);
+        // Fetch all comments for the post, populate userId
+        const comments = await Comment.find({ postId: postId }).populate('userId');
 
-        // Format each comment as requested
-        const formattedComments = await Promise.all(comments.map(async (comment) => {
-            // If you want to support per-comment author, you need to store userId in comment schema
-            // For now, use the current user as author
+        // Build a map of commentId -> comment for easy lookup
+        const commentMap = {};
+        comments.forEach(c => { commentMap[c._id] = c; });
+
+        // Helper to recursively format comments with nested replies and author info
+        async function formatComment(comment) {
+            await comment.populate('replies');
+            await comment.populate('userId');
+            const user = comment.userId;
             return {
                 id: comment._id,
                 author: {
-                    id: user._id,
-                    name: user.name,
-                    avatar: user.profileImage || null
+                    id: user?._id,
+                    name: user?.name,
+                    avatar: user?.profileImage || null
                 },
                 content: comment.text,
                 createdAt: comment.createAt ? comment.createAt.toISOString() : new Date().toISOString(),
                 likes: comment.likes || 0,
-                isLiked: false, // No per-user like tracking
-                replies: []
+                isLiked: false,
+                replies: await Promise.all((comment.replies || []).map(reply => formatComment(reply)))
             };
-        }));
+        }
+
+        // Get only top-level comments (no replyTo)
+        const topLevelComments = comments.filter(c => !c.replyTo);
+
+        const formattedComments = await Promise.all(
+            topLevelComments.map(comment => formatComment(comment))
+        );
 
         return res.status(200).json({
             success: true,
             message: "Comments found",
             body: formattedComments
-        })
+        });
     } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
         })
+    }
+}
+
+exports.replyToComment = async (req, res) => {
+    try {
+        const { postId, commentId, content } = req.body;
+        const userId = req.userId;
+
+        if (!postId || !commentId || !content) {
+            return res.status(400).json({
+                success: false,
+                message: "postId, commentId, and content are required"
+            });
+        }
+
+        // Ensure the parent comment exists
+        const parentComment = await Comment.findById(commentId);
+        if (!parentComment) {
+            return res.status(404).json({
+                success: false,
+                message: "Parent comment not found"
+            });
+        }
+
+        // Create the reply comment
+        const replyComment = await Comment.create({
+            text: content,
+            postId,
+            replyTo: commentId,
+            userId: req.userId
+        });
+
+        // Add reply to parent's replies array
+        parentComment.replies = parentComment.replies || [];
+        parentComment.replies.push(replyComment._id);
+        await parentComment.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Reply created",
+            body: replyComment
+        });
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
     }
 }
 
