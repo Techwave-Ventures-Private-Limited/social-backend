@@ -1,6 +1,6 @@
 const  mongoose = require("mongoose");
 const mailSender = require("../utils/mailSender");
-const  otpTemplate = require('../utils/emailTemplate');
+const  {otpTemplate} = require('../utils/emailTemplate');
 
 const otpSchema  = new mongoose.Schema({
 
@@ -11,6 +11,11 @@ const otpSchema  = new mongoose.Schema({
     otp:{
         type:String,
         required:true,
+    },
+    type: {
+        type: String,
+        enum: ["Verification", "Password"],
+        default: "Verification"
     },
     createdAt:{
         type:Date,
@@ -36,7 +41,7 @@ async function sendVerificationEmail(email, otp) {
 }
 
 otpSchema.pre("save", async function (next) {
-	if (this.isNew) {
+	if (this.isNew && this.type === "Verification") {
 		await sendVerificationEmail(this.email, this.otp);
 	}
 	next();

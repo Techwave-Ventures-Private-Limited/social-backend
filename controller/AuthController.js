@@ -181,7 +181,7 @@ exports.verifyOtp = async(req,res) => {
       })
     }
 
-    const otpPresent = await Otp.find({otp : otp});
+    const otpPresent = await Otp.findOne({ otp: otp, type: "Verification" }).sort({ createdAt: -1 });
     if(!otpPresent) {
       return res.status(400).json({
         success: false,
