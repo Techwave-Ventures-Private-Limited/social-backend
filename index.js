@@ -9,9 +9,9 @@ const authRouter = require("./route/authRoute");
 const userRouter = require("./route/userRoute");
 const postRouter = require("./route/postRoute");
 const eventRouter = require("./route/eventRoute");
+const showcaseRouter = require("./route/showcaseRoute");
 
 const {cloudinaryConnect} = require("./config/cloudinary");
-
 
 database.connect();
 
@@ -38,6 +38,7 @@ app.use("/auth", authRouter);
 app.use("/user", userRouter);
 app.use("/post", postRouter);
 app.use("/event", eventRouter);
+app.use("/showcase", showcaseRouter);
 app.use("/hailing",(req,res)=>{
     return res.status(200).json({
         success:true,
