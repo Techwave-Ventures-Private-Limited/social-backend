@@ -232,6 +232,34 @@ FormData --> one or multiple
 * **EndPoint:** `GET /user/story`
 ---
 
+### 17. Create Showcase
+
+* ** EndPoint:** `POST /showcase/create`
+```
+Formdata
+{
+  logo : imagefile,
+  bannerImage : imagefile,
+  images: [multipleimages],
+  category:App
+  projectTitle:new project
+  tagline:creating first showcsas
+  description:jaskdlfjklsdjflksad
+  problem:akdsjflkadsj fkladsj 
+  solution:lfkjdskf jsajsdk jsdklfj sdlfj sdljf 
+  revenueModel:dfsd kjfsldlkfl j fjsdlk fkljs
+  demoVideoLink:sdj fksdflksdfas
+  tags:[fkasjd,fskjfd]
+  projectLinks:sadkjfkdsjfkldsajf kadslf
+}
+```
+---
+### 18. GET Showcase
+
+* ** EndPoint:** `GET /showcase/get`
+```
+
+
 ## 🧪 Testing & Environment
 
 * The collection uses environment variables like `{{local}}` and `{{base_URL}}`. Be sure to set them in your Postman environment before running the APIs.
