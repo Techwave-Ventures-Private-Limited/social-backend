@@ -225,6 +225,8 @@ FormData --> one or multiple
 }
 ```
 ---
+### GET Own Sotry
+* **Endpoint:** `GET /user/story/self`
 
 ---
 ### 16. Get Story of following users
