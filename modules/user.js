@@ -12,7 +12,6 @@ const userSchema = new mongoose.Schema({
     },
     otp:{
         type:String,
-        required:true
     },
     emailVerityToken:{
         type:String,
@@ -76,13 +75,16 @@ const userSchema = new mongoose.Schema({
         type:String,
         default: null
     },
-    createAt:{
+    bannerImage: {
+        type: String,
+    },
+    createdAt:{
         type:Date,
-        default:Date.now()
+        default:Date.now
     },
     updatedAt: {
         type:Date,
-        default:Date.now()
+        default:Date.now
     },
     education: [{
         type: mongoose.Schema.Types.ObjectId,

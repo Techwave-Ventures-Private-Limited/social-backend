@@ -209,6 +209,45 @@ exports.uploadProfileImage = async (req, res) => {
     }
 }
 
+exports.uploadBannerImage = async(req,res) => {
+    try { 
+
+        const userId = req.userId;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "User does not exists"
+            })
+        }
+
+        const file = req.files.bannerImage;
+        if (!file) {
+            return res.status(400).json({
+                success: false,
+                message: "Banner Image not found"
+            })
+        }
+
+        const uploadedImage = await uploadImageToCloudinary(file, process.env.FOLDER_NAME);
+        user.bannerImage = uploadedImage.secure_url;
+        await user.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Banner Uploaded",
+            body: user
+        })
+
+    } catch(err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
+
 exports.sendForgotPasswordEmail = async(req,res) => {
     try {
 

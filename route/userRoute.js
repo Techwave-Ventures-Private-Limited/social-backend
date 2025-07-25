@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const {getUser, updateUser, uploadProfileImage, sendForgotPasswordEmail, verifyForgotPasswordOtp, changePassword} = require("../controller/UserController");
+const {getUser, updateUser, uploadProfileImage, sendForgotPasswordEmail, verifyForgotPasswordOtp, changePassword, uploadBannerImage} = require("../controller/UserController");
 const {createStory, getFollowingStories, getCurrentStory} = require("../controller/StoryController");
 const {auth}  = require("../middleware/authMiddleware");
 const { followUser } = require("../controller/FollowController");
@@ -16,5 +16,6 @@ router.get("/story/self", auth, getCurrentStory);
 router.post("/forgotPassword", sendForgotPasswordEmail);
 router.post("/verifyForgotPassword", verifyForgotPasswordOtp);
 router.post("/changePassword", changePassword);
+router.post("/uploadBannerImage", auth, uploadBannerImage);
 
 module.exports = router;
