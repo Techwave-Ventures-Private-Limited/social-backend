@@ -103,3 +103,24 @@ exports.getFollowingStories = async(req, res) => {
         })
     }
 }
+
+exports.getCurrentStory = async(req,res) => {
+  try{
+
+    const userId = req.userId;
+
+    const stories = await Story.find({userId});
+
+    return res.status(200).json({
+      success: true,
+      message: "Stories Fetched",
+      body: stories
+    })
+
+  } catch(err) {
+    return res.statu(500).json({
+      success : false,
+      message : err.message
+    })
+  }
+}
