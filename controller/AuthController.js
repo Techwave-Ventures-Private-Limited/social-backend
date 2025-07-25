@@ -1,42 +1,47 @@
 const User = require("../modules/user.js");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const Otp = require("../modules/otp.js");
 require("dotenv").config();
+
 exports.signup = async (req, res) => {
   try {
     const { name, email, password, confirmPassword } = req.body;
 
     if (!name || !email || !password || !confirmPassword) {
-      return res.status(400).json({ message: "All fields are required" });
+      return res.status(400).json({ message: "All details are required" });
     }
 
     if (password !== confirmPassword) {
-      return res.status(400).json({ message: "Passwords do not match" });
+      return res.status(400).json({ message: "Password and Confirm Password does not match" });
     }
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(409).json({ message: "User already exists" });
+      return res.status(409).json({ message: "Email already exists" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Step 1: Create a temporary token (without userId)
     let emailVerificationToken = jwt.sign(
       { email },
       process.env.JWT_SECRET,
       { expiresIn: "365d" }
     );
 
-    // Step 2: Create the user with token (required in schema)
+    let otp = '';
+    for (let i = 0; i < 6; i++) {
+      otp += Math.floor(Math.random() * 10);
+    }
+
     const savedUser = await User.create({
       name,
       email,
+      otp,
       password: hashedPassword,
       emailVerityToken: emailVerificationToken,
     });
 
-    // Step 3: Regenerate token with userId
     emailVerificationToken = jwt.sign(
       {
         email,
@@ -48,9 +53,13 @@ exports.signup = async (req, res) => {
       }
     );
 
-    // Step 4: Save updated token
     savedUser.emailVerityToken = emailVerificationToken;
     await savedUser.save();
+
+    await Otp.create({
+      email: savedUser.email,
+      otp: savedUser.otp 
+    })
 
     return res.status(201).json({
       message: "User registered successfully",
@@ -63,13 +72,8 @@ exports.signup = async (req, res) => {
   }
 };
 
-
-
-
 exports.login = async(req,res) =>{
-
     try{
-
         const {email,password} = req.body;
 
         if(!email || !password){
@@ -80,16 +84,14 @@ exports.login = async(req,res) =>{
         }
 
         const user =  await User.findOne({email});
-
-        if(!user){
+        if (!user){
             return res.status(402).json({
                 success:false,
                 message:"User does not exit",
             })
         }
 
-        //we  can check passwords  directly using  if else and bcrrytp compare  fuction
-        if(await bcrypt.compare(password,user.password) ){
+        if (await bcrypt.compare(password,user.password)) {
 
             const token = jwt.sign({
                 email:user.email,id:user._id,role:user.role
@@ -100,22 +102,20 @@ exports.login = async(req,res) =>{
             }
             );
 
-            //check here there may be any parsing  error  with object 
             user.toObject();
             user.token  = token;
             user.password = undefined;
             
             const options = {
-				expires: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-				httpOnly: true,
-			};
-			return res.cookie("token", token, options).status(200).json({
-				success: true,
-				token,
-				user,
-				message: `User Login Success`,
-			});
-
+              expires: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+              httpOnly: true,
+            };
+            return res.cookie("token", token, options).status(200).json({
+              success: true,
+              token,
+              user,
+              message: `User Login Success`,
+            });
         }
         else{
             return res.status(400).json({
@@ -123,7 +123,6 @@ exports.login = async(req,res) =>{
                 message:"Password does not match",
             })
         }
-
     }
     catch(err){
         return  res.status(500).json({
@@ -138,9 +137,7 @@ exports.login = async(req,res) =>{
 exports.logout = async(req,res)=>{
 
     try{
-
         const userId = req.userId;
-
         const user = await User.findById(userId);
 
         if(!user){
@@ -161,5 +158,52 @@ exports.logout = async(req,res)=>{
             message:err.message
         })
     }
+}
 
+exports.verifyOtp = async(req,res) => {
+  try {
+
+    const userId = req.body.userId;
+    const {otp} = req.body;
+
+    let user = await User.findById(userId);
+    if (user.isVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "User alreday verified"
+      })
+    } 
+
+    if (otp != user.otp ) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP Does not match, please try again."
+      })
+    }
+
+    const otpPresent = await Otp.find({otp : otp});
+    if(!otpPresent) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP Expired"
+      })
+    }
+
+    user.isVerified = true;
+    await user.save();
+    let emailVerityToken = user.emailVerityToken;
+
+    return res.status(200).json({
+      success:true,
+      message:"OTP verified successfully",
+      body: user,
+      emailVerityToken
+    })
+
+  } catch(err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    })
+  }
 }
