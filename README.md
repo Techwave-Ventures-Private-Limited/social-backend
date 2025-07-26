@@ -259,7 +259,11 @@ Formdata
 ### 18. GET Showcase
 
 * ** EndPoint:** `GET /showcase/get`
-```
+---
+
+### 19. Get news 
+* **Endponts:** `GET /news?limit={number}&category={string}`
+--- 
 
 
 ## 🧪 Testing & Environment

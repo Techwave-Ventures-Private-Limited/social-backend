@@ -10,6 +10,7 @@ const userRouter = require("./route/userRoute");
 const postRouter = require("./route/postRoute");
 const eventRouter = require("./route/eventRoute");
 const showcaseRouter = require("./route/showcaseRoute");
+const newsRouter = require("./route/newsRoute");
 
 const {cloudinaryConnect} = require("./config/cloudinary");
 
@@ -39,6 +40,7 @@ app.use("/user", userRouter);
 app.use("/post", postRouter);
 app.use("/event", eventRouter);
 app.use("/showcase", showcaseRouter);
+app.use("/news", newsRouter);
 app.use("/hailing",(req,res)=>{
     return res.status(200).json({
         success:true,
@@ -54,7 +56,6 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running at ${PORT}`);
 });
 
-
 const axios = require('axios');
 
 function callSelfApi() {
@@ -67,12 +68,9 @@ function callSelfApi() {
         });
 }
 
-
 function scheduleApiCall() {
     callSelfApi(); 
     setInterval(callSelfApi, 14 * 60 * 1000);
 }
 
-
 scheduleApiCall();
-
