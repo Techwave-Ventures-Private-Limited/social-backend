@@ -24,7 +24,7 @@ exports.createStory = async (req, res) => {
       if (isVideo) {
         result = await uploadVideoToCloudinary(file, process.env.FOLDER_NAME || "stories", "auto", expiresAt);
       } else {
-        result = await uploadImageToCloudinary(file, process.env.FOLDER_NAME || "stories", 400, 80, expiresAt);
+        result = await uploadImageToCloudinary(file, process.env.FOLDER_NAME || "stories", 400, "auto", expiresAt);
       }
 
       const createdStory = await Story.create({

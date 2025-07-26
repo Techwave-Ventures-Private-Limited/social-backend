@@ -58,7 +58,7 @@ app.listen(PORT, '0.0.0.0', () => {
 const axios = require('axios');
 
 function callSelfApi() {
-    axios.get('https://social-backend-xpcd.onrender.com/hailing')
+    axios.get('https://social-backend-zid2.onrender.com/hailing')
         .then(response => {
             console.log('API Response:', response.data);
         })
