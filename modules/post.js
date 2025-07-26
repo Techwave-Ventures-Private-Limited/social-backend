@@ -4,7 +4,6 @@ const postSchema = new mongoose.Schema({
 
     discription:{
         type: String,
-        required: true
     },
     media:[{
         type : String

@@ -1,34 +1,38 @@
 const Post = require("../modules/post");
 const User = require("../modules/user");
 const Comment = require("../modules/comments");
-const { uploadMultipleImagesToCloudinary } = require("../utils/imageUploader");
+const { uploadMultipleImagesToCloudinary, uploadVideoToCloudinary, uploadImageToCloudinary } = require("../utils/imageUploader");
 
 exports.createPost = async (req, res) => {
     try {
 
         const { discription, postType } = req.body;
         const userId = req.userId;
-        console.log("User request to upload a post", req.body)
+        // console.log("User request to upload a post", req.body)
         // Accept multiple files (media)
         let files = req.files && req.files.media;
-        let imageUrls;
-        if (files) {
-            files = Array.isArray(files) ? files : [files];
-            console.log(files);
-            const images = await uploadMultipleImagesToCloudinary(
-                files,
-                process.env.FOLDER_NAME,
-                1000,
-                1000
-            )
-            imageUrls = images.map(img => img.secure_url);
-        }
+        let mediaUrls = [];
 
-        if (!discription || !postType) {
+        if (!postType) {
             return res.status(400).json({
                 success: false,
-                message: "Discription and postType are required"
+                message: "PostType is required"
             })
+        }
+
+        if (files) {
+            files = Array.isArray(files) ? files : [files];
+            for (const file of files) {    
+                const isVideo = file.mimetype.startsWith("video");
+                if (isVideo) {
+                    const uploadedVideo = await uploadVideoToCloudinary(file, process.env.FOLDER_NAME || "post", "auto");
+                    mediaUrls.push(uploadedVideo.secure_url);
+                }
+                else {
+                    const uploadedImage = await uploadImageToCloudinary(file, process.env.FOLDER_NAME || "post");
+                    mediaUrls.push(uploadedImage.secure_url);
+                }
+            }
         }
 
         const user = await User.findById(userId);
@@ -41,7 +45,7 @@ exports.createPost = async (req, res) => {
 
         const createdPost = await Post.create({
             discription,
-            media: imageUrls,
+            media: mediaUrls,
             postType,
             userId
         });
