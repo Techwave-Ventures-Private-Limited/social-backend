@@ -10,9 +10,9 @@ exports.getNews = async(req,res) => {
         if (category !== "") {
             news = await News.find({
                 category : {$in: [category]}
-            }).limit(limit).offset(offset).sort({timestamp : -1}); 
+            }).skip(offset).limit(limit).sort({timestamp : -1}); 
         } else {
-            news = await News.find().limit(limit).offset(offset).sort({timestamp: -1});
+            news = await News.find().skip(offset).limit(limit).sort({timestamp: -1});
         }
 
         return res.status(200).json({
