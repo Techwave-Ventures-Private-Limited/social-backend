@@ -101,6 +101,16 @@ const userSchema = new mongoose.Schema({
         ref: "Story",
         default: []
     }],
+    savedNews: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "news-article",
+        default: []
+    }],
+    likedNews: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "news-article",
+        default: []
+    }],
     streak: {
         type: Number,
         default:0 
