@@ -69,7 +69,7 @@ exports.toggleLikeNews = async (req, res) => {
     const hasLiked = user.likedNews.includes(newsId);
 
     await User.findByIdAndUpdate(userId, {
-      [hasLiked ? '$pull' : '$addToSet']: { likedNews: newsId }
+      [hasLiked ? '$pull' : '$push']: { likedNews: newsId }
     });
 
     const updatedNews = await News.findByIdAndUpdate(
@@ -108,7 +108,7 @@ exports.toggleSaveNews = async (req, res) => {
     const hasSaved = user.savedNews.includes(newsId);
 
     await User.findByIdAndUpdate(userId, {
-      [hasSaved ? '$pull' : '$addToSet']: { savedNews: newsId }
+      [hasSaved ? '$pull' : '$push']: { savedNews: newsId }
     });
 
     return res.status(200).json({
@@ -123,3 +123,24 @@ exports.toggleSaveNews = async (req, res) => {
     });
   }
 };
+
+exports.getSavedNews = async(req,res) => {
+    try{
+
+        const userId = req.userId;
+
+        const user = await User.findById(userId).populate("savedNews");
+
+        return res.status(200).json({
+            success: true,
+            body: user.savedNews || []
+        })
+
+    } catch(err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
+
