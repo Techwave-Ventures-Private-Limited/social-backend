@@ -130,10 +130,17 @@ exports.getSavedNews = async(req,res) => {
         const userId = req.userId;
 
         const user = await User.findById(userId).populate("savedNews");
-        const news = user.savedNews.map(article => ({
-          ...article,
-          isSaved: true,
-        }));       
+        const likedNewsIds = new Set(user.likedNews.map(news => news._id.toString()));
+
+        const news = user.savedNews.map(article => {
+          const plainArticle = article.toObject(); // clean the Mongoose internals
+          return {
+            ...plainArticle,
+            isSaved: true,
+            isLiked: likedNewsIds.has(article._id.toString()),
+          };
+        });
+    
         return res.status(200).json({
             success: true,
             body: news
