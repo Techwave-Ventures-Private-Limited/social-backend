@@ -294,7 +294,7 @@ exports.sendForgotPasswordEmail = async(req,res) => {
 exports.verifyForgotPasswordOtp = async(req,res) => {
     try {
 
-        const {otp} = req.body;
+        const {otp, email} = req.body;
 
         if (!otp) {
             return res.status(400).json({
@@ -303,7 +303,7 @@ exports.verifyForgotPasswordOtp = async(req,res) => {
             })
         }
 
-        const otpPresent = await Otp.findOne({ otp: otp, type: "Password" }).sort({ createdAt: -1 });
+        const otpPresent = await Otp.findOne({ otp: otp, type: "Password", email: email }).sort({ createdAt: -1 });
         if (!otpPresent) {
             return res.status(400).json({
                 success: false,
@@ -334,9 +334,9 @@ exports.verifyForgotPasswordOtp = async(req,res) => {
 exports.changePassword = async(req,res) => {
     try {
 
-        const {password, confirmPassword, userId} = req.body;
+        const {password, confirmPassword, email} = req.body;
 
-        const user = await User.findById(userId);
+        const user = await User.find({email: email}).findOne();
 
         if (!user) {
             return res.status(400).json({
@@ -345,7 +345,7 @@ exports.changePassword = async(req,res) => {
             })
         }
 
-        if (password != confirmPassword) {
+        if (password.toString() !== confirmPassword.toString()) {
             return res.status(400).json({
                 success: false,
                 message : "Password and confirm password does not match"
