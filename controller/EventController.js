@@ -217,10 +217,84 @@ exports.getUserEvents = async(req,res) => {
     }
 }
 
-// Get all events
+// Get all events with filters and date logic
 exports.getAllEvents = async (req, res) => {
     try {
-        const events = await Event.find().populate("ticketTypes");
+        const { category, isPaid, isOnline, date } = req.query;
+        const filter = {};
+
+        // Category filter
+        if (category && category !== 'all') {
+            filter.category = category;
+        }
+        // isPaid filter
+        if (isPaid && isPaid !== 'all') {
+            if (isPaid === 'free') filter.isPaid = false;
+            else if (isPaid === 'paid') filter.isPaid = true;
+        }
+        // isOnline filter
+        if (isOnline && isOnline !== 'all') {
+            if (isOnline === 'online') filter.isOnline = true;
+            else if (isOnline === 'offline') filter.isOnline = false;
+        }
+
+        // Date filter
+        if (date && date !== 'all') {
+            let start, end;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (date === 'today') {
+                start = new Date(today);
+                end = new Date(today);
+                end.setHours(23, 59, 59, 999);
+            } else if (date === 'tomorrow') {
+                start = new Date(today);
+                start.setDate(start.getDate() + 1);
+                end = new Date(start);
+                end.setHours(23, 59, 59, 999);
+            } else {
+                // Specific date (YYYY-MM-DD)
+                start = new Date(date);
+                start.setHours(0, 0, 0, 0);
+                end = new Date(date);
+                end.setHours(23, 59, 59, 999);
+            }
+            // Event date is stored as string, so filter in-memory after fetching
+            filter.date = { $gte: start.toISOString().split('T')[0], $lte: end.toISOString().split('T')[0] };
+        }
+
+        // Fetch events
+        let events = await Event.find(filter).populate("ticketTypes");
+
+        // If date filter is today/tomorrow/specific, double-check with JS Date (in case of string date field)
+        if (date && date !== 'all') {
+            let start, end;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (date === 'today') {
+                start = new Date(today);
+                end = new Date(today);
+                end.setHours(23, 59, 59, 999);
+            } else if (date === 'tomorrow') {
+                start = new Date(today);
+                start.setDate(start.getDate() + 1);
+                end = new Date(start);
+                end.setHours(23, 59, 59, 999);
+            } else {
+                start = new Date(date);
+                start.setHours(0, 0, 0, 0);
+                end = new Date(date);
+                end.setHours(23, 59, 59, 999);
+            }
+            events = events.filter(event => {
+                const eventDate = new Date(event.date);
+                return eventDate >= start && eventDate <= end;
+            });
+        }
+
+        // Sort by date ascending
+        events.sort((a, b) => new Date(a.date) - new Date(b.date));
+
         return res.status(200).json({
             success: true,
             message: "All events fetched successfully",
