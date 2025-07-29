@@ -216,3 +216,20 @@ exports.getUserEvents = async(req,res) => {
         })
     }
 }
+
+// Get all events
+exports.getAllEvents = async (req, res) => {
+    try {
+        const events = await Event.find().populate("ticketTypes");
+        return res.status(200).json({
+            success: true,
+            message: "All events fetched successfully",
+            body: events
+        });
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+}
