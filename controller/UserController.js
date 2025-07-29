@@ -345,6 +345,9 @@ exports.changePassword = async(req,res) => {
             })
         }
 
+        console.log("Password: ", password);
+        console.log("Confirm Password: ", confirmPassword);
+
         const hashedPassword = await bcrypt.hash(password, 10);
         user.password = hashedPassword;
         await user.save();
