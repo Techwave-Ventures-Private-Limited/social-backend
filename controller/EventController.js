@@ -173,7 +173,7 @@ exports.getEvent = async(req,res) => {
             })
         }
 
-        const event = await Event.findById(eventId).populate("ticketPlan");
+        const event = await Event.findById(eventId).populate("ticketTypes");
 
         return res.status(200).json({
             success:false,
