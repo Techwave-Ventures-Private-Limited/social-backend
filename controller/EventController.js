@@ -5,12 +5,18 @@ const {uploadImageToCloudinary} = require("../utils/imageUploader")
 
 exports.createEvent = async(req,res) => {
     try{
-
         const eventObject = req.body;
-
         const userId = req.userId;
-        eventObject.userId = userId;
-        
+        eventObject.createdBy = userId;
+        eventObject.organizerId = eventObject.organizerId || userId;
+        // Remove deprecated/old fields if present
+        delete eventObject.userId;
+        delete eventObject.isEventOnline;
+        delete eventObject.isPaidEvent;
+        delete eventObject.des;
+        delete eventObject.ticketPlan;
+
+        // Validate required fields (optional: add more validation as needed)
         const user = await User.findById(userId);
         if(!user) {
             return res.status(400).json({
@@ -19,21 +25,104 @@ exports.createEvent = async(req,res) => {
             })
         }
 
-        const banner = req.files.banner;
+        // Handle banner upload
+        let bannerUrl = eventObject.banner;
+        if (req.files && req.files.banner) {
+            const image = await uploadImageToCloudinary(
+                req.files.banner,
+                process.env.FOLDER_NAME,
+                1000,
+                1000
+            );
+            bannerUrl = image.secure_url;
+        }
+        eventObject.banner = bannerUrl;
 
-        const image = await uploadImageToCloudinary(
-                    banner,
-                    process.env.FOLDER_NAME,
-                    1000,
-                    1000
-        )
-        eventObject.banner = image.secure_url;
 
-        const ticketString = eventObject.ticketPlan;
-        const ticketList = ticketString.split(",");
-        eventObject.ticketPlan = ticketList;
+        // Handle ticketTypes (was ticketPlan)
+        if (typeof eventObject.ticketTypes === 'string') {
+            try {
+                eventObject.ticketTypes = JSON.parse(eventObject.ticketTypes);
+            } catch (error) {
+                // Fallback to comma-separated if JSON parsing fails
+                eventObject.ticketTypes = eventObject.ticketTypes.split(",");
+            }
+        }
 
+        // Handle attendees array
+        if (eventObject.attendees && typeof eventObject.attendees === 'string') {
+            try {
+                eventObject.attendees = JSON.parse(eventObject.attendees);
+            } catch (error) {
+                // If it's an empty array string, make it empty array
+                if (eventObject.attendees === '[]') {
+                    eventObject.attendees = [];
+                } else {
+                    eventObject.attendees = eventObject.attendees.split(",");
+                }
+            }
+        }
+
+        // Handle likes array
+        if (eventObject.likes && typeof eventObject.likes === 'string') {
+            try {
+                eventObject.likes = JSON.parse(eventObject.likes);
+            } catch (error) {
+                if (eventObject.likes === '[]') {
+                    eventObject.likes = [];
+                } else {
+                    eventObject.likes = eventObject.likes.split(",");
+                }
+            }
+        }
+
+        // Handle bookmarks array
+        if (eventObject.bookmarks && typeof eventObject.bookmarks === 'string') {
+            try {
+                eventObject.bookmarks = JSON.parse(eventObject.bookmarks);
+            } catch (error) {
+                if (eventObject.bookmarks === '[]') {
+                    eventObject.bookmarks = [];
+                } else {
+                    eventObject.bookmarks = eventObject.bookmarks.split(",");
+                }
+            }
+        }
+
+        // Handle tags array
+        if (eventObject.tags && typeof eventObject.tags === 'string') {
+            try {
+                eventObject.tags = JSON.parse(eventObject.tags);
+            } catch (error) {
+                eventObject.tags = eventObject.tags.split(",");
+            }
+        }
+
+        // Handle speakers array
+        if (eventObject.speakers && typeof eventObject.speakers === 'string') {
+            try {
+                eventObject.speakers = JSON.parse(eventObject.speakers);
+            } catch (error) {
+                eventObject.speakers = eventObject.speakers.split(",");
+            }
+        }
+
+        // Convert boolean strings to actual booleans
+        if (typeof eventObject.isPaid === 'string') {
+            eventObject.isPaid = eventObject.isPaid === 'true';
+        }
+        if (typeof eventObject.isOnline === 'string') {
+            eventObject.isOnline = eventObject.isOnline === 'true';
+        }
+
+        // Convert maxAttendees to number if it's a string
+        if (eventObject.maxAttendees && typeof eventObject.maxAttendees === 'string') {
+            eventObject.maxAttendees = parseInt(eventObject.maxAttendees);
+        }
+
+        // Create the event
         const createdEvent = await Event.create(eventObject);
+        if (!user.event) user.event = [];
         user.event.push(createdEvent._id);
         await user.save();
 
@@ -84,7 +173,7 @@ exports.getEvent = async(req,res) => {
             })
         }
 
-        const event = await Event.findById(eventId).populate("ticketPlan");
+        const event = await Event.findById(eventId).populate("ticketTypes");
 
         return res.status(200).json({
             success:false,
