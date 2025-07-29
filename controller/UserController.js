@@ -345,7 +345,7 @@ exports.changePassword = async(req,res) => {
             })
         }
 
-        if (password !== confirmPassword) {
+        if (password.toString() !== confirmPassword.toString()) {
             return res.status(400).json({
                 success: false,
                 message : "Password and confirm password does not match"
