@@ -336,7 +336,7 @@ exports.changePassword = async(req,res) => {
 
         const {password, confirmPassword, email} = req.body;
 
-        const user = await User.find({email: email});
+        const user = await User.find({email: email}).findOne();
 
         if (!user) {
             return res.status(400).json({
