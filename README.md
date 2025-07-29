@@ -265,6 +265,14 @@ Formdata
 * **Endponts:** `GET /news?limit={number}&category={string}`
 --- 
 
+### 20. Delete post
+* **Endpoint :** `DELETE /post/:postId`
+---
+
+### 21. DELETE Story
+* **Endpoint :** `DELETE /user/story/:storyId`
+---
+
 
 ## 🧪 Testing & Environment
 
