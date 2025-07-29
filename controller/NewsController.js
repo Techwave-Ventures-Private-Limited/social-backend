@@ -130,10 +130,13 @@ exports.getSavedNews = async(req,res) => {
         const userId = req.userId;
 
         const user = await User.findById(userId).populate("savedNews");
-
+        const news = user.savedNews.map(article => ({
+          ...article,
+          isSaved: true,
+        }));       
         return res.status(200).json({
             success: true,
-            body: user.savedNews || []
+            body: news
         })
 
     } catch(err) {
