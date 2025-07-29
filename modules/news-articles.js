@@ -18,6 +18,10 @@ const newsSchema = new mongoose.Schema({
     }],
     timestamp: {
         type: String
+    },
+    likes: {
+        type: Number,
+        default: 0
     }
 });
 

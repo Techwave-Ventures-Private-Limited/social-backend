@@ -1,68 +1,41 @@
 const mongoose = require("mongoose");
 
 const eventSchema = new mongoose.Schema({
-    title: {
+    title: { type: String, required: true },
+    description: { type: String, required: true }, // was 'des'
+    shortDescription: { type: String }, // optional
+    date: { type: String, required: true },
+    time: { type: String, required: true },
+    location: { type: String, required: true },
+    banner: { type: String, },
+    organizer: { type: String, required: true },
+    organizerId: { type: String, required: true }, // new
+    isPaid: { type: Boolean, default: true }, // was 'isPaidEvent'
+    isOnline: { type: Boolean, default: false }, // was 'isEventOnline'
+    onlineEventLink: { type: String }, // optional
+    category: {
         type: String,
+        enum: ['Workshop', 'Meetup', 'Pitch', 'Seminar', 'Hackathon', 'Webinar', 'Conference', 'Networking'],
         required: true
     },
-    des: {
-        type:String,
-        required: true
-    },
-    banner: {
-        type:String,
-        required: true
-    },
-    date: {
-        type: String, //TODO : convert to date
-        required : true
-    },
-    time: {
-        type :String,
-        required : true
-    },
-    isEventOnline:{
-        type:Boolean,
-        default : false
-    },
-    location: {
-        type:String,
-        required: true
-    },
-    organizer: {
-        type:String,
-        required: true
-    },
-    tags: [{
-        type: String
-    }],
-    speakers: [{
-        type: String,
+    ticketTypes: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "TicketPlan",
         required: true
     }],
-    isPaidEvent : {
-        type : Boolean,
-        default : true
-    },
-    ticketPlan : [{
-        type : mongoose.Schema.Types.ObjectId,
-        ref : "TicketPlan",
-        default : "",
-        required: true
+    maxAttendees: { type: Number }, // optional
+    attendees: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
     }],
-    userId : {
-        type:String
-    },
-    createAt:{
-        type:Date,
-        default:Date.now()
-    },
-    updatedAt: {
-        type:Date,
-        default:Date.now()
-    }
-
-})
+    tags: [{ type: String }],
+    speakers: [{ type: String }],
+    createdBy: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now },
+    likes: [{ type: String }], // array of user IDs
+    bookmarks: [{ type: String }], // array of user IDs
+    updatedAt: { type: Date, default: Date.now }
+});
 
 module.exports = mongoose.model("Event", eventSchema);
 
