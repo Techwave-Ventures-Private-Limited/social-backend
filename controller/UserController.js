@@ -345,13 +345,6 @@ exports.changePassword = async(req,res) => {
             })
         }
 
-        if (password.toString() !== confirmPassword.toString()) {
-            return res.status(400).json({
-                success: false,
-                message : "Password and confirm password does not match"
-            })
-        }
-
         const hashedPassword = await bcrypt.hash(password, 10);
         user.password = hashedPassword;
         await user.save();
