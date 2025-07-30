@@ -123,6 +123,7 @@ exports.createEvent = async(req,res) => {
         // Create the event
         const createdEvent = await Event.create(eventObject);
         if (!user.event) user.event = [];
+        if (!user.event) user.event = [];
         user.event.push(createdEvent._id);
         await user.save();
 

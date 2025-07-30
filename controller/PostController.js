@@ -525,3 +525,45 @@ exports.getAllPosts = async (req, res) => {
         });
     }
 };
+
+exports.deletePost = async(req,res) => {
+    try {
+
+        const userId = req.userId;
+        const postId = req.params.postId;
+
+        const post = await Post.findById(postId);
+        if (!post) {
+            return res.status(500).json({
+                success: false,
+                message: "Post not found"
+            })
+        }
+
+        if (post.userId !== userId) {
+            return res.status(401).json({
+                success: false,
+                message: "User is not owner of the post"
+            })
+        }
+
+        const user = await User.findById(userId);
+        user.posts = user.posts.filter(
+            (userPostId) => userPostId.toString() !== postId.toString()
+        );
+        await user.save();
+
+        await Post.findByIdAndDelete(postId);
+
+        return res.status(200).json({
+            success: true,
+            message: "Post deleted successfully"
+        })
+
+    } catch(err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
