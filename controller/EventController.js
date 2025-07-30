@@ -97,6 +97,10 @@ exports.createEvent = async(req,res) => {
                 eventObject.tags = eventObject.tags.split(",");
             }
         }
+        // Ensure tags is an array
+        if (!eventObject.tags || !Array.isArray(eventObject.tags)) {
+            eventObject.tags = [];
+        }
 
         // Handle speakers array
         if (eventObject.speakers && typeof eventObject.speakers === 'string') {
@@ -244,6 +248,7 @@ exports.getAllEvents = async (req, res) => {
             let start, end;
             const today = new Date();
             today.setHours(0, 0, 0, 0);
+            
             if (date === 'today') {
                 start = new Date(today);
                 end = new Date(today);
@@ -253,6 +258,25 @@ exports.getAllEvents = async (req, res) => {
                 start.setDate(start.getDate() + 1);
                 end = new Date(start);
                 end.setHours(23, 59, 59, 999);
+            } else if (date === 'thisWeek') {
+                // Get start of current week (Sunday)
+                const dayOfWeek = today.getDay();
+                start = new Date(today);
+                start.setDate(today.getDate() - dayOfWeek);
+                start.setHours(0, 0, 0, 0);
+                
+                // Get end of current week (Saturday)
+                end = new Date(start);
+                end.setDate(start.getDate() + 6);
+                end.setHours(23, 59, 59, 999);
+            } else if (date === 'thisMonth') {
+                // Get start of current month
+                start = new Date(today.getFullYear(), today.getMonth(), 1);
+                start.setHours(0, 0, 0, 0);
+                
+                // Get end of current month
+                end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                end.setHours(23, 59, 59, 999);
             } else {
                 // Specific date (YYYY-MM-DD)
                 start = new Date(date);
@@ -260,6 +284,7 @@ exports.getAllEvents = async (req, res) => {
                 end = new Date(date);
                 end.setHours(23, 59, 59, 999);
             }
+            
             // Event date is stored as string, so filter in-memory after fetching
             filter.date = { $gte: start.toISOString().split('T')[0], $lte: end.toISOString().split('T')[0] };
         }
@@ -272,6 +297,7 @@ exports.getAllEvents = async (req, res) => {
             let start, end;
             const today = new Date();
             today.setHours(0, 0, 0, 0);
+            
             if (date === 'today') {
                 start = new Date(today);
                 end = new Date(today);
@@ -281,12 +307,32 @@ exports.getAllEvents = async (req, res) => {
                 start.setDate(start.getDate() + 1);
                 end = new Date(start);
                 end.setHours(23, 59, 59, 999);
+            } else if (date === 'thisWeek') {
+                // Get start of current week (Sunday)
+                const dayOfWeek = today.getDay();
+                start = new Date(today);
+                start.setDate(today.getDate() - dayOfWeek);
+                start.setHours(0, 0, 0, 0);
+                
+                // Get end of current week (Saturday)
+                end = new Date(start);
+                end.setDate(start.getDate() + 6);
+                end.setHours(23, 59, 59, 999);
+            } else if (date === 'thisMonth') {
+                // Get start of current month
+                start = new Date(today.getFullYear(), today.getMonth(), 1);
+                start.setHours(0, 0, 0, 0);
+                
+                // Get end of current month
+                end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                end.setHours(23, 59, 59, 999);
             } else {
                 start = new Date(date);
                 start.setHours(0, 0, 0, 0);
                 end = new Date(date);
                 end.setHours(23, 59, 59, 999);
             }
+            
             events = events.filter(event => {
                 const eventDate = new Date(event.date);
                 return eventDate >= start && eventDate <= end;
