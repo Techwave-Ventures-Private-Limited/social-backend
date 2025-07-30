@@ -124,3 +124,40 @@ exports.getCurrentStory = async(req,res) => {
     })
   }
 }
+
+exports.deleteStory = async(req,res) => {
+  try {
+    
+    const userId = req.userId;
+    const storyId = req.params.storyId;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message:"User not found"
+      })
+    }
+
+
+    
+    user.stories = user.stories.filter( 
+      (story) => story.toString() !== storyId 
+    )
+
+    await user.save();
+
+    await Story.findByIdAndDelete(storyId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Story deleted successfully"
+    })
+
+  } catch(err) {
+    return res.status(500).json({
+      success:false,
+      message: err.message
+    })
+  }
+}

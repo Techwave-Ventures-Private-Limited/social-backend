@@ -11,6 +11,7 @@ const postRouter = require("./route/postRoute");
 const eventRouter = require("./route/eventRoute");
 const showcaseRouter = require("./route/showcaseRoute");
 const newsRouter = require("./route/newsRoute");
+const searchRouter = require("./route/searchRoute");
 
 const {cloudinaryConnect} = require("./config/cloudinary");
 
@@ -41,6 +42,7 @@ app.use("/post", postRouter);
 app.use("/event", eventRouter);
 app.use("/showcase", showcaseRouter);
 app.use("/news", newsRouter);
+app.use("/search", searchRouter);
 app.use("/hailing",(req,res)=>{
     return res.status(200).json({
         success:true,
