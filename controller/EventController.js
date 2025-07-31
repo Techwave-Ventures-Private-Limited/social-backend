@@ -1,3 +1,4 @@
+const puppeteer = require("puppeteer");
 const Event = require("../modules/event");
 const User = require("../modules/user");
 const Ticket = require("../modules/ticketPlan");
@@ -484,7 +485,7 @@ exports.generateEventTicket = async (req, res) => {
 
         // Find the event
         const event = await Event.findById(eventId).populate("ticketTypes");
-        
+
         if (!event) {
             return res.status(404).json({
                 success: false,
@@ -503,8 +504,8 @@ exports.generateEventTicket = async (req, res) => {
 
         // Generate ticket ID
         const ticketId = `${eventId}-${attendee.name.toLowerCase().replace(/\s+/g, '')}`;
-        
-        // Format date
+
+        // Format date and time
         const eventDate = new Date(event.date);
         const formattedDate = eventDate.toLocaleDateString('en-US', {
             weekday: 'long',
@@ -512,8 +513,6 @@ exports.generateEventTicket = async (req, res) => {
             month: 'long',
             day: 'numeric'
         });
-
-        // Format time
         const eventTime = event.time || "10:00 AM";
 
         // Prepare ticket data
@@ -525,25 +524,28 @@ exports.generateEventTicket = async (req, res) => {
             attendeeName: attendee.name,
             attendeeEmail: attendee.email,
             ticketId: ticketId,
-            ticketType: event.ticketTypes && event.ticketTypes.length > 0 ? event.ticketTypes[0].name : "General",
+            ticketType: event.ticketTypes?.[0]?.name || "General",
             qrCodeData: ticketId
         };
 
+        // Generate HTML and PDF
         const htmlContent = eventTicketTemplate(ticketData);
+        const browser = await puppeteer.launch();
+        const page = await browser.newPage();
+        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+        const pdfBuffer = await page.pdf({ format: 'A4' });
+        await browser.close();
 
-        return res.status(200).json({
-            success: true,
-            message: "Event ticket generated successfully",
-            body: {
-                html: htmlContent,
-                ticketData: ticketData
-            }
-        });
-        
+        // Set headers and send the PDF
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="ticket-${ticketId}.pdf"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+        return res.end(pdfBuffer); // Send PDF and end the response
+
     } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
         });
     }
-}
+};
