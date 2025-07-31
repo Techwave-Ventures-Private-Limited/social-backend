@@ -1,7 +1,9 @@
+const pdf = require('html-pdf-node');
 const Event = require("../modules/event");
 const User = require("../modules/user");
 const Ticket = require("../modules/ticketPlan");
-const {uploadImageToCloudinary} = require("../utils/imageUploader")
+const {uploadImageToCloudinary} = require("../utils/imageUploader");
+const { eventTicketTemplate } = require("../utils/eventTicketTemplate");
 
 exports.createEvent = async(req,res) => {
     try{
@@ -97,6 +99,10 @@ exports.createEvent = async(req,res) => {
                 eventObject.tags = eventObject.tags.split(",");
             }
         }
+        // Ensure tags is an array
+        if (!eventObject.tags || !Array.isArray(eventObject.tags)) {
+            eventObject.tags = [];
+        }
 
         // Handle speakers array
         if (eventObject.speakers && typeof eventObject.speakers === 'string') {
@@ -122,6 +128,7 @@ exports.createEvent = async(req,res) => {
 
         // Create the event
         const createdEvent = await Event.create(eventObject);
+        if (!user.event) user.event = [];
         if (!user.event) user.event = [];
         user.event.push(createdEvent._id);
         await user.save();
@@ -243,6 +250,7 @@ exports.getAllEvents = async (req, res) => {
             let start, end;
             const today = new Date();
             today.setHours(0, 0, 0, 0);
+            
             if (date === 'today') {
                 start = new Date(today);
                 end = new Date(today);
@@ -252,6 +260,25 @@ exports.getAllEvents = async (req, res) => {
                 start.setDate(start.getDate() + 1);
                 end = new Date(start);
                 end.setHours(23, 59, 59, 999);
+            } else if (date === 'thisWeek') {
+                // Get start of current week (Sunday)
+                const dayOfWeek = today.getDay();
+                start = new Date(today);
+                start.setDate(today.getDate() - dayOfWeek);
+                start.setHours(0, 0, 0, 0);
+                
+                // Get end of current week (Saturday)
+                end = new Date(start);
+                end.setDate(start.getDate() + 6);
+                end.setHours(23, 59, 59, 999);
+            } else if (date === 'thisMonth') {
+                // Get start of current month
+                start = new Date(today.getFullYear(), today.getMonth(), 1);
+                start.setHours(0, 0, 0, 0);
+                
+                // Get end of current month
+                end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                end.setHours(23, 59, 59, 999);
             } else {
                 // Specific date (YYYY-MM-DD)
                 start = new Date(date);
@@ -259,6 +286,7 @@ exports.getAllEvents = async (req, res) => {
                 end = new Date(date);
                 end.setHours(23, 59, 59, 999);
             }
+            
             // Event date is stored as string, so filter in-memory after fetching
             filter.date = { $gte: start.toISOString().split('T')[0], $lte: end.toISOString().split('T')[0] };
         }
@@ -271,6 +299,7 @@ exports.getAllEvents = async (req, res) => {
             let start, end;
             const today = new Date();
             today.setHours(0, 0, 0, 0);
+            
             if (date === 'today') {
                 start = new Date(today);
                 end = new Date(today);
@@ -280,12 +309,32 @@ exports.getAllEvents = async (req, res) => {
                 start.setDate(start.getDate() + 1);
                 end = new Date(start);
                 end.setHours(23, 59, 59, 999);
+            } else if (date === 'thisWeek') {
+                // Get start of current week (Sunday)
+                const dayOfWeek = today.getDay();
+                start = new Date(today);
+                start.setDate(today.getDate() - dayOfWeek);
+                start.setHours(0, 0, 0, 0);
+                
+                // Get end of current week (Saturday)
+                end = new Date(start);
+                end.setDate(start.getDate() + 6);
+                end.setHours(23, 59, 59, 999);
+            } else if (date === 'thisMonth') {
+                // Get start of current month
+                start = new Date(today.getFullYear(), today.getMonth(), 1);
+                start.setHours(0, 0, 0, 0);
+                
+                // Get end of current month
+                end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                end.setHours(23, 59, 59, 999);
             } else {
                 start = new Date(date);
                 start.setHours(0, 0, 0, 0);
                 end = new Date(date);
                 end.setHours(23, 59, 59, 999);
             }
+            
             events = events.filter(event => {
                 const eventDate = new Date(event.date);
                 return eventDate >= start && eventDate <= end;
@@ -307,3 +356,189 @@ exports.getAllEvents = async (req, res) => {
         });
     }
 }
+
+// Book a ticket for an event
+exports.bookTicket = async (req, res) => {
+    try {
+        const { eventId, ticketTypeId, name, email, phone } = req.body;
+        if (!eventId || !ticketTypeId || !name || !email) {
+            return res.status(400).json({
+                success: false,
+                message: "Missing required fields (eventId, ticketTypeId, name, email)"
+            });
+        }
+
+        // Find the event
+        const event = await Event.findById(eventId).populate("ticketTypes");
+        if (!event) {
+            return res.status(404).json({
+                success: false,
+                message: "Event not found"
+            });
+        }
+
+        // Find the ticket type
+        const ticketType = event.ticketTypes.find(t => t._id.toString() === ticketTypeId);
+        if (!ticketType) {
+            return res.status(404).json({
+                success: false,
+                message: "Ticket type not found for this event"
+            });
+        }
+
+        // Check if tickets are available
+        if (ticketType.remTicket <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: "No tickets available for this type"
+            });
+        }
+
+        // Add attendee to event (if not already present)
+        if (!event.attendees) event.attendees = [];
+        const alreadyBooked = event.attendees.some(att => att.email === email);
+        if (alreadyBooked) {
+            return res.status(400).json({
+                success: false,
+                message: "This email has already booked a ticket for this event"
+            });
+        }
+        event.attendees.push({ name, email, phone });
+
+        // Decrement ticket count
+        ticketType.remTicket -= 1;
+
+        // Save changes
+        await event.save();
+        await ticketType.save && (await ticketType.save()); // In case ticketType is a mongoose doc
+
+        return res.status(200).json({
+            success: true,
+            message: "Ticket booked successfully",
+            body: {
+                event,
+                ticketType
+            }
+        });
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+}
+
+exports.getUserBookedEvents = async (req, res) => {
+    try {
+        const userId = req.userId;
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                message: "User ID is required"
+            });
+        }
+
+        // Find the user and get their email
+        const user = await User.findById(userId).select('email');
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        // Find events where the user is an attendee
+        const events = await Event.find({ "attendees.email": user.email }).populate("ticketTypes");
+
+        return res.status(200).json({
+            success: true,
+            message: "User booked events fetched successfully",
+            body: events
+        });
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+}
+
+// Generate event ticket HTML
+exports.generateEventTicketPDF = async (req, res) => {
+    try {
+        const { eventId, attendeeEmail } = req.params;
+        const token = req.headers.token;
+
+        if (!eventId || !attendeeEmail) {
+            return res.status(400).json({
+                success: false,
+                message: "Event ID and attendee email are required"
+            });
+        }
+
+        if (!token) {
+            return res.status(401).json({
+                success: false,
+                message: "Authentication token required"
+            });
+        }
+
+        // Find the event
+        const event = await Event.findById(eventId).populate("ticketTypes");
+        if (!event) {
+            return res.status(404).json({
+                success: false,
+                message: "Event not found"
+            });
+        }
+
+        // Find the attendee
+        const attendee = event.attendees.find(att => att.email === attendeeEmail);
+        if (!attendee) {
+            return res.status(404).json({
+                success: false,
+                message: "Attendee not found for this event"
+            });
+        }
+
+        // Prepare ticket data (same as before)
+        const ticketId = `${eventId}-${attendee.name.toLowerCase().replace(/\\s+/g, '')}`;
+        const eventDate = new Date(event.date);
+        const formattedDate = eventDate.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+        const eventTime = event.time || "10:00 AM";
+        const ticketData = {
+            eventTitle: event.title,
+            eventDate: formattedDate,
+            eventTime: eventTime,
+            eventLocation: event.location || "Tech Hub, Bangalore",
+            attendeeName: attendee.name,
+            attendeeEmail: attendee.email,
+            ticketId: ticketId,
+            ticketType: event.ticketTypes && event.ticketTypes.length > 0 ? event.ticketTypes[0].name : "General",
+            qrCodeData: ticketId
+        };
+
+        // Generate HTML
+        const htmlContent = eventTicketTemplate(ticketData);
+
+        // Generate PDF
+        const file = { content: htmlContent };
+        const pdfBuffer = await pdf.generatePdf(file, { format: 'A4' });
+
+        res.set({
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename=\"ticket-${ticketId}.pdf\"`
+        });
+        res.send(pdfBuffer);
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};

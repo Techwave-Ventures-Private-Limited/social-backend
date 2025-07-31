@@ -25,8 +25,9 @@ const eventSchema = new mongoose.Schema({
     }],
     maxAttendees: { type: Number }, // optional
     attendees: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User"
+        name: String,
+        email: String,
+        phone: String
     }],
     tags: [{ type: String }],
     speakers: [{ type: String }],
