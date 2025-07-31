@@ -54,6 +54,57 @@ exports.getUser = async(req,res) => {
     }
 }
 
+exports.getAnotherUser = async(req,res) => {
+    try{
+        const userId = req.params.userId;
+        const currUserId = req.userId;
+
+
+        if(!userId) {
+            return res.status(400).json({
+                success:false,
+                message:"Unauthorized request"
+            })
+        } 
+
+        const user = await User.findById(userId)
+            .populate({
+                path: 'about',
+                populate: [
+                    { path: 'education' },
+                    { path: 'experience' }
+                ]
+            })
+            .populate('education')
+            .populate('experience')
+            .lean();
+
+        if(!user) {
+            return res.status(402).json({
+                success:false,
+                message:"User not found"
+            })
+        }
+
+        const currUser = await User.findById(currUserId);
+        if (currUser.following.includes(user._id)) {
+            user.isFollowing = true;
+        }
+
+        return res.status(200).json({
+            success:true,
+            message:"User found",
+            body: user
+        })
+
+    } catch(err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
+
 exports.updateUser = async(req,res) => {
     try{
         const userId = req.userId;
