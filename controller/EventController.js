@@ -1,4 +1,4 @@
-const puppeteer = require("puppeteer");
+const pdf = require('html-pdf-node');
 const Event = require("../modules/event");
 const User = require("../modules/user");
 const Ticket = require("../modules/ticketPlan");
@@ -464,7 +464,7 @@ exports.getUserBookedEvents = async (req, res) => {
 }
 
 // Generate event ticket HTML
-exports.generateEventTicket = async (req, res) => {
+exports.generateEventTicketPDF = async (req, res) => {
     try {
         const { eventId, attendeeEmail } = req.params;
         const token = req.headers.token;
@@ -485,7 +485,6 @@ exports.generateEventTicket = async (req, res) => {
 
         // Find the event
         const event = await Event.findById(eventId).populate("ticketTypes");
-
         if (!event) {
             return res.status(404).json({
                 success: false,
@@ -502,10 +501,8 @@ exports.generateEventTicket = async (req, res) => {
             });
         }
 
-        // Generate ticket ID
-        const ticketId = `${eventId}-${attendee.name.toLowerCase().replace(/\s+/g, '')}`;
-
-        // Format date and time
+        // Prepare ticket data (same as before)
+        const ticketId = `${eventId}-${attendee.name.toLowerCase().replace(/\\s+/g, '')}`;
         const eventDate = new Date(event.date);
         const formattedDate = eventDate.toLocaleDateString('en-US', {
             weekday: 'long',
@@ -514,8 +511,6 @@ exports.generateEventTicket = async (req, res) => {
             day: 'numeric'
         });
         const eventTime = event.time || "10:00 AM";
-
-        // Prepare ticket data
         const ticketData = {
             eventTitle: event.title,
             eventDate: formattedDate,
@@ -524,24 +519,22 @@ exports.generateEventTicket = async (req, res) => {
             attendeeName: attendee.name,
             attendeeEmail: attendee.email,
             ticketId: ticketId,
-            ticketType: event.ticketTypes?.[0]?.name || "General",
+            ticketType: event.ticketTypes && event.ticketTypes.length > 0 ? event.ticketTypes[0].name : "General",
             qrCodeData: ticketId
         };
 
-        // Generate HTML and PDF
+        // Generate HTML
         const htmlContent = eventTicketTemplate(ticketData);
-        const browser = await puppeteer.launch();
-        const page = await browser.newPage();
-        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-        const pdfBuffer = await page.pdf({ format: 'A4' });
-        await browser.close();
 
-        // Set headers and send the PDF
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="ticket-${ticketId}.pdf"`);
-        res.setHeader('Content-Length', pdfBuffer.length);
-        return res.end(pdfBuffer); // Send PDF and end the response
+        // Generate PDF
+        const file = { content: htmlContent };
+        const pdfBuffer = await pdf.generatePdf(file, { format: 'A4' });
 
+        res.set({
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename=\"ticket-${ticketId}.pdf\"`
+        });
+        res.send(pdfBuffer);
     } catch (err) {
         return res.status(500).json({
             success: false,
