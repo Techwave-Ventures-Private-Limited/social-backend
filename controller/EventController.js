@@ -1,7 +1,8 @@
 const Event = require("../modules/event");
 const User = require("../modules/user");
 const Ticket = require("../modules/ticketPlan");
-const {uploadImageToCloudinary} = require("../utils/imageUploader")
+const {uploadImageToCloudinary} = require("../utils/imageUploader");
+const { eventTicketTemplate } = require("../utils/eventTicketTemplate");
 
 exports.createEvent = async(req,res) => {
     try{
@@ -453,6 +454,92 @@ exports.getUserBookedEvents = async (req, res) => {
             message: "User booked events fetched successfully",
             body: events
         });
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+}
+
+// Generate event ticket HTML
+exports.generateEventTicket = async (req, res) => {
+    try {
+        const { eventId, attendeeEmail } = req.params;
+        const token = req.headers.token;
+
+        if (!eventId || !attendeeEmail) {
+            return res.status(400).json({
+                success: false,
+                message: "Event ID and attendee email are required"
+            });
+        }
+
+        if (!token) {
+            return res.status(401).json({
+                success: false,
+                message: "Authentication token required"
+            });
+        }
+
+        // Find the event
+        const event = await Event.findById(eventId).populate("ticketTypes");
+        
+        if (!event) {
+            return res.status(404).json({
+                success: false,
+                message: "Event not found"
+            });
+        }
+
+        // Find the attendee
+        const attendee = event.attendees.find(att => att.email === attendeeEmail);
+        if (!attendee) {
+            return res.status(404).json({
+                success: false,
+                message: "Attendee not found for this event"
+            });
+        }
+
+        // Generate ticket ID
+        const ticketId = `${eventId}-${attendee.name.toLowerCase().replace(/\s+/g, '')}`;
+        
+        // Format date
+        const eventDate = new Date(event.date);
+        const formattedDate = eventDate.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        // Format time
+        const eventTime = event.time || "10:00 AM";
+
+        // Prepare ticket data
+        const ticketData = {
+            eventTitle: event.title,
+            eventDate: formattedDate,
+            eventTime: eventTime,
+            eventLocation: event.location || "Tech Hub, Bangalore",
+            attendeeName: attendee.name,
+            attendeeEmail: attendee.email,
+            ticketId: ticketId,
+            ticketType: event.ticketTypes && event.ticketTypes.length > 0 ? event.ticketTypes[0].name : "General",
+            qrCodeData: ticketId
+        };
+
+        const htmlContent = eventTicketTemplate(ticketData);
+
+        return res.status(200).json({
+            success: true,
+            message: "Event ticket generated successfully",
+            body: {
+                html: htmlContent,
+                ticketData: ticketData
+            }
+        });
+        
     } catch (err) {
         return res.status(500).json({
             success: false,
