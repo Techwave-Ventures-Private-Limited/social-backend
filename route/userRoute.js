@@ -4,12 +4,13 @@ const router = express.Router();
 const {getUser, updateUser, uploadProfileImage, sendForgotPasswordEmail, verifyForgotPasswordOtp, changePassword, uploadBannerImage, getAnotherUser} = require("../controller/UserController");
 const {createStory, getFollowingStories, getCurrentStory, deleteStory} = require("../controller/StoryController");
 const {auth}  = require("../middleware/authMiddleware");
-const { followUser } = require("../controller/FollowController");
+const { followUser, unFollowUser } = require("../controller/FollowController");
 
 router.get("/getUser", auth, getUser);
 router.get("/:userId", auth, getAnotherUser);
 router.post("/update", auth, updateUser);
 router.post("/follow", auth, followUser);
+router.post("/unfollow", auth, unFollowUser);
 router.post("/uploadProfileImage", auth, uploadProfileImage);
 router.post("/upload/story", auth, createStory);
 router.get("/story", auth, getFollowingStories);
