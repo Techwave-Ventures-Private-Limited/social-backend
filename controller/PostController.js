@@ -567,3 +567,67 @@ exports.deletePost = async(req,res) => {
         })
     }
 }
+
+exports.editPost = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { postId, discription, postType } = req.body;
+
+        if (!postId) {
+            return res.status(400).json({
+                success: false,
+                message: "PostId is required"
+            });
+        }
+
+        const post = await Post.findById(postId);
+
+        if (!post) {
+            return res.status(404).json({
+                success: false,
+                message: "Post not found"
+            });
+        }
+
+        if (post.userId.toString() !== userId) {
+            return res.status(403).json({
+                success: false,
+                message: "You are not authorized to edit this post"
+            });
+        }
+
+        if (discription !== undefined) post.discription = discription;
+        if (postType !== undefined) post.postType = postType;
+
+        let files = req.files && req.files.media;
+        let mediaUrls = [];
+        if (files) {
+            files = Array.isArray(files) ? files : [files];
+            for (const file of files) {
+                const isVideo = file.mimetype.startsWith("video");
+                if (isVideo) {
+                    const uploadedVideo = await uploadVideoToCloudinary(file, process.env.FOLDER_NAME || "post", "auto");
+                    mediaUrls.push(uploadedVideo.secure_url);
+                } else {
+                    const uploadedImage = await uploadImageToCloudinary(file, process.env.FOLDER_NAME || "post");
+                    mediaUrls.push(uploadedImage.secure_url);
+                }
+            }
+            post.media = mediaUrls;
+        }
+
+        await post.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Post updated successfully",
+            body: post
+        });
+
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};
