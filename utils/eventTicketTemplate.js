@@ -1,4 +1,4 @@
- const eventTicketTemplate = (eventData) => {
+const eventTicketTemplate = (eventData) => {
     const {
         eventTitle = "React Native Workshop",
         eventDate = "Friday, December 15, 2023",
@@ -258,4 +258,4 @@
 </html>`;
 };
 
-module.exports = { eventTicketTemplate }; 
+module.exports = { eventTicketTemplate };
