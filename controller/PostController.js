@@ -6,7 +6,8 @@ const { uploadMultipleImagesToCloudinary, uploadVideoToCloudinary, uploadImageTo
 exports.createPost = async (req, res) => {
     try {
 
-        const { discription, postType } = req.body;
+        const { discription, postType, originalPostId } = req.body || "";
+        const { isReposted } = req.body || false;
         const userId = req.userId;
         // console.log("User request to upload a post", req.body)
         // Accept multiple files (media)
@@ -43,11 +44,15 @@ exports.createPost = async (req, res) => {
             })
         }
 
+        
         const createdPost = await Post.create({
             discription,
             media: mediaUrls,
             postType,
-            userId
+            userId,
+            user,
+            originalPostId,
+            isReposted
         });
         user.posts.push(createdPost._id);
         await user.save();
@@ -415,7 +420,8 @@ exports.getAllPosts = async (req, res) => {
                         { path: 'experience', model: 'Experience' }
                     ]
                 })
-                .populate('comments');
+                .populate('comments')
+                .pupulate("originalPostId");
         } else if (filter == 1) {
             posts = await Post.find()
                 .sort({ createdAt: -1 })
@@ -428,7 +434,8 @@ exports.getAllPosts = async (req, res) => {
                         { path: 'experience', model: 'Experience' }
                     ]
                 })
-                .populate('comments');
+                .populate('comments')
+                .populate("originalPostId");
         }
 
         // Get current user for isBookmarked and isFollowing
