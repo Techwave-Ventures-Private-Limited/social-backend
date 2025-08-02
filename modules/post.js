@@ -29,8 +29,8 @@ const postSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId
     },
     originalPostId: {
-        type: String,
-        default : ""
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Post"
     },
     isReposted: {
         type: Boolean,

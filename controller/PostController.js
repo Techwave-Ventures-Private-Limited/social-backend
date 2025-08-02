@@ -407,11 +407,23 @@ exports.replyToComment = async (req, res) => {
 exports.getAllPosts = async (req, res) => {
     try {
         const filter = req.query.filter;
-        let posts;
+        const sortOption = filter == 1 ? { createdAt: -1 } : {};
         
-        if (filter == 0) {
-            posts = await Post.find()
-                .populate({
+        let posts = await Post.find({})
+            .sort(sortOption)
+            .populate({
+                path: 'userId',
+                model: 'User',
+                populate: [
+                    { path: 'about', model: 'About' },
+                    { path: 'education', model: 'Education' },
+                    { path: 'experience', model: 'Experience' }
+                ]
+            })
+            .populate('comments')
+            .populate({
+                path: 'originalPostId',
+                populate: {
                     path: 'userId',
                     model: 'User',
                     populate: [
@@ -419,109 +431,16 @@ exports.getAllPosts = async (req, res) => {
                         { path: 'education', model: 'Education' },
                         { path: 'experience', model: 'Experience' }
                     ]
-                })
-                .populate('comments')
-                .pupulate("originalPostId");
-        } else if (filter == 1) {
-            posts = await Post.find()
-                .sort({ createdAt: -1 })
-                .populate({
-                    path: 'userId',
-                    model: 'User',
-                    populate: [
-                        { path: 'about', model: 'About' },
-                        { path: 'education', model: 'Education' },
-                        { path: 'experience', model: 'Experience' }
-                    ]
-                })
-                .populate('comments')
-                .populate("originalPostId");
-        }
+                }
+            });
 
-        // Get current user for isBookmarked and isFollowing
-        let currentUser = null;
-        if (req.userId) {
-            currentUser = await User.findById(req.userId);
-        }
+        const currentUser = req.userId ? await User.findById(req.userId) : null;
 
-        const formattedPosts = posts.map(post => {
-            // Determine isBookmarked
-            let isBookmarked = false;
-            if (currentUser && currentUser.savedPost) {
-                isBookmarked = currentUser.savedPost.some(
-                    savedId => savedId.toString() === post._id.toString()
-                );
-            }
-
-            let isLiked = currentUser.likedPost.includes(post._id);
-
-            // Map author (user) to full User interface
-            const author = post.userId;
-          
-            
-            // Handle case where author might not be populated
-            if (!author) {
-                console.log('Author not found for post:', post._id);
-                return null; // Skip this post or handle as needed
-            }
-
-            let about = author.about || {};
-            let education = author.education || [];
-            let experience = author.experience || [];
-            let skills = (about.skills && Array.isArray(about.skills)) ? about.skills : [];
-
-            // Followers/following count
-            const followers = author.followers ? author.followers.length : 0;
-            const following = author.following ? author.following.length : 0;
-
-            // isFollowing: is currentUser following this author?
-            let isFollowing = false;
-            if (currentUser && author.followers) {
-                isFollowing = author.followers.some(f => f.toString() === currentUser._id.toString());
-            }
-
-            return {
-                id: post._id,
-                author: {
-                    id: author._id,
-                    name: author.name,
-                    username: null, // not in schema
-                    email: author.email,
-                    avatar: author.profileImage || null,
-                    coverImage: null, // not in schema
-                    headline: about.headline || null,
-                    bio: author.bio || null,
-                    location: about.location || null,
-                    website: about.website || null,
-                    joinedDate: author.createAt ? author.createAt.toISOString() : null,
-                    followers,
-                    following,
-                    streak: null, // not in schema
-                    lastStoryDate: null, // not in schema
-                    isFollowing,
-                    profileViews: null, // not in schema
-                    education,
-                    experience,
-                    skills,
-                    phone: about.phone || null,
-                    socialLinks: [], // not in schema
-                    isCounselor: false, // not in schema
-                    counselorInfo: null // not in schema
-                },
-                content: post.discription,
-                images: post.media,
-                createdAt: post.createdAt,
-                likes: post.likes,
-                comments: post.comments.length,
-                isLiked,
-                isBookmarked,
-                commentsList: post.comments
-            };
-        }).filter(post => post !== null); // Remove any null posts
+        const formattedPosts = await Promise.all(posts.map(post => formatPost(post, currentUser)));
 
         return res.status(200).json({
             success: true,
-            body: formattedPosts
+            body: formattedPosts.filter(Boolean)
         });
 
     } catch (err) {
@@ -532,6 +451,69 @@ exports.getAllPosts = async (req, res) => {
         });
     }
 };
+
+
+const formatPost = (post, currentUser = null) => {
+    if (!post || !post.userId) return null;
+
+    const author = post.userId;
+    const about = author.about || {};
+    const education = author.education || [];
+    const experience = author.experience || [];
+    const skills = Array.isArray(about.skills) ? about.skills : [];
+
+    const followers = Array.isArray(author.followers) ? author.followers.length : 0;
+    const following = Array.isArray(author.following) ? author.following.length : 0;
+
+    const isFollowing = currentUser?.followers?.some(f => f.toString() === author._id.toString()) || false;
+    const isBookmarked = currentUser?.savedPost?.some(id => id.toString() === post._id.toString()) || false;
+    const isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
+
+    let originalPost = null;
+    if (post.originalPostId) {
+        originalPost = formatPost(post.originalPostId, currentUser);
+    }
+
+    return {
+        id: post._id,
+        author: {
+            id: author._id,
+            name: author.name,
+            username: null,
+            email: author.email,
+            avatar: author.profileImage || null,
+            coverImage: null,
+            headline: about.headline || null,
+            bio: author.bio || null,
+            location: about.location || null,
+            website: about.website || null,
+            joinedDate: author.createdAt ? author.createdAt.toISOString() : null,
+            followers,
+            following,
+            streak: null,
+            lastStoryDate: null,
+            isFollowing,
+            profileViews: null,
+            education,
+            experience,
+            skills,
+            phone: about.phone || null,
+            socialLinks: [],
+            isCounselor: false,
+            counselorInfo: null
+        },
+        content: post.discription,
+        images: post.media || [],
+        createdAt: post.createdAt,
+        likes: post.likes,
+        comments: post.comments?.length || 0,
+        isLiked,
+        isBookmarked,
+        commentsList: post.comments || [],
+        originalPost
+    };
+};
+
 
 exports.formatPost = (posts, currentUser) => {
     const formattedPosts = posts.map(post => {
@@ -610,6 +592,7 @@ exports.formatPost = (posts, currentUser) => {
         }).filter(post => post !== null); // Remove any null posts
         return formattedPosts;
 }
+
 
 exports.deletePost = async(req,res) => {
     try {
