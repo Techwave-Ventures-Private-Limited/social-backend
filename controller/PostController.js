@@ -510,7 +510,8 @@ const formatPost = (post, currentUser = null) => {
         isLiked,
         isBookmarked,
         commentsList: post.comments || [],
-        originalPost
+        originalPost,
+        isReposted: post.isReposted
     };
 };
 
