@@ -176,8 +176,8 @@ exports.updateUser = async(req,res) => {
         const experienceIds = [];
         for (const exp of experience) {
             let expDoc;
-            const startDate = exp.startDate ? new Date(exp.startDate) : null;
-            const endDate = exp.endDate ? new Date(exp.endDate) : null;
+            const startDate = exp.startDate ? new Date(exp.startDate) : new Date();
+            const endDate = exp.endDate ? new Date(exp.endDate) : new Date();
             if (exp.id && mongoose.Types.ObjectId.isValid(exp.id)) {
                 expDoc = await Experience.findByIdAndUpdate(
                     exp.id,
