@@ -142,8 +142,8 @@ exports.updateUser = async(req,res) => {
         const educationIds = [];
         for (const edu of education) {
             let eduDoc;
-            const startDate = edu.startDate ? new Date(edu.startDate) : null;
-            const endDate = edu.endDate ? new Date(edu.endDate) : null;
+            const startDate = edu.startDate ? new Date(edu.startDate) : new Date();
+            const endDate = edu.endDate && edu.endDate !== "Present" ? new Date(edu.endDate) : new Date();
             if (edu.id && mongoose.Types.ObjectId.isValid(edu.id)) {
                 eduDoc = await Education.findByIdAndUpdate(
                     edu.id,
@@ -152,6 +152,7 @@ exports.updateUser = async(req,res) => {
                         school: edu.institution,
                         fos: edu.field,
                         degree: edu.degree,
+                        current: edu.current,
                         startDate,
                         endDate
                     },
@@ -163,6 +164,7 @@ exports.updateUser = async(req,res) => {
                     school: edu.institution,
                     fos: edu.field,
                     degree: edu.degree,
+                    current: edu.current,
                     startDate,
                     endDate
                 });
@@ -177,7 +179,7 @@ exports.updateUser = async(req,res) => {
         for (const exp of experience) {
             let expDoc;
             const startDate = exp.startDate ? new Date(exp.startDate) : new Date();
-            const endDate = exp.endDate ? new Date(exp.endDate) : new Date();
+            const endDate = exp.endDate && exp.endDate !== "Present" ? new Date(exp.endDate) : new Date();
             if (exp.id && mongoose.Types.ObjectId.isValid(exp.id)) {
                 expDoc = await Experience.findByIdAndUpdate(
                     exp.id,
@@ -186,7 +188,8 @@ exports.updateUser = async(req,res) => {
                         role: exp.position,
                         startDate,
                         endDate,
-                        desc: exp.description
+                        desc: exp.description,
+                        current: exp.current
                     },
                     { new: true, upsert: true }
                 );
@@ -196,7 +199,8 @@ exports.updateUser = async(req,res) => {
                     role: exp.position,
                     startDate,
                     endDate,
-                    desc: exp.description
+                    desc: exp.description,
+                    current: exp.current
                 });
             }
             experienceIds.push(expDoc._id);
