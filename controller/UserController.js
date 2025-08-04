@@ -142,8 +142,8 @@ exports.updateUser = async(req,res) => {
         const educationIds = [];
         for (const edu of education) {
             let eduDoc;
-            const startDate = edu.startYear ? new Date(edu.startYear) : null;
-            const endDate = edu.endYear ? new Date(edu.endYear) : null;
+            const startDate = edu.startDate ? new Date(edu.startDate) : null;
+            const endDate = edu.endDate ? new Date(edu.endDate) : null;
             if (edu.id && mongoose.Types.ObjectId.isValid(edu.id)) {
                 eduDoc = await Education.findByIdAndUpdate(
                     edu.id,
@@ -176,8 +176,8 @@ exports.updateUser = async(req,res) => {
         const experienceIds = [];
         for (const exp of experience) {
             let expDoc;
-            const startDate = exp.startYear ? new Date(exp.startYear) : null;
-            const endDate = exp.endYear ? new Date(exp.endYear) : null;
+            const startDate = exp.startDate ? new Date(exp.startDate) : null;
+            const endDate = exp.endDate ? new Date(exp.endDate) : null;
             if (exp.id && mongoose.Types.ObjectId.isValid(exp.id)) {
                 expDoc = await Experience.findByIdAndUpdate(
                     exp.id,
