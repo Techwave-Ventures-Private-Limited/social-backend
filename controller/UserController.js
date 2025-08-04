@@ -8,6 +8,7 @@ const mailSender = require("../utils/mailSender");
 const { forgotPassowordTemplate } = require("../utils/emailTemplate");
 const Otp = require("../modules/otp");
 const bcrypt = require("bcrypt");
+const Portfolio = require("../modules/portfolio");
 
 
 exports.getUser = async(req,res) => {
@@ -407,6 +408,60 @@ exports.changePassword = async(req,res) => {
         return res.status(200).json({
             success: true,
             message: "Password updated successfully"
+        })
+
+    } catch(err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
+
+exports.addPortfolio = async(req,res) => {
+    try {
+
+        const userId = req.userId;
+        const user = await User.findById(userId);
+        
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "User not found"
+            })
+        }
+
+        const logo = req.files.logo;
+        if (!logo) {
+            return res.status(400).json({
+                success: false,
+                message : "Logo is required"
+            })
+        }
+
+        const {link, description} = req.body;
+        if (!link) {
+            return res.status(400).json({
+                success: false,
+                message: "Link required"
+            })
+        }
+
+        const uploadedImage = await uploadImageToCloudinary(logo, process.env.FOLDER_NAME || "portfolio_images");
+        const portfolio = await Portfolio.create({
+            logo: uploadedImage.secure_url,
+            link,
+            desc : description,
+            userId
+        })
+
+        user.portfolio.push(portfolio._id);
+        await user.save();
+
+        return res.status(200).json({
+            success: true,
+            message :"Portfolio created successfully",
+            body : portfolio
         })
 
     } catch(err) {

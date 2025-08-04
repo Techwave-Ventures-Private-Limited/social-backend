@@ -114,7 +114,11 @@ const userSchema = new mongoose.Schema({
     streak: {
         type: Number,
         default:0 
-    }
+    },
+    portfolio: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Portfolio"
+    }]
 })
 
 module.exports = mongoose.model("User",userSchema);
