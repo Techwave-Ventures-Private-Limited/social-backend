@@ -283,3 +283,7 @@ Formdata
  } 
 
 ---
+
+### 23. Get user showcase 
+* **Endpoint :** `/get /showcase/user`
+---

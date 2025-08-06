@@ -83,3 +83,23 @@ exports.getShowcases = async(req,res) => {
         })
     }
 }
+
+exports.getUserShowcase = async(req,res) => {
+    try {
+        const userId = req.userId;
+
+        const showcases = await Showcase.find({userId : userId});
+        
+        return res.status(200).json({
+            success: true,
+            message: "Showcase found",
+            body: showcases
+        })
+
+    } catch(err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
