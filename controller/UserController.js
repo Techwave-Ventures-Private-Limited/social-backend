@@ -439,11 +439,11 @@ exports.addPortfolio = async(req,res) => {
             })
         }
 
-        const {link, description} = req.body;
-        if (!link) {
+        const {link, description, title} = req.body;
+        if (!link || !title) {
             return res.status(400).json({
                 success: false,
-                message: "Link required"
+                message: "Link and title required"
             })
         }
 
@@ -452,7 +452,8 @@ exports.addPortfolio = async(req,res) => {
             logo: uploadedImage.secure_url,
             link,
             desc : description,
-            userId
+            userId,
+            title
         })
 
         user.portfolio.push(portfolio._id);
