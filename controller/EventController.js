@@ -464,81 +464,290 @@ exports.getUserBookedEvents = async (req, res) => {
 }
 
 // Generate event ticket HTML
+// exports.generateEventTicketPDF = async (req, res) => {
+//     try {
+//         const { eventId, attendeeEmail } = req.params;
+//         const token = req.headers.token;
+
+//         if (!eventId || !attendeeEmail) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "Event ID and attendee email are required"
+//             });
+//         }
+
+//         if (!token) {
+//             return res.status(401).json({
+//                 success: false,
+//                 message: "Authentication token required"
+//             });
+//         }
+
+//         // Find the event
+//         const event = await Event.findById(eventId).populate("ticketTypes");
+//         if (!event) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "Event not found"
+//             });
+//         }
+
+//         // Find the attendee
+//         const attendee = event.attendees.find(att => att.email === attendeeEmail);
+//         if (!attendee) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "Attendee not found for this event"
+//             });
+//         }
+
+//         // Prepare ticket data (same as before)
+//         const ticketId = `${eventId}-${attendee.name.toLowerCase().replace(/\\s+/g, '')}`;
+//         const eventDate = new Date(event.date);
+//         const formattedDate = eventDate.toLocaleDateString('en-US', {
+//             weekday: 'long',
+//             year: 'numeric',
+//             month: 'long',
+//             day: 'numeric'
+//         });
+//         const eventTime = event.time || "10:00 AM";
+//         const ticketData = {
+//             eventTitle: event.title,
+//             eventDate: formattedDate,
+//             eventTime: eventTime,
+//             eventLocation: event.location || "Tech Hub, Bangalore",
+//             attendeeName: attendee.name,
+//             attendeeEmail: attendee.email,
+//             ticketId: ticketId,
+//             ticketType: event.ticketTypes && event.ticketTypes.length > 0 ? event.ticketTypes[0].name : "General",
+//             qrCodeData: ticketId
+//         };
+
+//         // Generate HTML
+//         const htmlContent = eventTicketTemplate(ticketData);
+
+//         // Generate PDF
+//         const file = { content: htmlContent };
+//         const pdfBuffer = await pdf.generatePdf(file, { format: 'A4' });
+
+//         res.set({
+//             'Content-Type': 'application/pdf',
+//             'Content-Disposition': `attachment; filename=\"ticket-${ticketId}.pdf\"`
+//         });
+//         res.send(pdfBuffer);
+//     } catch (err) {
+//         return res.status(500).json({
+//             success: false,
+//             message: err.message
+//         });
+//     }
+// };
+
+const PDFDocument = require('pdfkit');
+const QRCode = require('qrcode');
+
+// Vector icons
+function drawCalendarIcon(doc, x, y, size = 16) {
+  const w = size;
+  const h = size;
+  doc.save();
+  doc.lineWidth(1.2);
+  doc.roundedRect(x, y, w, h, 3).stroke('#ffffff');
+  doc.rect(x, y, w, h * 0.25).fill('#4a90e2');
+  const ringR = 1.5;
+  doc.circle(x + w * 0.25, y + h * 0.15, ringR).fill('#ffffff');
+  doc.circle(x + w * 0.75, y + h * 0.15, ringR).fill('#ffffff');
+  doc.restore();
+}
+
+function drawClockIcon(doc, x, y, size = 16) {
+  const r = size / 2;
+  const cx = x + r;
+  const cy = y + r;
+  doc.save();
+  doc.lineWidth(1.2);
+  doc.circle(cx, cy, r).stroke('#ffffff');
+  doc.moveTo(cx, cy);
+  doc.lineTo(cx - r * 0.4, cy - r * 0.4).stroke('#ffffff'); // hour hand
+  doc.moveTo(cx, cy);
+  doc.lineTo(cx, cy - r * 0.7).stroke('#ffffff'); // minute hand
+  doc.restore();
+}
+
+function drawLocationIcon(doc, x, y, size = 16) {
+  const w = size;
+  const h = size;
+  const centerX = x + w / 2;
+  const topY = y;
+  doc.save();
+  doc.lineWidth(1.2);
+  doc.moveTo(centerX, topY + h * 0.1);
+  doc.bezierCurveTo(
+    centerX + w * 0.5, topY + h * 0.35,
+    centerX + w * 0.2, topY + h * 0.9,
+    centerX, topY + h
+  );
+  doc.bezierCurveTo(
+    centerX - w * 0.2, topY + h * 0.9,
+    centerX - w * 0.5, topY + h * 0.35,
+    centerX, topY + h * 0.1
+  );
+  doc.closePath().stroke('#ffffff');
+  doc.circle(centerX, topY + h * 0.45, w * 0.18).fill('#ffffff');
+  doc.restore();
+}
+
 exports.generateEventTicketPDF = async (req, res) => {
-    try {
-        const { eventId, attendeeEmail } = req.params;
-        const token = req.headers.token;
+  try {
+    const { eventId, attendeeEmail } = req.params;
+    const token = req.headers.token;
 
-        if (!eventId || !attendeeEmail) {
-            return res.status(400).json({
-                success: false,
-                message: "Event ID and attendee email are required"
-            });
-        }
-
-        if (!token) {
-            return res.status(401).json({
-                success: false,
-                message: "Authentication token required"
-            });
-        }
-
-        // Find the event
-        const event = await Event.findById(eventId).populate("ticketTypes");
-        if (!event) {
-            return res.status(404).json({
-                success: false,
-                message: "Event not found"
-            });
-        }
-
-        // Find the attendee
-        const attendee = event.attendees.find(att => att.email === attendeeEmail);
-        if (!attendee) {
-            return res.status(404).json({
-                success: false,
-                message: "Attendee not found for this event"
-            });
-        }
-
-        // Prepare ticket data (same as before)
-        const ticketId = `${eventId}-${attendee.name.toLowerCase().replace(/\\s+/g, '')}`;
-        const eventDate = new Date(event.date);
-        const formattedDate = eventDate.toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
-        const eventTime = event.time || "10:00 AM";
-        const ticketData = {
-            eventTitle: event.title,
-            eventDate: formattedDate,
-            eventTime: eventTime,
-            eventLocation: event.location || "Tech Hub, Bangalore",
-            attendeeName: attendee.name,
-            attendeeEmail: attendee.email,
-            ticketId: ticketId,
-            ticketType: event.ticketTypes && event.ticketTypes.length > 0 ? event.ticketTypes[0].name : "General",
-            qrCodeData: ticketId
-        };
-
-        // Generate HTML
-        const htmlContent = eventTicketTemplate(ticketData);
-
-        // Generate PDF
-        const file = { content: htmlContent };
-        const pdfBuffer = await pdf.generatePdf(file, { format: 'A4' });
-
-        res.set({
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': `attachment; filename=\"ticket-${ticketId}.pdf\"`
-        });
-        res.send(pdfBuffer);
-    } catch (err) {
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
+    if (!eventId || !attendeeEmail) {
+      return res.status(400).json({ success: false, message: "Event ID and attendee email are required" });
     }
+    if (!token) {
+      return res.status(401).json({ success: false, message: "Authentication token required" });
+    }
+
+    // Fetch event and attendee (adjust to your ORM/DB)
+    const event = await Event.findById(eventId).populate("ticketTypes");
+    if (!event) {
+      return res.status(404).json({ success: false, message: "Event not found" });
+    }
+    const attendee = event.attendees.find(att => att.email === attendeeEmail);
+    if (!attendee) {
+      return res.status(404).json({ success: false, message: "Attendee not found for this event" });
+    }
+
+    const ticketId = `${eventId}-${attendee.name.toLowerCase().replace(/\s+/g, '')}`;
+    const eventDate = new Date(event.date);
+    const formattedDate = eventDate.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    const eventTime = event.time || "10:00 AM";
+    const eventLocation = event.location || "Tech Hub, Bangalore";
+    const ticketType = (event.ticketTypes && event.ticketTypes.length > 0)
+      ? event.ticketTypes[0].name
+      : "General";
+
+    // Generate QR code
+    const qrDataUrl = await QRCode.toDataURL(ticketId, { margin: 1, width: 200 });
+    const qrBase64 = qrDataUrl.split(',')[1];
+    const qrBuffer = Buffer.from(qrBase64, 'base64');
+
+    // Create PDF
+    const doc = new PDFDocument({
+      size: 'A4',
+      margins: { top: 50, bottom: 50, left: 50, right: 50 }
+    });
+
+    const chunks = [];
+    doc.on('data', c => chunks.push(c));
+    doc.on('end', () => {
+      const pdfBuffer = Buffer.concat(chunks);
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="ticket-${ticketId}.pdf"`,
+        'Content-Length': pdfBuffer.length
+      });
+      res.send(pdfBuffer);
+    });
+
+    // Colors
+    const bg = '#1f1f23';
+    const panelBg = '#2c2c33';
+    const accent = '#3366ff';
+    const textLight = '#ffffff';
+    const muted = '#999999';
+
+    // Draw background
+    doc.rect(0, 0, doc.page.width, doc.page.height).fill(bg);
+
+    // Title
+    const titleX = 60;
+    const titleY = 60;
+    doc.font('Helvetica-Bold').fontSize(26).fillColor(textLight).text(event.title, titleX, titleY);
+
+    // ticketType pill aligned right on same line
+    const pillText = ticketType.toUpperCase();
+    doc.font('Helvetica-Bold').fontSize(10);
+    const textWidth = doc.widthOfString(pillText);
+    const paddingX = 12;
+    const paddingY = 6;
+    const pillWidth = textWidth + paddingX * 2;
+    const pillHeight = 20;
+    const pillX = doc.page.width - 60 - pillWidth;
+    const pillY = titleY; // same vertical as title
+    doc.roundedRect(pillX, pillY, pillWidth, pillHeight, 10).fill(accent);
+    doc.fillColor(textLight).text(pillText, pillX + paddingX, pillY + paddingY - 1, {
+      width: textWidth,
+      align: 'center',
+      lineBreak: false
+    });
+
+    // QR code box
+    const qrBoxSize = 200;
+    const qrBoxX = (doc.page.width - qrBoxSize) / 2;
+    const qrBoxY = 140;
+    doc.lineWidth(1).strokeColor('#ffffff').rect(qrBoxX, qrBoxY, qrBoxSize, qrBoxSize).stroke();
+    const innerQrSize = 160;
+    doc.image(qrBuffer, qrBoxX + (qrBoxSize - innerQrSize) / 2, qrBoxY + (qrBoxSize - innerQrSize) / 2, {
+      width: innerQrSize,
+      height: innerQrSize
+    });
+    doc.fontSize(10).fillColor(muted).text(`QR Code for: ${ticketId}`, qrBoxX, qrBoxY + qrBoxSize + 8, {
+      width: qrBoxSize,
+      align: 'center'
+    });
+
+    // Ticket ID
+    doc.moveDown(0.5);
+    doc.fontSize(12).fillColor(muted).text(`Ticket ID: ${ticketId}`, { align: 'center' });
+
+    // Event details with increased vertical spacing
+    const detailStartY = qrBoxY + qrBoxSize + 60;
+    const indent = 80;
+    const spacingY = 28;
+
+    // Date
+    drawCalendarIcon(doc, indent, detailStartY, 16);
+    doc.font('Helvetica').fontSize(14).fillColor(textLight).text(`  ${formattedDate}`, indent + 22, detailStartY + 2);
+
+    // Time
+    drawClockIcon(doc, indent, detailStartY + spacingY, 16);
+    doc.text(`  ${eventTime}`, indent + 22, detailStartY + spacingY + 2);
+
+    // Location
+    drawLocationIcon(doc, indent, detailStartY + spacingY * 2, 16);
+    doc.text(`  ${eventLocation}`, indent + 22, detailStartY + spacingY * 2 + 2);
+
+    // Attendee info panel
+    const panelY = detailStartY + spacingY * 3 + 40;
+    const panelX = 50;
+    const panelWidth = doc.page.width - 100;
+    const panelHeight = 120;
+    doc.roundedRect(panelX, panelY, panelWidth, panelHeight, 8).fill(panelBg);
+
+    const padding = 12;
+    let cursorY = panelY + padding;
+    doc.font('Helvetica-Bold').fontSize(16).fillColor(textLight).text('Attendee Information', panelX + padding, cursorY);
+    cursorY += 24;
+
+    doc.font('Helvetica').fontSize(10).fillColor(muted).text('Name', panelX + padding, cursorY);
+    cursorY += 12;
+    doc.fontSize(16).fillColor(textLight).text(attendee.name, panelX + padding, cursorY);
+    cursorY += 22;
+    doc.fontSize(10).fillColor(muted).text('Email', panelX + padding, cursorY);
+    cursorY += 12;
+    doc.fontSize(16).fillColor(textLight).text(attendee.email, panelX + padding, cursorY);
+
+    // Finish
+    doc.end();
+  } catch (err) {
+    console.error('PDF generation error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
 };

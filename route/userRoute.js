@@ -7,14 +7,16 @@ const {auth}  = require("../middleware/authMiddleware");
 const { followUser, unFollowUser } = require("../controller/FollowController");
 
 router.get("/getUser", auth, getUser);
+router.get("/story", auth, getFollowingStories);
 router.get("/:userId", auth, getAnotherUser);
 router.post("/update", auth, updateUser);
 router.post("/follow", auth, followUser);
 router.post("/unfollow", auth, unFollowUser);
 router.post("/uploadProfileImage", auth, uploadProfileImage);
 router.post("/upload/story", auth, createStory);
-router.get("/story", auth, getFollowingStories);
 router.get("/story/self", auth, getCurrentStory);
+
+
 router.post("/forgotPassword", sendForgotPasswordEmail);
 router.post("/verifyForgotPassword", verifyForgotPasswordOtp);
 router.post("/changePassword", changePassword);
