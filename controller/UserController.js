@@ -8,6 +8,7 @@ const mailSender = require("../utils/mailSender");
 const { forgotPassowordTemplate } = require("../utils/emailTemplate");
 const Otp = require("../modules/otp");
 const bcrypt = require("bcrypt");
+const Portfolio = require("../modules/portfolio");
 
 
 exports.getUser = async(req,res) => {
@@ -142,8 +143,8 @@ exports.updateUser = async(req,res) => {
         const educationIds = [];
         for (const edu of education) {
             let eduDoc;
-            const startDate = edu.startYear ? new Date(edu.startYear) : null;
-            const endDate = edu.endYear ? new Date(edu.endYear) : null;
+            const startDate = edu.startDate ? new Date(edu.startDate) : new Date();
+            const endDate = edu.endDate && edu.endDate !== "Present" ? new Date(edu.endDate) : new Date();
             if (edu.id && mongoose.Types.ObjectId.isValid(edu.id)) {
                 eduDoc = await Education.findByIdAndUpdate(
                     edu.id,
@@ -152,6 +153,7 @@ exports.updateUser = async(req,res) => {
                         school: edu.institution,
                         fos: edu.field,
                         degree: edu.degree,
+                        current: edu.current,
                         startDate,
                         endDate
                     },
@@ -163,6 +165,7 @@ exports.updateUser = async(req,res) => {
                     school: edu.institution,
                     fos: edu.field,
                     degree: edu.degree,
+                    current: edu.current,
                     startDate,
                     endDate
                 });
@@ -176,8 +179,8 @@ exports.updateUser = async(req,res) => {
         const experienceIds = [];
         for (const exp of experience) {
             let expDoc;
-            const startDate = exp.startYear ? new Date(exp.startYear) : null;
-            const endDate = exp.endYear ? new Date(exp.endYear) : null;
+            const startDate = exp.startDate ? new Date(exp.startDate) : new Date();
+            const endDate = exp.endDate && exp.endDate !== "Present" ? new Date(exp.endDate) : new Date();
             if (exp.id && mongoose.Types.ObjectId.isValid(exp.id)) {
                 expDoc = await Experience.findByIdAndUpdate(
                     exp.id,
@@ -186,7 +189,8 @@ exports.updateUser = async(req,res) => {
                         role: exp.position,
                         startDate,
                         endDate,
-                        desc: exp.description
+                        desc: exp.description,
+                        current: exp.current
                     },
                     { new: true, upsert: true }
                 );
@@ -196,7 +200,8 @@ exports.updateUser = async(req,res) => {
                     role: exp.position,
                     startDate,
                     endDate,
-                    desc: exp.description
+                    desc: exp.description,
+                    current: exp.current
                 });
             }
             experienceIds.push(expDoc._id);
@@ -403,6 +408,61 @@ exports.changePassword = async(req,res) => {
         return res.status(200).json({
             success: true,
             message: "Password updated successfully"
+        })
+
+    } catch(err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
+
+exports.addPortfolio = async(req,res) => {
+    try {
+
+        const userId = req.userId;
+        const user = await User.findById(userId);
+        
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "User not found"
+            })
+        }
+
+        const logo = req.files.logo;
+        if (!logo) {
+            return res.status(400).json({
+                success: false,
+                message : "Logo is required"
+            })
+        }
+
+        const {link, description, title} = req.body;
+        if (!link || !title) {
+            return res.status(400).json({
+                success: false,
+                message: "Link and title required"
+            })
+        }
+
+        const uploadedImage = await uploadImageToCloudinary(logo, process.env.FOLDER_NAME || "portfolio_images");
+        const portfolio = await Portfolio.create({
+            logo: uploadedImage.secure_url,
+            link,
+            desc : description,
+            userId,
+            title
+        })
+
+        user.portfolio.push(portfolio._id);
+        await user.save();
+
+        return res.status(200).json({
+            success: true,
+            message :"Portfolio created successfully",
+            body : portfolio
         })
 
     } catch(err) {

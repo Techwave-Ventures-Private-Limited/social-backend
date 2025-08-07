@@ -17,6 +17,9 @@ const experienceSchema = new mongoose.Schema({
     desc:{
         type:String
     },
+    current: {
+        type: Boolean
+    },
     createAt:{
         type:Date,
         default:Date.now()

@@ -273,25 +273,17 @@ Formdata
 * **Endpoint :** `DELETE /user/story/:storyId`
 ---
 
-
-## 🧪 Testing & Environment
-
-* The collection uses environment variables like `{{local}}` and `{{base_URL}}`. Be sure to set them in your Postman environment before running the APIs.
-
----
-
-## 📂 Importing to Postman
-
-1. Download the `.postman_collection.json` file.
-2. Open Postman.
-3. Click `Import` > `File` and select the downloaded file.
-4. Create a new environment and define `local` and `base_URL` variables accordingly.
-
----
-
-## 📫 Feedback
-
-Feel free to open issues or PRs for improvements. Let's build better APIs together! 🚀
-
+### 22. Create Portfolio 
+* **Endpoin :** `POST /user/portfolio/
 ```
+ Formdata : {
+  logo : file
+  description
+  link
+ } 
+```
+---
 
+### 23. Get user showcase 
+* **Endpoint :** `/get /showcase/user`
+---

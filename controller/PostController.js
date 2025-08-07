@@ -6,7 +6,8 @@ const { uploadMultipleImagesToCloudinary, uploadVideoToCloudinary, uploadImageTo
 exports.createPost = async (req, res) => {
     try {
 
-        const { discription, postType } = req.body;
+        const { discription, postType, originalPostId } = req.body || "";
+        const { isReposted } = req.body || false;
         const userId = req.userId;
         // console.log("User request to upload a post", req.body)
         // Accept multiple files (media)
@@ -43,11 +44,15 @@ exports.createPost = async (req, res) => {
             })
         }
 
+        
         const createdPost = await Post.create({
             discription,
             media: mediaUrls,
             postType,
-            userId
+            userId,
+            user,
+            originalPostId,
+            isReposted
         });
         user.posts.push(createdPost._id);
         await user.save();
@@ -402,11 +407,23 @@ exports.replyToComment = async (req, res) => {
 exports.getAllPosts = async (req, res) => {
     try {
         const filter = req.query.filter;
-        let posts;
+        const sortOption = filter == 1 ? { createdAt: -1 } : {};
         
-        if (filter == 0) {
-            posts = await Post.find()
-                .populate({
+        let posts = await Post.find({})
+            .sort(sortOption)
+            .populate({
+                path: 'userId',
+                model: 'User',
+                populate: [
+                    { path: 'about', model: 'About' },
+                    { path: 'education', model: 'Education' },
+                    { path: 'experience', model: 'Experience' }
+                ]
+            })
+            .populate('comments')
+            .populate({
+                path: 'originalPostId',
+                populate: {
                     path: 'userId',
                     model: 'User',
                     populate: [
@@ -414,30 +431,93 @@ exports.getAllPosts = async (req, res) => {
                         { path: 'education', model: 'Education' },
                         { path: 'experience', model: 'Experience' }
                     ]
-                })
-                .populate('comments');
-        } else if (filter == 1) {
-            posts = await Post.find()
-                .sort({ createdAt: -1 })
-                .populate({
-                    path: 'userId',
-                    model: 'User',
-                    populate: [
-                        { path: 'about', model: 'About' },
-                        { path: 'education', model: 'Education' },
-                        { path: 'experience', model: 'Experience' }
-                    ]
-                })
-                .populate('comments');
-        }
+                }
+            });
 
-        // Get current user for isBookmarked and isFollowing
-        let currentUser = null;
-        if (req.userId) {
-            currentUser = await User.findById(req.userId);
-        }
+        const currentUser = req.userId ? await User.findById(req.userId) : null;
 
-        const formattedPosts = posts.map(post => {
+        const formattedPosts = await Promise.all(posts.map(post => formatPost(post, currentUser)));
+
+        return res.status(200).json({
+            success: true,
+            body: formattedPosts.filter(Boolean)
+        });
+
+    } catch (err) {
+        console.error('Error in getAllPosts:', err);
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};
+
+
+const formatPost = (post, currentUser = null) => {
+    if (!post || !post.userId) return null;
+
+    const author = post.userId;
+    const about = author.about || {};
+    const education = author.education || [];
+    const experience = author.experience || [];
+    const skills = Array.isArray(about.skills) ? about.skills : [];
+
+    const followers = Array.isArray(author.followers) ? author.followers.length : 0;
+    const following = Array.isArray(author.following) ? author.following.length : 0;
+
+    const isFollowing = currentUser?.followers?.some(f => f.toString() === author._id.toString()) || false;
+    const isBookmarked = currentUser?.savedPost?.some(id => id.toString() === post._id.toString()) || false;
+    const isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
+
+    let originalPost = null;
+    if (post.originalPostId) {
+        originalPost = formatPost(post.originalPostId, currentUser);
+    }
+
+    return {
+        id: post._id,
+        author: {
+            id: author._id,
+            name: author.name,
+            username: null,
+            email: author.email,
+            avatar: author.profileImage || null,
+            coverImage: null,
+            headline: about.headline || null,
+            bio: author.bio || null,
+            location: about.location || null,
+            website: about.website || null,
+            joinedDate: author.createdAt ? author.createdAt.toISOString() : null,
+            followers,
+            following,
+            streak: null,
+            lastStoryDate: null,
+            isFollowing,
+            profileViews: null,
+            education,
+            experience,
+            skills,
+            phone: about.phone || null,
+            socialLinks: [],
+            isCounselor: false,
+            counselorInfo: null
+        },
+        content: post.discription,
+        images: post.media || [],
+        createdAt: post.createdAt,
+        likes: post.likes,
+        comments: post.comments?.length || 0,
+        isLiked,
+        isBookmarked,
+        commentsList: post.comments || [],
+        originalPost,
+        isReposted: post.isReposted
+    };
+};
+
+
+exports.formatPost = (posts, currentUser) => {
+    const formattedPosts = posts.map(post => {
             // Determine isBookmarked
             let isBookmarked = false;
             if (currentUser && currentUser.savedPost) {
@@ -511,20 +591,9 @@ exports.getAllPosts = async (req, res) => {
                 commentsList: post.comments
             };
         }).filter(post => post !== null); // Remove any null posts
+        return formattedPosts;
+}
 
-        return res.status(200).json({
-            success: true,
-            body: formattedPosts
-        });
-
-    } catch (err) {
-        console.error('Error in getAllPosts:', err);
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
-    }
-};
 
 exports.deletePost = async(req,res) => {
     try {

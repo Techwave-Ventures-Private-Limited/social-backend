@@ -21,6 +21,9 @@ const educationSchema = new mongoose.Schema({
     endDate:{
         type:Date
     },
+    current: {
+        type: Boolean
+    },
     createAt:{
         type:Date,
         default:Date.now()

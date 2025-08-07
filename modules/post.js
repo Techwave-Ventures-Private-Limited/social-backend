@@ -23,7 +23,18 @@ const postSchema = new mongoose.Schema({
         default : ""
     }],
     userId : {
-        type: String
+        type: String 
+    },
+    user : {
+        type: mongoose.Schema.Types.ObjectId
+    },
+    originalPostId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Post"
+    },
+    isReposted: {
+        type: Boolean,
+        default: false
     },
     createdAt:{
         type:Date,
