@@ -96,7 +96,7 @@ exports.getFollowingStories = async (req, res) => {
   followingUserIds.map(async (followedUserId) => {
     console.log("Fetching story for:", followedUserId.toString());
 
-    return await Story.find({ userId: followedUserId  }) // <<< FIXED HERE
+    return await Story.findOne({ userId: followedUserId  }) 
       .populate("userId", "name profileImage")
       .sort({ createdAt: -1 });
   })
