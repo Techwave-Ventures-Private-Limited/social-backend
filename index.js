@@ -1,5 +1,6 @@
 const express = require('express');
 const app = express();
+const admin = require('firebase-admin');
 
 const cookieParser = require("cookie-parser");
 const database = require('./config/dbonfig');
@@ -12,10 +13,15 @@ const eventRouter = require("./route/eventRoute");
 const showcaseRouter = require("./route/showcaseRoute");
 const newsRouter = require("./route/newsRoute");
 const searchRouter = require("./route/searchRoute");
+const notificationRouter = require("./route/notificationRoute");
 
 const {cloudinaryConnect} = require("./config/cloudinary");
+const serviceAccount = require("/etc/secrets/connektx-firebase-adminsdk-fbsvc-b76858ef61.json");
 
 database.connect();
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+});
 
 const PORT = process.env.PORT;
 app.use(express.json());
@@ -43,6 +49,7 @@ app.use("/event", eventRouter);
 app.use("/showcase", showcaseRouter);
 app.use("/news", newsRouter);
 app.use("/search", searchRouter);
+app.use("/notification", notificationRouter);
 app.use("/hailing",(req,res)=>{
     return res.status(200).json({
         success:true,
@@ -61,7 +68,7 @@ app.listen(PORT, '0.0.0.0', () => {
 const axios = require('axios');
 
 function callSelfApi() {
-    axios.get('https://social-backend-zid2.onrender.com/hailing')
+    axios.get('https://backend-new-u9tc.onrender.com/hailing')
         .then(response => {
             console.log('API Response:', response.data);
         })

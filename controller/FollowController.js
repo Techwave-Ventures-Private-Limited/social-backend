@@ -1,10 +1,13 @@
 const User = require("../modules/user");
+const { createNotification } = require('../utils/notificationUtils');
 
 exports.followUser = async(req,res) => {
     try{
 
         const {userToFollowId} = req.body;
+        console.log("userToFollowId", userToFollowId);
         const userId = req.userId;
+        console.log("userId", userId);
 
         if(!userToFollowId) {
             return res.status(400).json({
@@ -29,9 +32,11 @@ exports.followUser = async(req,res) => {
         userToFollow.followers.push(user._id);
         await userToFollow.save();
 
+        await createNotification(userToFollow._id, userId, 'follow');
+
         return res.status(200).json({
             success:true,
-            message:"Follow sucessfull",
+            message:"Follow successfull",
             body: user
         })
 
