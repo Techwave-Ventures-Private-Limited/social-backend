@@ -31,7 +31,7 @@ router.get('/:conversationId/messages', getMessages);
 router.post('/findOrCreate', auth, async (req, res) => {
     try {
         const { recipientId } = req.body;
-        const senderId = req.user.id;
+        const senderId = req.userId;
 
         if (!recipientId) {
             return res.status(400).json({ message: 'Recipient ID is required.' });
