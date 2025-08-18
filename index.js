@@ -137,7 +137,8 @@ io.on('connection', (socket) => {
     // Listen for new messages from a client
     socket.on('sendMessage', async (data) => {
         try {
-            const { conversationId, content, sharedPost, sharedNews } = data;
+            // 1. Destructure the temporary ID from the client payload
+            const { conversationId, content, sharedPost, sharedNews, tempId } = data;
             
             // Basic validation
             if (!conversationId || (!content && !sharedPost && !sharedNews)) {
@@ -162,20 +163,24 @@ io.on('connection', (socket) => {
             // Update the conversation's last message
             conversation.lastMessage = newMessage._id;
             await conversation.save();
-
+            
             const populatedMessage = await Message.findById(newMessage._id).populate('sender', 'name profileImage');
 
-            // Send the new message to all participants in the conversation
+            // 2. Add the tempId to the message object before broadcasting
+            const messageToSend = populatedMessage.toObject();
+            messageToSend.tempId = tempId; // This is the key change
+
+            // 3. Broadcast the enhanced message object
             conversation.participants.forEach(participantId => {
                 if (onlineUsers.has(participantId.toString())) {
-                    io.to(participantId.toString()).emit('newMessage', populatedMessage);
+                    io.to(participantId.toString()).emit('newMessage', messageToSend);
                 }
-            });
-            
-        } catch (err) {
-            console.error("Error in sendMessage event:", err);
-            socket.emit('error', { message: 'An error occurred while sending the message.' });
-        }
+        });
+        
+    } catch (err) {
+        console.error("Error in sendMessage event:", err);
+        socket.emit('error', { message: 'An error occurred while sending the message.' });
+    }
     });
 
     // Handle user disconnection
