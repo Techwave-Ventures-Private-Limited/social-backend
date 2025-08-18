@@ -109,7 +109,11 @@ const onlineUsers = new Map(); // Tracks online users: { userId -> socketId }
 // Middleware for authenticating socket connections
 io.use(async (socket, next) => {
     try {
+
+        console.log("Socket handshake auth:", socket.handshake.auth); // ADD THIS
         const token = socket.handshake.auth.token;
+        console.log("Extracted JWT Token:", token); // ADD THIS
+
         if (!token) {
             return next(new Error('Authentication error: Token is required.'));
         }
@@ -118,6 +122,7 @@ io.use(async (socket, next) => {
         socket.userId = decoded.id; // Attach userId to the socket object
         next();
     } catch (err) {
+        console.error("JWT verification failed:", err);
         next(new Error('Authentication error: Invalid token.'));
     }
 });
