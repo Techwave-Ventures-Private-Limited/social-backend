@@ -1,6 +1,6 @@
 const User = require('../modules/user');
-const Conversation = require('../modules/Conversation');
-const Message = require('../modules/Message');
+const Conversation = require('../modules/conversation');
+const Message = require('../modules/message');
 
 // 1. Start a new conversation or return an existing one
 exports.startConversation = async (req, res) => {

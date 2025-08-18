@@ -46,8 +46,8 @@ const conversationRouter = require("./route/ConversationRoutes");
 
 // --- Models (needed for socket logic) ---
 const User = require('./modules/user');
-const Conversation = require('./modules/Conversation');
-const Message = require('./modules/Message'); 
+const Conversation = require('./modules/conversation');
+const Message = require('./modules/message'); 
 
 // --- Database and Cloudinary Connection ---
 database.connect();
