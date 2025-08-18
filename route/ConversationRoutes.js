@@ -28,7 +28,7 @@ router.post('/requests/:conversationId/accept', acceptMessageRequest);
 // Get all messages for a specific conversation
 router.get('/:conversationId/messages', getMessages);
 
-router.post('/findOrCreate', authMiddleware, async (req, res) => {
+router.post('/findOrCreate', auth, async (req, res) => {
     try {
         const { recipientId } = req.body;
         const senderId = req.user.id;
