@@ -5,6 +5,7 @@ const {getUser, updateUser, uploadProfileImage, sendForgotPasswordEmail, verifyF
 const {createStory, getFollowingStories, getCurrentStory, deleteStory} = require("../controller/StoryController");
 const {auth}  = require("../middleware/authMiddleware");
 const { followUser, unFollowUser } = require("../controller/FollowController");
+const {commentOnStory,getCommentsByStoryId} = require("../controller/commentController");
 
 router.get("/getUser", auth, getUser);
 router.get("/story", auth, getFollowingStories);
@@ -15,6 +16,8 @@ router.post("/unfollow", auth, unFollowUser);
 router.post("/uploadProfileImage", auth, uploadProfileImage);
 router.post("/upload/story", auth, createStory);
 router.get("/story/self", auth, getCurrentStory);
+router.post("/story/comment",  commentOnStory);
+router.get("/story/:storyId/comments", getCommentsByStoryId);
 
 
 router.post("/forgotPassword", sendForgotPasswordEmail);
