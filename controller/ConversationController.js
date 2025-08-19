@@ -177,6 +177,8 @@ exports.getMessages = async (req, res) => {
             message: "Messages fetched successfully.",
             body: {
                 messages,
+                conversationStatus: conversation.status,
+                initiatedBy: conversation.initiatedBy,
                 totalPages: Math.ceil(count / limit),
                 currentPage: parseInt(page)
             },
