@@ -118,7 +118,10 @@ const userSchema = new mongoose.Schema({
     portfolio: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: "Portfolio"
-    }]
+    }],
+    deviceTokens: [{
+        type: String,
+    }],
 })
 
 module.exports = mongoose.model("User",userSchema);

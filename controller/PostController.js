@@ -1,6 +1,7 @@
 const Post = require("../modules/post");
 const User = require("../modules/user");
 const Comment = require("../modules/comments");
+const { createNotification } = require('../utils/notificationUtils');
 const { uploadMultipleImagesToCloudinary, uploadVideoToCloudinary, uploadImageToCloudinary } = require("../utils/imageUploader");
 
 exports.createPost = async (req, res) => {
@@ -156,6 +157,8 @@ exports.likePost = async (req, res) => {
         user.likedPost.push(post._id);
         await user.save();
 
+        await createNotification(post.userId, userId, 'like', postId);
+
         return res.status(200).json({
             success: true,
             message: "Post liked",
@@ -223,6 +226,8 @@ exports.commentPost = async (req, res) => {
 
         post.comments.push(comment._id);
         await post.save();
+
+        await createNotification(post.userId, req.userId, 'comment', postId);
 
         return res.status(200).json({
             success: true,
@@ -390,6 +395,8 @@ exports.replyToComment = async (req, res) => {
         parentComment.replies = parentComment.replies || [];
         parentComment.replies.push(replyComment._id);
         await parentComment.save();
+
+        await createNotification(parentComment.userId, userId, 'reply', postId);
 
         return res.status(200).json({
             success: true,

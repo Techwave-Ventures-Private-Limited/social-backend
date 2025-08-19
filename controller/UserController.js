@@ -472,3 +472,50 @@ exports.addPortfolio = async(req,res) => {
         })
     }
 }
+
+
+exports.registerDeviceToken = async (req, res) => {
+    try {
+        const { token } = req.body;
+        const userId = req.userId;
+
+        console.log(`[Push Token] Attempting to register token for userId: ${userId}`);
+        console.log(`[Push Token] Received token from client: ${token}`);
+
+        if (!token) {
+            return res.status(400).json({ success: false, message: "Device token is required." });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            console.error(`[Push Token] User not found for ID: ${userId}`);
+            return res.status(404).json({ success: false, message: "User not found." });
+        }
+
+        if (!user.deviceTokens.includes(token)) {
+            user.deviceTokens.push(token);
+
+            // --- THIS IS THE FIX ---
+            // Explicitly tell Mongoose that the deviceTokens array has changed.
+            user.markModified('deviceTokens');
+            // --- END OF FIX ---
+
+            await user.save();
+            console.log(`[Push Token] Successfully saved token for userId: ${userId}`);
+        } else {
+            console.log(`[Push Token] Token already exists for userId: ${userId}. No action taken.`);
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Device token registered successfully.",
+        });
+
+    } catch (err) {
+        console.error(`[Push Token] Error during registration: ${err.message}`);
+        return res.status(500).json({
+            success: false,
+            message: err.message,
+        });
+    }
+};
