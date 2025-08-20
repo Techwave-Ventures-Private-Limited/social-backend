@@ -473,6 +473,45 @@ exports.addPortfolio = async(req,res) => {
     }
 }
 
+exports.deletePortfolio = async(req,res) => {
+    try {
+
+        const id = req.params.id;
+
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                message: "Id required"
+            })
+        }
+
+        await Portfolio.findByIdAndDelete(id);
+
+        const user = await User.findById(req.userId);
+
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message:" User not found"
+            })
+        }
+
+        await user.portfolio.pull(id);
+        await user.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Portfolio deleted"
+        })
+
+    } catch(err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
+
 
 exports.registerDeviceToken = async (req, res) => {
     try {
@@ -518,4 +557,31 @@ exports.registerDeviceToken = async (req, res) => {
             message: err.message,
         });
     }
+};
+
+exports.getBulkUsers = async (req, res) => {
+  try {
+    const ids = req.body.ids;
+    console.log(ids)
+    if (!ids || !Array.isArray(ids)) {
+        return res.status(400).json({
+            success: false,
+            message: "UserId array required",
+        });
+    }
+
+    //const userIds = ids.split(",");
+
+    const users = await User.find({ _id: { $in: ids } });
+
+    return res.status(200).json({
+      success: true,
+      body: users,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
 };

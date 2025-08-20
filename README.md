@@ -287,3 +287,16 @@ Formdata
 ### 23. Get user showcase 
 * **Endpoint :** `/get /showcase/user`
 ---
+
+### Delete portfolio 
+`user/portfolio/:id`
+
+---
+
+### Delete showcase
+`showcase/:showcaseId`
+
+---
+
+### Bulk call 
+`user/getBulkUser`

@@ -103,3 +103,30 @@ exports.getUserShowcase = async(req,res) => {
         })
     }
 }
+
+exports.deleteShowcase = async(req,res) => {
+    try {
+
+        const {showcaseId} = req.params;
+
+        if (!showcaseId) {
+            return res.status(400).json({
+                success: false,
+                message: "ShowcaseId required"
+            })
+        }
+
+        await Showcase.findByIdAndDelete(showcaseId);
+
+        return res.status(200).json({
+            success: true,
+            message: "Showcase deleted"
+        })
+
+    } catch(err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
