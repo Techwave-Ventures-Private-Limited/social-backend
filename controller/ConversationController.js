@@ -210,3 +210,52 @@ exports.getMessages = async (req, res) => {
         return res.status(500).json({ success: false, message: err.message });
     }
 };
+
+
+// 6. Create a new message in a conversation
+exports.createMessage = async (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        const senderId = req.userId;
+
+        // Get the message content from the request body
+        const { content, sharedPostId, sharedNewsId } = req.body;
+
+        // Basic validation
+        if (!content && !sharedPostId && !sharedNewsId) {
+            return res.status(400).json({ success: false, message: "Message cannot be empty." });
+        }
+
+        // Create the new message document
+        const newMessage = await Message.create({
+            conversationId,
+            sender: senderId,
+            content: content || '', // Default to empty string if not provided
+            sharedPost: sharedPostId || null,
+            sharedNews: sharedNewsId || null,
+            readBy: [senderId] // The sender has "read" their own message
+        });
+
+        // Update the parent conversation with the last message and timestamp
+        await Conversation.findByIdAndUpdate(conversationId, {
+            lastMessage: newMessage._id,
+            updatedAt: Date.now()
+        });
+
+        // Populate the sender info for the socket event
+        const populatedMessage = await Message.findById(newMessage._id).populate('sender', 'name profileImage');
+
+        // You should emit a socket event here to notify other users in real-time
+        // E.g., io.to(conversationId).emit('newMessage', populatedMessage);
+
+        return res.status(201).json({
+            success: true,
+            message: "Message sent successfully.",
+            body: populatedMessage
+        });
+
+    } catch (err) {
+        console.error("💥 [BE FATAL ERROR] The createMessage controller crashed:", err);
+        return res.status(500).json({ success: false, message: "Failed to send message.", error: err.message });
+    }
+};
