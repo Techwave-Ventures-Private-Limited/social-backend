@@ -46,6 +46,13 @@ const showcaseSchema = new mongoose.Schema({
     projectLinks: [{
         type: String
     }],
+    upvotes: {
+        type: Number,
+        default: 0
+    },
+    upvotesUsers: [{
+        type: String,
+    }],
     createdAt: {
         type: Date,
         default: Date.now

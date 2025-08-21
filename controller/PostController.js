@@ -362,6 +362,63 @@ exports.getCommentsForPost = async (req, res) => {
     }
 }
 
+exports.getCommentsByUser = async (req, res) => {
+    try {
+        const userId  = req.userId;
+
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                message: "UserId required"
+            });
+        }
+
+        const comments = await Comment.find({ userId: userId })
+            .populate("postId", "title")
+            .populate("userId", "name profileImage");
+
+        const formatComment = async (comment) => {
+            await comment.populate("replies");
+            await comment.populate("userId");
+            const user = comment.userId;
+            return {
+                id: comment._id,
+                post: comment.postId ? {
+                    id: comment.postId._id,
+                    title: comment.postId.title
+                } : null,
+                author: {
+                    id: user?._id,
+                    name: user?.name,
+                    avatar: user?.profileImage || null
+                },
+                content: comment.text,
+                createdAt: comment.createAt ? comment.createAt.toISOString() : new Date().toISOString(),
+                likes: comment.likes || 0,
+                isLiked: false,
+                replies: await Promise.all((comment.replies || []).map(reply => formatComment(reply)))
+            };
+        };
+
+        const formattedComments = await Promise.all(
+            comments.map(comment => formatComment(comment))
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: "User comments found",
+            body: formattedComments
+        });
+
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};
+
+
 exports.replyToComment = async (req, res) => {
     try {
         const { postId, commentId, content } = req.body;

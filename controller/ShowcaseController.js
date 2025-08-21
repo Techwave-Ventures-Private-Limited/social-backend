@@ -130,3 +130,68 @@ exports.deleteShowcase = async(req,res) => {
         })
     }
 }
+
+exports.upvote = async(req,res) => {
+    try {
+        const showcaseId = req.params.showcaseId;
+
+        const showcase = await Showcase.findById(showcaseId);
+
+        if (!showcase) {
+            return res.status(400).json({
+                success: false,
+                message: "Showcase not found"
+            })
+        }
+
+        const userId = req.userId;
+
+        showcase.upvotesUsers.push(userId);
+        showcase.upvotes = showcase.upvotes + 1;
+        await showcase.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Upvote successfull"
+        })
+
+    } catch(err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
+
+exports.downvote = async(req,res) => {
+    try {
+        const showcaseId = req.params.showcaseId;
+
+        const showcase = await Showcase.findById(showcaseId);
+
+        if (!showcase) {
+            return res.status(400).json({
+                success: false,
+                message: "Showcase not found"
+            })
+        }
+
+        const userId = req.userId;
+
+        showcase.upvotesUsers.pull(userId);
+        showcase.upvotes = showcase.upvotes - 1;
+        await showcase.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Downvote successfull"
+        })
+
+    } catch(err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
+

@@ -300,3 +300,19 @@ Formdata
 
 ### Bulk call 
 `user/getBulkUser`
+
+---
+
+### Upvote 
+`showcase/upvote/:showcaseId`
+
+---
+
+### Downvote
+`showcase/downvote/:showcaseId`
+
+---
+
+### get user comments (replies)
+`post/comment/getUser`
+---
