@@ -16,6 +16,14 @@ const commentSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  isLiked: {
+    type: Boolean,
+    default: false
+  },
+  likesCount: {
+    type: Number,
+    default: 0
+  },
   createdAt: {
     type: Date,
     default: Date.now

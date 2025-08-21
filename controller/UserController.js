@@ -585,3 +585,46 @@ exports.getBulkUsers = async (req, res) => {
     });
   }
 };
+
+
+exports.getFollowers = async (req, res) => {
+    try {
+        const userId = req.userId; // Get the logged-in user's ID from the auth middleware
+
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized request",
+            });
+        }
+
+        // Find the user and populate the 'following' field to get the full user objects
+        const user = await User.findById(userId).populate({
+            path: 'following',
+            select: '_id name profileImage' // Select only the fields you need for the share sheet
+        }).lean();
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+
+        // The 'following' array now contains the full user profiles
+        const followers = user.following;
+
+        return res.status(200).json({
+            success: true,
+            message: "Followers fetched successfully",
+            body: followers,
+        });
+
+    } catch (err) {
+        console.error("Error in getFollowers controller:", err.message);
+        return res.status(500).json({
+            success: false,
+            message: err.message,
+        });
+    }
+};

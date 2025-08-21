@@ -8,7 +8,8 @@ const {
     getConversations,
     getMessageRequests,
     acceptMessageRequest,
-    getMessages
+    getMessages,
+    createMessage
 } = require('../controller/ConversationController');
 
 // Apply authentication middleware to all routes in this file
@@ -30,6 +31,9 @@ router.post('/requests/:conversationId/accept', acceptMessageRequest);
 
 // GET /conversations/:conversationId/messages -> Gets messages for one chat
 router.get('/:conversationId/messages', getMessages);
+
+// POST /conversations/:conversationId/messages -> Creates a new message in a conversation
+router.post('/:conversationId/messages', createMessage);
 
 // router.post('/findOrCreate', auth, async (req, res) => {
 //     try {

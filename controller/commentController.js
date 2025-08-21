@@ -5,6 +5,7 @@ exports.commentOnStory = async (req, res) => {
   try {
     // const userId = req.userId;
     const { storyId, text } = req.body;
+    const userId = req.userId; // Get userId from the request, assuming it's set by auth middleware
 
     // Validate input
     if (!storyId || !text) {
@@ -26,7 +27,7 @@ exports.commentOnStory = async (req, res) => {
     // Create a new comment
     const newComment = await comment.create({
       story: storyId,
-      user: "6880df0837ed2e823bf8e3d8",
+      user: userId,
       text
     });
 
@@ -72,6 +73,66 @@ exports.getCommentsByStoryId = async (req, res) => {
       success: true,
       message: "Comments fetched successfully",
       body: comments
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
+  }
+};
+
+exports.saveCommentslikeByStoryId = async (req, res) => {
+  try {
+    const { storyId, commentId } = req.params; // Need both storyId and commentId
+    const userId = req.userId; // Assuming you have user authentication middleware
+
+    // Find and update the comment's like status
+    const updatedComment = await comment.findOneAndUpdate(
+      { 
+        _id: commentId, 
+        story: storyId,
+        user: userId 
+      },
+      [
+        {
+          $set: {
+            isLiked: {
+              $cond: {
+                if: { $ifNull: ["$isLiked", false] }, // if isLiked is null/undefined, treat as false
+                then: false,                          // if currently true, set to false
+                else: true                           // if currently false, set to true
+              }
+            },
+            likesCount: {
+              $cond: {
+                if: { $ifNull: ["$isLiked", false] }, // if currently liked
+                then: { $subtract: [{ $ifNull: ["$likesCount", 0] }, 1] }, // decrease count
+                else: { $add: [{ $ifNull: ["$likesCount", 0] }, 1] }       // increase count
+              }
+            }
+          }
+        }
+      ],
+      { 
+        new: true, // Return updated document
+        runValidators: true 
+      }
+    ).populate('user', 'name profileImage');
+
+    if (!updatedComment) {
+      return res.status(404).json({
+        success: false,
+        message: "Comment not found"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: updatedComment.isLiked ? "Comment liked successfully" : "Comment unliked successfully",
+      body: updatedComment
     });
 
   } catch (err) {
