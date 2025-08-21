@@ -5,6 +5,7 @@ exports.commentOnStory = async (req, res) => {
   try {
     // const userId = req.userId;
     const { storyId, text } = req.body;
+    const userId = req.userId; // Get userId from the request, assuming it's set by auth middleware
 
     // Validate input
     if (!storyId || !text) {
@@ -26,7 +27,7 @@ exports.commentOnStory = async (req, res) => {
     // Create a new comment
     const newComment = await comment.create({
       story: storyId,
-      user: "6880df0837ed2e823bf8e3d8",
+      user: userId,
       text
     });
 
