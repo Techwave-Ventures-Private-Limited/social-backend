@@ -83,3 +83,63 @@ exports.getCommentsByStoryId = async (req, res) => {
     });
   }
 };
+
+exports.saveCommentslikeByStoryId = async (req, res) => {
+  try {
+    const { storyId, commentId } = req.params; // Need both storyId and commentId
+    const userId = req.userId; // Assuming you have user authentication middleware
+
+    // Find and update the comment's like status
+    const updatedComment = await comment.findOneAndUpdate(
+      { 
+        _id: commentId, 
+        story: storyId,
+        user: userId 
+      },
+      [
+        {
+          $set: {
+            isLiked: {
+              $cond: {
+                if: { $ifNull: ["$isLiked", false] }, // if isLiked is null/undefined, treat as false
+                then: false,                          // if currently true, set to false
+                else: true                           // if currently false, set to true
+              }
+            },
+            likesCount: {
+              $cond: {
+                if: { $ifNull: ["$isLiked", false] }, // if currently liked
+                then: { $subtract: [{ $ifNull: ["$likesCount", 0] }, 1] }, // decrease count
+                else: { $add: [{ $ifNull: ["$likesCount", 0] }, 1] }       // increase count
+              }
+            }
+          }
+        }
+      ],
+      { 
+        new: true, // Return updated document
+        runValidators: true 
+      }
+    ).populate('user', 'name profileImage');
+
+    if (!updatedComment) {
+      return res.status(404).json({
+        success: false,
+        message: "Comment not found"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: updatedComment.isLiked ? "Comment liked successfully" : "Comment unliked successfully",
+      body: updatedComment
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
+  }
+};
