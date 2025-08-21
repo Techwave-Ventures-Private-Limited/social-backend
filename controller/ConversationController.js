@@ -1,23 +1,39 @@
+const mongoose = require('mongoose');
 const User = require('../modules/user');
 const Conversation = require('../modules/conversation');
 const Message = require('../modules/message');
 
 // 1. Start a new conversation or return an existing one
+// Replace your existing startConversation function with this more robust version
 exports.startConversation = async (req, res) => {
     try {
         const { recipientId } = req.body;
         const senderId = req.userId;
+        
+        console.log(`[BE LOG] startConversation called. Sender: ${senderId}, Recipient: ${recipientId}`);
 
-        if (!recipientId) {
-            return res.status(400).json({ success: false, message: "Recipient ID is required." });
+        // --- FIX 1: Add validation for the recipient's ID ---
+        // This prevents crashes if an invalid ID is sent from the client.
+        if (!recipientId || !mongoose.Types.ObjectId.isValid(recipientId)) {
+            console.error(`[BE ERROR] Invalid or missing recipientId provided: ${recipientId}`);
+            return res.status(400).json({ success: false, message: "Invalid or missing Recipient ID." });
         }
         
-        // Check if a conversation between these two users already exists
+        // --- FIX 2: Ensure the sender (the logged-in user) exists ---
+        // This prevents the server from crashing if the user's token is valid but their account was deleted.
+        const sender = await User.findById(senderId);
+        if (!sender) {
+            console.error(`[BE FATAL] Authenticated sender with ID ${senderId} not found.`);
+            return res.status(404).json({ success: false, message: "Authenticated user not found." });
+        }
+
+        // Check if a one-on-one conversation between these two users already exists
         const existingConversation = await Conversation.findOne({
-            participants: { $all: [senderId, recipientId] }
+            participants: { $all: [senderId, recipientId], $size: 2 }
         });
 
         if (existingConversation) {
+            console.log(`[BE LOG] Conversation already exists. ID: ${existingConversation._id}`);
             return res.status(200).json({
                 success: true,
                 message: "Conversation already exists.",
@@ -25,12 +41,11 @@ exports.startConversation = async (req, res) => {
             });
         }
 
-        // Determine the status based on follow relationship
-        const sender = await User.findById(senderId);
+        // Determine the status based on the follow relationship
         const isFollowing = sender.following.includes(recipientId);
-        
         const conversationStatus = isFollowing ? 'active' : 'pending';
-
+        console.log(`[BE LOG] Follow status: ${isFollowing}. New conversation status: ${conversationStatus}`);
+        
         const newConversation = new Conversation({
             participants: [senderId, recipientId],
             status: conversationStatus,
@@ -38,6 +53,7 @@ exports.startConversation = async (req, res) => {
         });
 
         await newConversation.save();
+        console.log(`[BE LOG] Successfully created new conversation. ID: ${newConversation._id}`);
 
         return res.status(201).json({
             success: true,
@@ -46,7 +62,14 @@ exports.startConversation = async (req, res) => {
         });
 
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message });
+        // --- FIX 3: Improved catch block to handle ANY other errors ---
+        // This will catch any unexpected database errors and prevent a server crash.
+        console.error("💥 [BE FATAL ERROR] The startConversation controller crashed:", err);
+        return res.status(500).json({ 
+            success: false, 
+            message: "An internal server error occurred while starting the conversation.",
+            error: err.message // Send the actual error message back for easier debugging
+        });
     }
 };
 
