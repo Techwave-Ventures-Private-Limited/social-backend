@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const {getUser, updateUser, uploadProfileImage, sendForgotPasswordEmail, verifyForgotPasswordOtp, changePassword, uploadBannerImage, getAnotherUser, addPortfolio, registerDeviceToken, deletePortfolio, getBulkUsers} = require("../controller/UserController");
+const {getUser, updateUser, uploadProfileImage, sendForgotPasswordEmail, verifyForgotPasswordOtp, changePassword, uploadBannerImage, getAnotherUser, addPortfolio, registerDeviceToken, deletePortfolio, getBulkUsers, getFollowers} = require("../controller/UserController");
 const {createStory, getFollowingStories, getCurrentStory, deleteStory} = require("../controller/StoryController");
 const {auth}  = require("../middleware/authMiddleware");
 const { followUser, unFollowUser } = require("../controller/FollowController");
@@ -9,7 +9,6 @@ const {commentOnStory,getCommentsByStoryId,saveCommentslikeByStoryId} = require(
 
 router.get("/getUser", auth, getUser);
 router.get("/story", auth, getFollowingStories);
-router.get("/:userId", auth, getAnotherUser);
 router.post("/update", auth, updateUser);
 router.post("/follow", auth, followUser);
 router.post("/unfollow", auth, unFollowUser);
@@ -20,6 +19,7 @@ router.post("/story/comment", auth, commentOnStory);
 router.get("/story/:storyId/comments", getCommentsByStoryId);
 router.put("/storyId/:storyId/commnentId/:commentId/saveComment", auth, saveCommentslikeByStoryId);
 router.post("/getBulkUser", auth, getBulkUsers);
+router.get("/followers", auth, getFollowers);
 
 
 router.post("/forgotPassword", sendForgotPasswordEmail);
@@ -29,6 +29,7 @@ router.post("/uploadBannerImage", auth, uploadBannerImage);
 router.delete("/story/:storyId", auth, deleteStory);
 router.post("/portfolio", auth, addPortfolio);
 router.delete("/portfolio/:id", auth, deletePortfolio);
+router.get("/:userId", auth, getAnotherUser);
 
 router.post("/register-device-token", auth, registerDeviceToken);
 
