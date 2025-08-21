@@ -9,7 +9,6 @@ const {commentOnStory,getCommentsByStoryId} = require("../controller/commentCont
 
 router.get("/getUser", auth, getUser);
 router.get("/story", auth, getFollowingStories);
-router.get("/:userId", auth, getAnotherUser);
 router.post("/update", auth, updateUser);
 router.post("/follow", auth, followUser);
 router.post("/unfollow", auth, unFollowUser);
@@ -29,6 +28,7 @@ router.post("/uploadBannerImage", auth, uploadBannerImage);
 router.delete("/story/:storyId", auth, deleteStory);
 router.post("/portfolio", auth, addPortfolio);
 router.delete("/portfolio/:id", auth, deletePortfolio);
+router.get("/:userId", auth, getAnotherUser);
 
 router.post("/register-device-token", auth, registerDeviceToken);
 
