@@ -9,7 +9,8 @@ const {
     getMessageRequests,
     acceptMessageRequest,
     getMessages,
-    createMessage
+    createMessage,
+    markMessagesAsSeen
 } = require('../controller/ConversationController');
 
 // Apply authentication middleware to all routes in this file
@@ -35,37 +36,7 @@ router.get('/:conversationId/messages', getMessages);
 // POST /conversations/:conversationId/messages -> Creates a new message in a conversation
 router.post('/:conversationId/messages', createMessage);
 
-// router.post('/findOrCreate', auth, async (req, res) => {
-//     try {
-//         const { recipientId } = req.body;
-//         const senderId = req.userId;
-
-//         if (!recipientId) {
-//             return res.status(400).json({ message: 'Recipient ID is required.' });
-//         }
-
-//         // Search for an existing one-on-one conversation
-//         let conversation = await Conversation.findOne({
-//             participants: { $all: [senderId, recipientId], $size: 2 }, // Exactly these two participants
-//             isGroupChat: false // Ensure it's not a group chat
-//         });
-
-//         // If no conversation exists, create one
-//         if (!conversation) {
-//             conversation = new Conversation({
-//                 participants: [senderId, recipientId],
-//                 isGroupChat: false
-//             });
-//             await conversation.save();
-//         }
-
-//         // Return the full conversation object, including its ID
-//         res.status(200).json({ success: true, body: conversation });
-
-//     } catch (error) {
-//         console.error('Error in findOrCreate conversation:', error);
-//         res.status(500).json({ message: 'Server error' });
-//     }
-// });
+// POST /conversations/:conversationId/seen -> Marks messages as seen
+router.post('/:conversationId/seen', markMessagesAsSeen);
 
 module.exports = router;
