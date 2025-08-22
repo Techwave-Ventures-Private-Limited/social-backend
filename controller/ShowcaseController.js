@@ -319,7 +319,7 @@ exports.replyToComment = async (req, res) => {
         // Create the reply comment
         const replyComment = await Comment.create({
             text: content,
-            postId,
+            showcaseId,
             replyTo: commentId,
             userId: req.userId
         });
