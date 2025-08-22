@@ -1,6 +1,7 @@
 const User = require("../modules/user");
 const Showcase = require("../modules/showcase");
 const { uploadMultipleImagesToCloudinary, uploadImageToCloudinary } = require("../utils/imageUploader");
+const { createNotification } = require('../utils/notificationUtils');
 
 exports.createShowcase = async(req,res) => {
     try {
@@ -195,3 +196,148 @@ exports.downvote = async(req,res) => {
     }
 }
 
+exports.commentShowcase = async (req, res) => {
+    try {
+        const { showcaseId, text } = req.body;
+
+        if (!showcaseId || !text) {
+            return res.json({
+                success: false,
+                message: "showcaseId and text required"
+            })
+        }
+
+        const showcase = await Showcase.findById(showcaseId);
+        if (!showcase) {
+            return res.status(400).json({
+                success: false,
+                message: "Showcase Not found"
+            })
+        }
+
+        const comment = await Comment.create({ text, showcaseId, userId: req.userId });
+
+        showcase.comments.push(comment._id);
+        await showcase.save();
+
+        await createNotification(showcase.userId, req.userId, 'comment', showcaseId);
+
+        return res.status(200).json({
+            success: true,
+            message: "Comment created ",
+            body: comment,
+            showcase: showcase
+        })
+
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
+
+exports.getCommentsForShowcase = async (req, res) => {
+    try {
+        const { showcaseId } = req.params;
+
+        if (!showcaseId) {
+            return res.status(400).json({
+                success: false,
+                message: "showcaseId required"
+            })
+        }
+
+        // Fetch all comments for the showcase, populate userId
+        const comments = await Comment.find({ showcaseId: showcaseId }).populate('userId');
+
+        // Build a map of commentId -> comment for easy lookup
+        const commentMap = {};
+        comments.forEach(c => { commentMap[c._id] = c; });
+
+        // Helper to recursively format comments with nested replies and author info
+        async function formatComment(comment) {
+            await comment.populate('replies');
+            await comment.populate('userId');
+            const user = comment.userId;
+            return {
+                id: comment._id,
+                author: {
+                    id: user?._id,
+                    name: user?.name,
+                    avatar: user?.profileImage || null
+                },
+                content: comment.text,
+                createdAt: comment.createAt ? comment.createAt.toISOString() : new Date().toISOString(),
+                likes: comment.likes || 0,
+                isLiked: false,
+                replies: await Promise.all((comment.replies || []).map(reply => formatComment(reply)))
+            };
+        }
+
+        // Get only top-level comments (no replyTo)
+        const topLevelComments = comments.filter(c => !c.replyTo);
+
+        const formattedComments = await Promise.all(
+            topLevelComments.map(comment => formatComment(comment))
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: "Comments found",
+            body: formattedComments
+        });
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
+
+exports.replyToComment = async (req, res) => {
+    try {
+        const { showcaseId, commentId, content } = req.body;
+        const userId = req.userId;
+
+        if (!showcaseId || !commentId || !content) {
+            return res.status(400).json({
+                success: false,
+                message: "showcaseId, commentId, and content are required"
+            });
+        }
+
+        // Ensure the parent comment exists
+        const parentComment = await Comment.findById(commentId);
+        if (!parentComment) {
+            return res.status(404).json({
+                success: false,
+                message: "Parent comment not found"
+            });
+        }
+
+        // Create the reply comment
+        const replyComment = await Comment.create({
+            text: content,
+            postId,
+            replyTo: commentId,
+            userId: req.userId
+        });
+
+        // Add reply to parent's replies array
+        parentComment.replies = parentComment.replies || [];
+        parentComment.replies.push(replyComment._id);
+        await parentComment.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Reply created",
+            body: replyComment
+        });
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+}
