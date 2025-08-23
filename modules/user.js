@@ -33,6 +33,10 @@ const userSchema = new mongoose.Schema({
         type:String,
         default: ""
     },
+    highlight: {
+        type: String,
+        default: ""
+    },
     address:{
         type:String,
         default : ""

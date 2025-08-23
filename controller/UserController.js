@@ -118,13 +118,13 @@ exports.updateUser = async(req,res) => {
         }
 
         const {
-            name, bio, education = [], experience = [],
+            name, bio, highlight, education = [], experience = [],
             skills = [], headline = "", location = "", phone = "", website = ""
         } = req.body;
 
         user.name = name || user.name;
         user.bio = bio || user.bio;
-
+        user.highlight = highlight || user.highlight;
        
         let about = null;
         if (user.about) {
