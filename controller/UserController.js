@@ -119,7 +119,7 @@ exports.updateUser = async(req,res) => {
 
         const {
             name, bio, headline, education = [], experience = [],
-            skills = [], headline = "", location = "", phone = "", website = ""
+            skills = [], location = "", phone = "", website = ""
         } = req.body;
 
         user.name = name || user.name;
