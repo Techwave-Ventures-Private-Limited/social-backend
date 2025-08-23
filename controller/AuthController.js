@@ -65,6 +65,7 @@ exports.signup = async (req, res) => {
       message: "User registered successfully",
       userId: savedUser._id,
       token: emailVerificationToken,
+      user: savedUser
     });
   } catch (error) {
     console.error("Signup Error:", error);
