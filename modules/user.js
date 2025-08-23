@@ -33,7 +33,7 @@ const userSchema = new mongoose.Schema({
         type:String,
         default: ""
     },
-    highlight: {
+    headline: {
         type: String,
         default: ""
     },
