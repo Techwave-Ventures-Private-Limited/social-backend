@@ -118,13 +118,13 @@ exports.updateUser = async(req,res) => {
         }
 
         const {
-            name, bio, education = [], experience = [],
-            skills = [], headline = "", location = "", phone = "", website = ""
+            name, bio, headline, education = [], experience = [],
+            skills = [], location = "", phone = "", website = ""
         } = req.body;
 
         user.name = name || user.name;
         user.bio = bio || user.bio;
-
+        user.headline = headline || user.headline;
        
         let about = null;
         if (user.about) {
@@ -587,32 +587,60 @@ exports.getBulkUsers = async (req, res) => {
 };
 
 
-exports.getFollowers = async (req, res) => {
+// exports.getFollowers = async (req, res) => {
+//     try {
+//         const userId = req.userId; // Get the logged-in user's ID from the auth middleware
+
+//         if (!userId) {
+//             return res.status(401).json({
+//                 success: false,
+//                 message: "Unauthorized request",
+//             });
+//         }
+
+//         // Find the user and populate the 'following' field to get the full user objects
+//         const user = await User.findById(userId).populate({
+//             path: 'following',
+//             select: '_id name profileImage' // Select only the fields you need for the share sheet
+//         }).lean();
+
+//         if (!user) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "User not found",
+//             });
+//         }
+
+//         // The 'following' array now contains the full user profiles
+//         const followers = user.following;
+
+//         return res.status(200).json({
+//             success: true,
+//             message: "Followers fetched successfully",
+//             body: followers,
+//         });
+
+//     } catch (err) {
+//         console.error("Error in getFollowers controller:", err.message);
+//         return res.status(500).json({
+//             success: false,
+//             message: err.message,
+//         });
+//     }
+// };
+
+
+/**
+ * @description Get the list of users who follow the currently authenticated user.
+ */
+exports.getSelfFollowers = async (req, res) => {
     try {
-        const userId = req.userId; // Get the logged-in user's ID from the auth middleware
+        const userId = req.userId;
 
-        if (!userId) {
-            return res.status(401).json({
-                success: false,
-                message: "Unauthorized request",
-            });
-        }
-
-        // Find the user and populate the 'following' field to get the full user objects
-        const user = await User.findById(userId).populate({
-            path: 'following',
-            select: '_id name profileImage' // Select only the fields you need for the share sheet
-        }).lean();
-
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: "User not found",
-            });
-        }
-
-        // The 'following' array now contains the full user profiles
-        const followers = user.following;
+        // Find all users who are following the current user
+        const followers = await User.find({ following: userId })
+            .select('_id name profileImage bio headline')
+            .lean();
 
         return res.status(200).json({
             success: true,
@@ -621,10 +649,103 @@ exports.getFollowers = async (req, res) => {
         });
 
     } catch (err) {
-        console.error("Error in getFollowers controller:", err.message);
+        console.error("Error in getSelfFollowers controller:", err.message);
         return res.status(500).json({
             success: false,
-            message: err.message,
+            message: "Failed to fetch followers.",
+        });
+    }
+};
+
+/**
+ * @description Get the list of users the currently authenticated user is following.
+ */
+exports.getSelfFollowing = async (req, res) => {
+    try {
+        const userId = req.userId;
+
+        const user = await User.findById(userId)
+            .populate({
+                path: 'following',
+                select: '_id name profileImage bio headline'
+            })
+            .lean();
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Following list fetched successfully",
+            body: user.following || [],
+        });
+
+    } catch (err) {
+        console.error("Error in getSelfFollowing controller:", err.message);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch following list.",
+        });
+    }
+};
+
+/**
+ * @description Get the followers list for a specific user by their ID.
+ */
+exports.getUserFollowers = async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        // Find all users who are following the specified userId
+        const followers = await User.find({ following: userId })
+            .select('_id name profileImage bio headline')
+            .lean();
+
+        return res.status(200).json({
+            success: true,
+            message: `Followers for user ${userId} fetched successfully`,
+            body: followers,
+        });
+
+    } catch (err) {
+        console.error("Error in getUserFollowers controller:", err.message);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch user's followers.",
+        });
+    }
+};
+
+/**
+ * @description Get the following list for a specific user by their ID.
+ */
+exports.getUserFollowing = async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        const user = await User.findById(userId)
+            .populate({
+                path: 'following',
+                select: '_id name profileImage bio headline'
+            })
+            .lean();
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: `Following list for user ${userId} fetched successfully`,
+            body: user.following || [],
+        });
+
+    } catch (err) {
+        console.error("Error in getUserFollowing controller:", err.message);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch user's following list.",
         });
     }
 };

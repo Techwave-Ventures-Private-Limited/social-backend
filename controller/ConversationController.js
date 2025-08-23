@@ -169,13 +169,107 @@ exports.acceptMessageRequest = async (req, res) => {
 };
 
 // 5. Get all messages for a specific conversation
+// exports.getMessages = async (req, res) => {
+//     try {
+//         const { conversationId } = req.params;
+//         const userId = req.userId;
+//         const { page = 1, limit = 20 } = req.query;
+
+//         // Ensure user is part of the conversation
+//         const conversation = await Conversation.findOne({ _id: conversationId, participants: userId });
+//         if (!conversation) {
+//             return res.status(403).json({ success: false, message: "You are not a member of this conversation." });
+//         }
+
+//         const messages = await Message.find({ conversationId: conversationId })
+//             .populate('sender', 'name profileImage')
+//             .populate('sharedPost') // Populates the full post document if shared
+//             .populate('sharedNews') // Populates the full news document if shared
+//             .sort({ createdAt: -1 })
+//             .limit(limit * 1)
+//             .skip((page - 1) * limit);
+
+//         // Reverse to show oldest messages first in the chat window
+//         messages.reverse();
+        
+//         const count = await Message.countDocuments({ conversationId });
+
+
+//         return res.status(200).json({
+//             success: true,
+//             message: "Messages fetched successfully.",
+//             body: {
+//                 messages,
+//                 conversationStatus: conversation.status,
+//                 initiatedBy: conversation.initiatedBy,
+//                 totalPages: Math.ceil(count / limit),
+//                 currentPage: parseInt(page)
+//             },
+//         });
+//     } catch (err) {
+//         return res.status(500).json({ success: false, message: err.message });
+//     }
+// };
+
+
+// 6. Create a new message in a conversation
+// exports.createMessage = async (req, res) => {
+//     try {
+//         const { conversationId } = req.params;
+//         const senderId = req.userId;
+
+//         // Get the message content from the request body
+//         const { content, sharedPostId, sharedNewsId } = req.body;
+
+//         // Basic validation
+//         if (!content && !sharedPostId && !sharedNewsId) {
+//             return res.status(400).json({ success: false, message: "Message cannot be empty." });
+//         }
+
+//         // Create the new message document
+//         const newMessage = await Message.create({
+//             conversationId,
+//             sender: senderId,
+//             content: content || '', // Default to empty string if not provided
+//             sharedPost: sharedPostId || null,
+//             sharedNews: sharedNewsId || null,
+//             readBy: [senderId] // The sender has "read" their own message
+//         });
+
+//         // Update the parent conversation with the last message and timestamp
+//         await Conversation.findByIdAndUpdate(conversationId, {
+//             lastMessage: newMessage._id,
+//             updatedAt: Date.now()
+//         });
+
+//         // Populate the sender info for the socket event
+//         const populatedMessage = await Message.findById(newMessage._id).populate('sender', 'name profileImage');
+
+//         // You should emit a socket event here to notify other users in real-time
+//         // E.g., io.to(conversationId).emit('newMessage', populatedMessage);
+
+//         return res.status(201).json({
+//             success: true,
+//             message: "Message sent successfully.",
+//             body: populatedMessage
+//         });
+
+//     } catch (err) {
+//         console.error("💥 [BE FATAL ERROR] The createMessage controller crashed:", err);
+//         return res.status(500).json({ success: false, message: "Failed to send message.", error: err.message });
+//     }
+// };
+
+
+
+
+// 5. Get all messages for a specific conversation
 exports.getMessages = async (req, res) => {
     try {
         const { conversationId } = req.params;
         const userId = req.userId;
         const { page = 1, limit = 20 } = req.query;
 
-        // Ensure user is part of the conversation
         const conversation = await Conversation.findOne({ _id: conversationId, participants: userId });
         if (!conversation) {
             return res.status(403).json({ success: false, message: "You are not a member of this conversation." });
@@ -183,17 +277,17 @@ exports.getMessages = async (req, res) => {
 
         const messages = await Message.find({ conversationId: conversationId })
             .populate('sender', 'name profileImage')
-            .populate('sharedPost') // Populates the full post document if shared
-            .populate('sharedNews') // Populates the full news document if shared
+            .populate('sharedPost')
+            .populate('sharedNews')
+            .populate('sharedUser', 'name profileImage bio') 
+            .populate('sharedShowcase', 'projectTitle logo tagline')
             .sort({ createdAt: -1 })
             .limit(limit * 1)
             .skip((page - 1) * limit);
 
-        // Reverse to show oldest messages first in the chat window
         messages.reverse();
         
         const count = await Message.countDocuments({ conversationId });
-
 
         return res.status(200).json({
             success: true,
@@ -211,39 +305,43 @@ exports.getMessages = async (req, res) => {
     }
 };
 
-
-// 6. Create a new message in a conversation
+// 6. Create a new message in a conversation (UPDATED)
 exports.createMessage = async (req, res) => {
     try {
         const { conversationId } = req.params;
         const senderId = req.userId;
 
-        // Get the message content from the request body
-        const { content, sharedPostId, sharedNewsId } = req.body;
+        // --- NEW: Destructure new shared item IDs from the body ---
+        const { content, sharedPostId, sharedNewsId, sharedUserId, sharedShowcaseId } = req.body;
 
-        // Basic validation
-        if (!content && !sharedPostId && !sharedNewsId) {
-            return res.status(400).json({ success: false, message: "Message cannot be empty." });
+        // --- NEW: Updated validation to include new shared types ---
+        if (!content && !sharedPostId && !sharedNewsId && !sharedUserId && !sharedShowcaseId) {
+            return res.status(400).json({ success: false, message: "Message content cannot be empty." });
         }
 
-        // Create the new message document
+        // --- NEW: Create message object with the new schema structure ---
         const newMessage = await Message.create({
             conversationId,
             sender: senderId,
-            content: content || '', // Default to empty string if not provided
+            content: content || null,
             sharedPost: sharedPostId || null,
             sharedNews: sharedNewsId || null,
-            readBy: [senderId] // The sender has "read" their own message
+            sharedUser: sharedUserId || null,
+            sharedShowcase: sharedShowcaseId || null,
+            readBy: [{ user: senderId, seenAt: new Date() }]
         });
 
-        // Update the parent conversation with the last message and timestamp
         await Conversation.findByIdAndUpdate(conversationId, {
             lastMessage: newMessage._id,
-            updatedAt: Date.now()
         });
 
-        // Populate the sender info for the socket event
-        const populatedMessage = await Message.findById(newMessage._id).populate('sender', 'name profileImage');
+        // --- NEW: Populate all possible shared item types ---
+        const populatedMessage = await Message.findById(newMessage._id)
+            .populate('sender', 'name profileImage')
+            .populate('sharedPost')
+            .populate('sharedNews')
+            .populate('sharedUser', 'name profileImage bio')
+            .populate('sharedShowcase', 'projectTitle logo tagline');
 
         // You should emit a socket event here to notify other users in real-time
         // E.g., io.to(conversationId).emit('newMessage', populatedMessage);
@@ -257,5 +355,48 @@ exports.createMessage = async (req, res) => {
     } catch (err) {
         console.error("💥 [BE FATAL ERROR] The createMessage controller crashed:", err);
         return res.status(500).json({ success: false, message: "Failed to send message.", error: err.message });
+    }
+};
+
+// 7. Mark messages in a conversation as seen (NEW)
+exports.markMessagesAsSeen = async (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        const userId = req.userId;
+
+        // Find all messages in the conversation that the user has not yet read
+        // and update them by adding the user to the 'readBy' array.
+        const result = await Message.updateMany(
+            {
+                conversationId: conversationId,
+                // Ensure the user is not the sender
+                sender: { $ne: userId }, 
+                // Ensure the user is not already in the readBy array
+                'readBy.user': { $ne: userId }
+            },
+            {
+                // Add the current user and timestamp to the 'readBy' array
+                $addToSet: { readBy: { user: userId, seenAt: new Date() } }
+            }
+        );
+
+        if (result.nModified > 0) {
+            // A socket event should be emitted here to inform the other user(s)
+            // that their messages have been seen in real-time.
+            // E.g., io.to(conversationId).emit('messagesSeen', { conversationId, readerId: userId });
+            console.log(`[BE LOG] ${result.nModified} messages in conversation ${conversationId} marked as seen by user ${userId}.`);
+        }
+        
+        return res.status(200).json({
+            success: true,
+            message: "Messages marked as seen.",
+            body: {
+                modifiedCount: result.nModified
+            }
+        });
+
+    } catch (err) {
+        console.error("💥 [BE FATAL ERROR] The markMessagesAsSeen controller crashed:", err);
+        return res.status(500).json({ success: false, message: "Failed to update seen status.", error: err.message });
     }
 };
