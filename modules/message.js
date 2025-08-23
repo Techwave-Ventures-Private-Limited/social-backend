@@ -1,3 +1,4 @@
+// module/message.js
 const mongoose = require('mongoose');
 
 const messageSchema = new mongoose.Schema({
@@ -23,10 +24,27 @@ const messageSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "news-article",
     },
-    readBy: [{
+    // New fields to handle sharing user profiles and showcases
+    sharedUser: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
+    },
+    sharedShowcase: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Showcase",
+    },
+    // Updated to store seen timestamps for each user
+    readBy: [{
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true
+        },
+        seenAt: {
+            type: Date,
+            default: Date.now
+        }
     }]
-}, { timestamps: true });
+}, { timestamps: true }); // `createdAt` acts as the sent timestamp
 
 module.exports = mongoose.model("Message", messageSchema);
