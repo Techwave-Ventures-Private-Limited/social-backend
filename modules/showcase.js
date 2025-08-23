@@ -53,6 +53,11 @@ const showcaseSchema = new mongoose.Schema({
     upvotesUsers: [{
         type: String,
     }],
+    comments:[{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "ShowcaseComment",
+            default : ""
+    }],
     createdAt: {
         type: Date,
         default: Date.now
