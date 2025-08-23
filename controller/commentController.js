@@ -1,5 +1,8 @@
 const comment = require("../modules/comment");
+const ShowcaseComment = require("../modules/showcaseComment");
 const Story = require('../modules/story'); // Assuming your Story model is in this path
+const User = require("../modules/user");
+const PostComment = require("../modules/comments");
 
 exports.commentOnStory = async (req, res) => {
   try {
@@ -143,3 +146,95 @@ exports.saveCommentslikeByStoryId = async (req, res) => {
     });
   }
 };
+
+exports.likeComment = async(req,res) => {
+  try {
+
+    const commentId = req.params.commentId;
+    const userId = req.userId;
+    let comment = await ShowcaseComment.findById(commentId);
+
+    if (!comment) {
+      comment = await PostComment.findById(commentId);
+      if (!comment) {
+         return res.status(400).json({
+          success: false,
+          message: "Comment not found"
+        })
+      }
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(400).json({
+        succes: false,
+        message:"User doesnot exists"
+      })
+    }
+
+    comment.likes = comment.likes+1;
+    await comment.save();
+
+    user.likedComments.push(commentId);
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message:"Comment liked",
+      comment
+    })
+
+  } catch(err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+}
+
+exports.unlikeComment = async(req,res) => {
+  try {
+
+    const commentId = req.params.commentId;
+    const userId = req.userId;
+    let comment = await ShowcaseComment.findById(commentId);
+
+    if (!comment) {
+      comment = await PostComment.findById(commentId);
+      if (!comment) {
+         return res.status(400).json({
+          success: false,
+          message: "Comment not found"
+        })
+      }
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(400).json({
+        succes: false,
+        message:"User doesnot exists"
+      })
+    }
+
+    comment.likes = comment.likes-1;
+    await comment.save();
+
+    user.likedComments.pull(commentId);
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message:"Comment unliked",
+      comment
+    })
+
+  } catch(err) {
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
+  }
+}

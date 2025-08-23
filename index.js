@@ -42,6 +42,7 @@ const newsRouter = require("./route/newsRoute");
 const searchRouter = require("./route/searchRoute");
 const notificationRouter = require("./route/notificationRoute");
 const conversationRouter = require("./route/ConversationRoutes");
+const commentRouter = require("./route/commentRoute");
 
 
 // --- Models (needed for socket logic) ---
@@ -88,6 +89,7 @@ app.use("/news", newsRouter);
 app.use("/search", searchRouter);
 app.use("/notification", notificationRouter);
 app.use("/conversations", conversationRouter); 
+app.use("/comment", commentRouter);
 
 // --- Health Check and Root Routes ---
 app.use("/hailing",(req,res)=>{

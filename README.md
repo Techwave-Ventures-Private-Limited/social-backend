@@ -315,4 +315,15 @@ Formdata
 
 ### get user comments (replies)
 `post/comment/getUser`
+
+---
+
+### Like comment 
+`comment/like/:commentId`
+
+---
+
+### Unlike comment 
+`comment/unlike/:commentId`
+
 ---

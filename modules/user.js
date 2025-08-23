@@ -126,6 +126,10 @@ const userSchema = new mongoose.Schema({
     deviceTokens: [{
         type: String,
     }],
+    likedComments: [{
+        type: String,
+        default: []
+    }]
 })
 
 module.exports = mongoose.model("User",userSchema);
