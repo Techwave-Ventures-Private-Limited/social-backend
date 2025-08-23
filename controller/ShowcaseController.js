@@ -1,5 +1,6 @@
 const User = require("../modules/user");
 const Showcase = require("../modules/showcase");
+const Comment = require("../modules/showcaseComment");
 const { uploadMultipleImagesToCloudinary, uploadImageToCloudinary } = require("../utils/imageUploader");
 const { createNotification } = require('../utils/notificationUtils');
 
