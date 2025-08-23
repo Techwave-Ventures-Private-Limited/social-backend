@@ -21,12 +21,12 @@ const showcaseCommentSchema = new mongoose.Schema({
     },
     replyTo: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Comment',
+        ref: 'ShowcaseComment',
         default: null
     },
     replies: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Comment',
+        ref: 'ShowcaseComment',
         default: []
     }],
     createAt:{
