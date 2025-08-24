@@ -5,7 +5,7 @@ exports.auth = async (req,res,next)=>{
 
     try{
         //console.log("Flow til here")
-        const token = req.cookies.token || req.headers.token || req.headers.token.split(' ')[1];
+        const token = req.headers.token || req.headers.token.split(' ')[1];
         //console.log(process.env.JWT_SECRET)
         //console.log("Token:", token);
         if(!token){
