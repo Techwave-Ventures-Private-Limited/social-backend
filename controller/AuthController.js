@@ -23,12 +23,6 @@ exports.signup = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    let emailVerificationToken = jwt.sign(
-      { email },
-      process.env.JWT_SECRET,
-      { expiresIn: "365d" }
-    );
-
     let otp = '';
     for (let i = 0; i < 6; i++) {
       otp += Math.floor(Math.random() * 10);
@@ -46,27 +40,24 @@ exports.signup = async (req, res) => {
 
     const profileImage = `https://ui-avatars.com/api/?name=${initials}&background=random&color=fff`;
 
-    const savedUser = await User.create({
+     const savedUser = await User.create({
       name,
       email,
       otp,
       password: hashedPassword,
-      emailVerityToken: emailVerificationToken,
       profileImage,
     });
 
-    emailVerificationToken = jwt.sign(
-      {
-        email,
-        id: savedUser._id,
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "5d",
-      }
-    );
+    const token = jwt.sign({
+                email:email,id:savedUser._id,role:savedUser.role
+            },
+            process.env.JWT_SECRET, 
+            {
+                expiresIn: "365d",
+            }
+            );
 
-    savedUser.emailVerityToken = emailVerificationToken;
+    savedUser.token = token;
     await savedUser.save();
 
     await Otp.create({
@@ -77,7 +68,7 @@ exports.signup = async (req, res) => {
     return res.status(201).json({
       message: "User registered successfully",
       userId: savedUser._id,
-      token: emailVerificationToken,
+      token: token,
       user: savedUser
     });
   } catch (error) {
