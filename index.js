@@ -28,7 +28,7 @@ const database = require('./config/dbonfig');
 const cors = require("cors");
 const fileUpload = require("express-fileupload");
 const { cloudinaryConnect } = require("./config/cloudinary");
-const serviceAccount = require("/etc/secrets/connektx-firebase-adminsdk-fbsvc-b76858ef61.json");
+const serviceAccount = require("./etc/secrets/connektx-firebase-adminsdk-fbsvc-b76858ef61.json");
 const admin = require('firebase-admin');
 
 
