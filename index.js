@@ -99,8 +99,8 @@ app.use("/hailing",(req,res)=>{
     })
 })
 
-app.get("/",()=>{
-    return `<h1>Working..</h1>`
+app.get("/",(req, res)=>{
+    return res.send(`<h1>Working..</h1>`)
 })
 
 
@@ -194,7 +194,7 @@ io.on('connection', (socket) => {
 
 
 // --- Server Listening ---
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running at ${PORT}`);
 });
 
