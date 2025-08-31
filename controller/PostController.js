@@ -1,6 +1,8 @@
 const Post = require("../modules/post");
 const User = require("../modules/user");
 const Comment = require("../modules/comments");
+const Community = require("../modules/community");
+const CommunityPost = require("../modules/communityPost");
 const { createNotification } = require('../utils/notificationUtils');
 const { uploadMultipleImagesToCloudinary, uploadVideoToCloudinary, uploadImageToCloudinary } = require("../utils/imageUploader");
 
@@ -761,6 +763,165 @@ exports.editPost = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: err.message
+        });
+    }
+};
+
+// ================================
+// HOME FEED WITH COMMUNITY POSTS
+// ================================
+
+// Get combined home feed (regular posts + community posts based on privacy rules)
+exports.getHomeFeedWithCommunities = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { page = 1, limit = 20, filter = 'latest' } = req.query;
+        const skip = (page - 1) * limit;
+
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: "Authentication required"
+            });
+        }
+
+        // Get user's following list and joined communities
+        const currentUser = await User.findById(userId)
+            .populate('following', '_id name profileImage')
+            .populate('savedPost')
+            .populate('likedPost');
+
+        const followingIds = currentUser.following.map(f => f._id);
+
+        // Get communities user is member of
+        const userCommunities = await Community.find({
+            members: userId
+        }).select('_id isPrivate name logo');
+
+        const publicCommunityIds = userCommunities
+            .filter(c => !c.isPrivate)
+            .map(c => c._id);
+
+        // Get regular posts from following users
+        const regularPostsQuery = {
+            userId: { $in: followingIds },
+            postType: 'public'
+        };
+
+        const regularPosts = await Post.find(regularPostsQuery)
+            .populate({
+                path: 'userId',
+                populate: [
+                    { path: 'about', model: 'About' },
+                    { path: 'education', model: 'Education' },
+                    { path: 'experience', model: 'Experience' }
+                ]
+            })
+            .populate('comments')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        // Get community posts that should appear in home feed
+        let communityPosts = [];
+        if (publicCommunityIds.length > 0) {
+            communityPosts = await CommunityPost.find({
+                communityId: { $in: publicCommunityIds },
+                type: { $ne: 'question' }, // Q&A should not appear in home feed
+                isDeleted: { $ne: true }
+            })
+            .populate('authorId', 'name profileImage')
+            .populate('communityId', 'name logo isPrivate')
+            .populate('likes', 'name')
+            .populate({
+                path: 'comments',
+                populate: { path: 'authorId', select: 'name profileImage' }
+            })
+            .sort({ createdAt: -1 })
+            .lean();
+        }
+
+        // Format regular posts
+        const formattedRegularPosts = regularPosts.map(post => {
+            const formatted = formatPost(post, currentUser);
+            return {
+                ...formatted,
+                postSource: 'user',
+                community: null
+            };
+        }).filter(Boolean);
+
+        // Format community posts
+        const formattedCommunityPosts = communityPosts.map(post => {
+            const author = post.authorId;
+            if (!author) return null;
+
+            const isBookmarked = false; // Community posts bookmarking can be implemented later
+            const isLiked = post.likes.some(like => like._id?.toString() === userId || like.toString() === userId);
+
+            return {
+                id: post._id,
+                author: {
+                    id: author._id,
+                    name: author.name,
+                    username: null,
+                    email: author.email || null,
+                    avatar: author.profileImage || null,
+                    coverImage: null,
+                    headline: null,
+                    bio: null,
+                    location: null,
+                    website: null,
+                    joinedDate: null,
+                    followers: 0,
+                    following: 0,
+                    streak: null,
+                    lastStoryDate: null,
+                    isFollowing: false,
+                    profileViews: null,
+                    education: [],
+                    experience: [],
+                    skills: [],
+                    phone: null,
+                    socialLinks: [],
+                    isCounselor: false,
+                    counselorInfo: null
+                },
+                content: post.content,
+                images: post.images || [],
+                createdAt: post.createdAt,
+                likes: post.likes?.length || 0,
+                comments: post.comments?.length || 0,
+                isLiked,
+                isBookmarked,
+                commentsList: post.comments || [],
+                originalPost: null,
+                isReposted: false,
+                postSource: 'community',
+                community: post.communityId,
+                postType: post.type
+            };
+        }).filter(Boolean);
+
+        // Combine and sort all posts by creation date
+        const allPosts = [...formattedRegularPosts, ...formattedCommunityPosts]
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            .slice(skip, skip + parseInt(limit));
+
+        return res.status(200).json({
+            success: true,
+            body: allPosts,
+            pagination: {
+                currentPage: parseInt(page),
+                hasNextPage: allPosts.length === parseInt(limit)
+            }
+        });
+
+    } catch (error) {
+        console.error("Error fetching home feed with communities:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch home feed",
+            error: error.message
         });
     }
 };
