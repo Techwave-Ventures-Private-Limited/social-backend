@@ -126,6 +126,8 @@ exports.createEvent = async(req,res) => {
             eventObject.maxAttendees = parseInt(eventObject.maxAttendees);
         }
 
+        eventObject.userId = userId;
+
         // Create the event
         const createdEvent = await Event.create(eventObject);
         if (!user.event) user.event = [];
@@ -208,7 +210,7 @@ exports.getUserEvents = async(req,res) => {
             })
         }
 
-        const events = await Event.find({userId: userId});
+        const events = await Event.find({ userId: userId });
 
         return res.status(200).json({
             success:true,
@@ -751,3 +753,68 @@ exports.generateEventTicketPDF = async (req, res) => {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
+
+exports.deleteEvent = async(req, res) => {
+    try {
+
+        const userId = req.userId;
+
+        const eventId = req.params.eventId;
+
+        const event = await Event.findById(eventId);
+
+        if (!event) {
+            return res.status(404).json({
+                success: false,
+                message: "Event not found"
+        })
+        }
+
+        if (event.userId !== userId) {
+            return res.status(400).json({
+                success: false,
+                message: "You are not owner of this event."
+            })
+        }
+
+        await Event.findByIdAndDelete(eventId);
+
+        return res.status(200).json({
+            success: true,
+            message: "Event deleted successfully"
+        })
+
+    } catch(err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
+
+exports.getAttendesUser = async(req,res) => {
+    try {
+
+        const eventId = req.params.eventId;
+
+        const event = await Event.findById(eventId);
+
+        if (!event) {
+            return res.status(404).json({
+                success: false,
+                message: "Event not found"
+            })
+        }
+
+        return res.status(200).json({   
+            success: true,
+            data : event.attendees
+        })
+
+    } catch(err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}

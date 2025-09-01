@@ -327,3 +327,16 @@ Formdata
 `comment/unlike/:commentId`
 
 ---
+
+### get user event 
+`event/user/self`
+
+--- 
+
+### delete event
+`event/:eventId`
+
+---
+
+### get attendees
+`event/attendees/:eventId`
