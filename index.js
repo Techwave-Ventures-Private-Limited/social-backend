@@ -1,13 +1,15 @@
 // index.js
 // This is the main entry point for the application.
 
-
+// Load environment variables first
+require('dotenv').config();
 
 // --- Core Modules ---
 const express = require('express');
 const http = require('http'); // Import the http module
 const { Server } = require("socket.io"); // Import the Server class from socket.io
 const jwt = require('jsonwebtoken'); // You'll need this for auth
+const { initializeCommunitySocket } = require('./utils/communitySocketHelper');
 
 // --- App Setup ---
 const app = express();
@@ -22,13 +24,15 @@ const io = new Server(server, {
     }
 });
 
+// Initialize community socket helper
+initializeCommunitySocket(io);
+
 // --- Middleware and Config ---
 const cookieParser = require("cookie-parser");
 const database = require('./config/dbonfig');
 const cors = require("cors");
 const fileUpload = require("express-fileupload");
 const { cloudinaryConnect } = require("./config/cloudinary");
-const serviceAccount = require("./etc2/secrets/connektx-firebase-adminsdk-fbsvc-b76858ef61.json");
 const admin = require('firebase-admin');
 
 
@@ -43,21 +47,36 @@ const searchRouter = require("./route/searchRoute");
 const notificationRouter = require("./route/notificationRoute");
 const conversationRouter = require("./route/ConversationRoutes");
 const commentRouter = require("./route/commentRoute");
+const communityRouter = require("./route/communityRoute");
 
 
 // --- Models (needed for socket logic) ---
 const User = require('./modules/user');
 const Conversation = require('./modules/conversation');
-const Message = require('./modules/message'); 
+const Message = require('./modules/message');
+const Community = require('./modules/community');
+const CommunityPost = require('./modules/communityPost');
+const CommunityComment = require('./modules/communityComment');
 
 // --- Database and Cloudinary Connection ---
 database.connect();
 cloudinaryConnect();
 
-// Initialize Firebase Admin
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-});
+// Initialize Firebase Admin (conditional)
+if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
+    try {
+        const serviceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount)
+        });
+        console.log('Firebase Admin initialized successfully');
+    } catch (error) {
+        console.warn('Firebase Admin initialization failed:', error.message);
+        console.warn('Firebase features will be disabled');
+    }
+} else {
+    console.log('Firebase service account path not provided - Firebase features disabled');
+}
 
 
 // --- Express Middleware ---
@@ -90,6 +109,7 @@ app.use("/search", searchRouter);
 app.use("/notification", notificationRouter);
 app.use("/conversations", conversationRouter); 
 app.use("/comment", commentRouter);
+app.use("/community", communityRouter);
 
 // --- Health Check and Root Routes ---
 app.use("/hailing",(req,res)=>{
@@ -135,6 +155,32 @@ io.on('connection', (socket) => {
     // Add user to the online users map and join their private room
     onlineUsers.set(socket.userId, socket.id);
     socket.join(socket.userId);
+    
+    // Join community rooms for real-time updates
+    socket.on('joinCommunityRooms', async (data) => {
+        try {
+            const { communityIds } = data;
+            if (Array.isArray(communityIds)) {
+                communityIds.forEach(communityId => {
+                    socket.join(`community_${communityId}`);
+                    console.log(`User ${socket.userId} joined community room: community_${communityId}`);
+                });
+            }
+        } catch (err) {
+            console.error('Error joining community rooms:', err);
+        }
+    });
+    
+    // Leave community room
+    socket.on('leaveCommunityRoom', (data) => {
+        try {
+            const { communityId } = data;
+            socket.leave(`community_${communityId}`);
+            console.log(`User ${socket.userId} left community room: community_${communityId}`);
+        } catch (err) {
+            console.error('Error leaving community room:', err);
+        }
+    });
 
     // Listen for new messages from a client
     socket.on('sendMessage', async (data) => {
