@@ -3,3 +3,5 @@ node_modules
 Updates
 config/firebase.json
 etc2
+.dockerignore
+Dockerfile

@@ -306,20 +306,78 @@ exports.getMessages = async (req, res) => {
 };
 
 // 6. Create a new message in a conversation (UPDATED)
+// exports.createMessage = async (req, res) => {
+//     try {
+//         const { conversationId } = req.params;
+//         const senderId = req.userId;
+
+//         // --- NEW: Destructure new shared item IDs from the body ---
+//         const { content, sharedPostId, sharedNewsId, sharedUserId, sharedShowcaseId } = req.body;
+
+//         // --- NEW: Updated validation to include new shared types ---
+//         if (!content && !sharedPostId && !sharedNewsId && !sharedUserId && !sharedShowcaseId) {
+//             return res.status(400).json({ success: false, message: "Message content cannot be empty." });
+//         }
+
+//         // --- NEW: Create message object with the new schema structure ---
+//         const newMessage = await Message.create({
+//             conversationId,
+//             sender: senderId,
+//             content: content || null,
+//             sharedPost: sharedPostId || null,
+//             sharedNews: sharedNewsId || null,
+//             sharedUser: sharedUserId || null,
+//             sharedShowcase: sharedShowcaseId || null,
+//             readBy: [{ user: senderId, seenAt: new Date() }]
+//         });
+
+//         await Conversation.findByIdAndUpdate(conversationId, {
+//             lastMessage: newMessage._id,
+//         });
+
+//         // --- NEW: Populate all possible shared item types ---
+//         const populatedMessage = await Message.findById(newMessage._id)
+//             .populate('sender', 'name profileImage')
+//             .populate('sharedPost')
+//             .populate('sharedNews')
+//             .populate('sharedUser', 'name profileImage bio')
+//             .populate('sharedShowcase', 'projectTitle logo tagline');
+
+//         // You should emit a socket event here to notify other users in real-time
+//         // E.g., io.to(conversationId).emit('newMessage', populatedMessage);
+
+//         return res.status(201).json({
+//             success: true,
+//             message: "Message sent successfully.",
+//             body: populatedMessage
+//         });
+
+//     } catch (err) {
+//         console.error("💥 [BE FATAL ERROR] The createMessage controller crashed:", err);
+//         return res.status(500).json({ success: false, message: "Failed to send message.", error: err.message });
+//     }
+// };
+
+// 6. Create a new message in a conversation (UPDATED with Real-Time Logic)
 exports.createMessage = async (req, res) => {
     try {
         const { conversationId } = req.params;
         const senderId = req.userId;
 
-        // --- NEW: Destructure new shared item IDs from the body ---
+        // --- Destructure shared item IDs from the body ---
         const { content, sharedPostId, sharedNewsId, sharedUserId, sharedShowcaseId } = req.body;
+        
+        // --- Get io and onlineUsers from the request object ---
+        const { io, onlineUsers } = req;
+        console.log('[DEBUG] onlineUsers map in controller:', onlineUsers); // <-- ADD THIS LOG
 
-        // --- NEW: Updated validation to include new shared types ---
+
+        // --- Updated validation to include new shared types ---
         if (!content && !sharedPostId && !sharedNewsId && !sharedUserId && !sharedShowcaseId) {
             return res.status(400).json({ success: false, message: "Message content cannot be empty." });
         }
 
-        // --- NEW: Create message object with the new schema structure ---
+        // --- Create message object with the new schema structure ---
         const newMessage = await Message.create({
             conversationId,
             sender: senderId,
@@ -331,11 +389,12 @@ exports.createMessage = async (req, res) => {
             readBy: [{ user: senderId, seenAt: new Date() }]
         });
 
-        await Conversation.findByIdAndUpdate(conversationId, {
+        // Find the conversation to get all participants and update the last message
+        const conversation = await Conversation.findByIdAndUpdate(conversationId, {
             lastMessage: newMessage._id,
         });
 
-        // --- NEW: Populate all possible shared item types ---
+        // --- Populate all possible shared item types for the broadcast ---
         const populatedMessage = await Message.findById(newMessage._id)
             .populate('sender', 'name profileImage')
             .populate('sharedPost')
@@ -343,8 +402,26 @@ exports.createMessage = async (req, res) => {
             .populate('sharedUser', 'name profileImage bio')
             .populate('sharedShowcase', 'projectTitle logo tagline');
 
-        // You should emit a socket event here to notify other users in real-time
-        // E.g., io.to(conversationId).emit('newMessage', populatedMessage);
+        // --- REAL-TIME BROADCAST LOGIC ---
+        if (conversation && populatedMessage) {
+            // Loop through every participant in the conversation
+            conversation.participants.forEach(participantId => {
+                // Check if the participant is currently online by looking them up in the map
+                console.log(`[DEBUG] Checking for participant: ${participantId.toString()}`);
+                if (onlineUsers.has(participantId.toString())) {
+                    // Get the participant's unique socket ID from the map
+                    const participantSocketId = onlineUsers.get(participantId.toString());
+                    
+                    // Emit the 'newMessage' event directly to that user's socket connection
+                    io.to(participantSocketId).emit('newMessage', populatedMessage.toObject());
+                    
+                    console.log(`[REAL-TIME] Emitted 'newMessage' to participant: ${participantId}`);
+                } else {
+                    console.log(`[DEBUG] Participant ${participantId.toString()} NOT found in onlineUsers map.`); // <-- ADD THIS LOG
+                }
+            });
+        }
+        // --- END OF REAL-TIME LOGIC ---
 
         return res.status(201).json({
             success: true,
