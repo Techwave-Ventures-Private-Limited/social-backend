@@ -101,6 +101,14 @@ app.use(
 );
 
 
+// --- MIDDLEWARE TO ATTACH SOCKET.IO TO REQUESTS ---
+// This makes `io` and `onlineUsers` available in your controllers (e.g., req.io)
+app.use((req, res, next) => {
+    req.io = io;
+    req.onlineUsers = onlineUsers;
+    next();
+});
+
 // --- API Route Mounting ---
 app.use("/auth", authRouter);
 app.use("/user", userRouter);
@@ -110,11 +118,6 @@ app.use("/showcase", showcaseRouter);
 app.use("/news", newsRouter);
 app.use("/search", searchRouter);
 app.use("/notification", notificationRouter);
-app.use((req, res, next) => {
-    req.io = io;
-    req.onlineUsers = onlineUsers;
-    next();
-});
 app.use("/conversations", conversationRouter); 
 app.use("/comment", commentRouter);
 app.use("/community", communityRouter);
@@ -186,53 +189,53 @@ io.on('connection', (socket) => {
     });
 
     // Listen for new messages from a client
-    socket.on('sendMessage', async (data) => {
-        try {
-            // 1. Destructure the temporary ID from the client payload
-            const { conversationId, content, sharedPost, sharedNews, tempId } = data;
+    // socket.on('sendMessage', async (data) => {
+    //     try {
+    //         // 1. Destructure the temporary ID from the client payload
+    //         const { conversationId, content, sharedPost, sharedNews, tempId } = data;
             
-            // Basic validation
-            if (!conversationId || (!content && !sharedPost && !sharedNews)) {
-                return socket.emit('error', { message: 'Missing required message data.' });
-            }
+    //         // Basic validation
+    //         if (!conversationId || (!content && !sharedPost && !sharedNews)) {
+    //             return socket.emit('error', { message: 'Missing required message data.' });
+    //         }
 
-            const conversation = await Conversation.findById(conversationId);
-            if (!conversation || !conversation.participants.includes(socket.userId)) {
-                return socket.emit('error', { message: 'Cannot send message to this conversation.' });
-            }
+    //         const conversation = await Conversation.findById(conversationId);
+    //         if (!conversation || !conversation.participants.includes(socket.userId)) {
+    //             return socket.emit('error', { message: 'Cannot send message to this conversation.' });
+    //         }
 
-            // Create and save the new message
-            const newMessage = new Message({
-                conversationId,
-                sender: socket.userId,
-                content,
-                sharedPost,
-                sharedNews,
-            });
-            await newMessage.save();
+    //         // Create and save the new message
+    //         const newMessage = new Message({
+    //             conversationId,
+    //             sender: socket.userId,
+    //             content,
+    //             sharedPost,
+    //             sharedNews,
+    //         });
+    //         await newMessage.save();
 
-            // Update the conversation's last message
-            conversation.lastMessage = newMessage._id;
-            await conversation.save();
+    //         // Update the conversation's last message
+    //         conversation.lastMessage = newMessage._id;
+    //         await conversation.save();
             
-            const populatedMessage = await Message.findById(newMessage._id).populate('sender', 'name profileImage');
+    //         const populatedMessage = await Message.findById(newMessage._id).populate('sender', 'name profileImage');
 
-            // 2. Add the tempId to the message object before broadcasting
-            const messageToSend = populatedMessage.toObject();
-            messageToSend.tempId = tempId; // This is the key change
+    //         // 2. Add the tempId to the message object before broadcasting
+    //         const messageToSend = populatedMessage.toObject();
+    //         messageToSend.tempId = tempId; // This is the key change
 
-            // 3. Broadcast the enhanced message object
-            conversation.participants.forEach(participantId => {
-                if (onlineUsers.has(participantId.toString())) {
-                    io.to(participantId.toString()).emit('newMessage', messageToSend);
-                }
-        });
+    //         // 3. Broadcast the enhanced message object
+    //         conversation.participants.forEach(participantId => {
+    //             if (onlineUsers.has(participantId.toString())) {
+    //                 io.to(participantId.toString()).emit('newMessage', messageToSend);
+    //             }
+    //     });
         
-    } catch (err) {
-        console.error("Error in sendMessage event:", err);
-        socket.emit('error', { message: 'An error occurred while sending the message.' });
-    }
-    });
+    // } catch (err) {
+    //     console.error("Error in sendMessage event:", err);
+    //     socket.emit('error', { message: 'An error occurred while sending the message.' });
+    // }
+    // });
 
     // Handle user disconnection
     socket.on('disconnect', () => {
