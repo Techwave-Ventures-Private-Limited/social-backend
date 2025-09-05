@@ -369,6 +369,8 @@ exports.createMessage = async (req, res) => {
         
         // --- Get io and onlineUsers from the request object ---
         const { io, onlineUsers } = req;
+        console.log('[DEBUG] onlineUsers map in controller:', onlineUsers); // <-- ADD THIS LOG
+
 
         // --- Updated validation to include new shared types ---
         if (!content && !sharedPostId && !sharedNewsId && !sharedUserId && !sharedShowcaseId) {
@@ -405,6 +407,7 @@ exports.createMessage = async (req, res) => {
             // Loop through every participant in the conversation
             conversation.participants.forEach(participantId => {
                 // Check if the participant is currently online by looking them up in the map
+                console.log(`[DEBUG] Checking for participant: ${participantId.toString()}`);
                 if (onlineUsers.has(participantId.toString())) {
                     // Get the participant's unique socket ID from the map
                     const participantSocketId = onlineUsers.get(participantId.toString());
@@ -413,6 +416,8 @@ exports.createMessage = async (req, res) => {
                     io.to(participantSocketId).emit('newMessage', populatedMessage.toObject());
                     
                     console.log(`[REAL-TIME] Emitted 'newMessage' to participant: ${participantId}`);
+                } else {
+                    console.log(`[DEBUG] Participant ${participantId.toString()} NOT found in onlineUsers map.`); // <-- ADD THIS LOG
                 }
             });
         }

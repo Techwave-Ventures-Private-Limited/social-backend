@@ -156,10 +156,9 @@ io.use(async (socket, next) => {
 });
 
 io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.userId}`);
-    
-    // Add user to the online users map and join their private room
+    console.log(`User connected: ${socket.userId} with socket ID: ${socket.id}`);
     onlineUsers.set(socket.userId, socket.id);
+    console.log('[DEBUG] onlineUsers map updated:', onlineUsers); // <-- ADD THIS LOG
     socket.join(socket.userId);
     
     // Join community rooms for real-time updates
