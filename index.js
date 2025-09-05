@@ -24,6 +24,9 @@ const io = new Server(server, {
     }
 });
 
+// --- Socket.IO Real-Time Logic ---
+const onlineUsers = new Map(); // Tracks online users: { userId -> socketId }
+
 // Initialize community socket helper
 initializeCommunitySocket(io);
 
@@ -107,6 +110,11 @@ app.use("/showcase", showcaseRouter);
 app.use("/news", newsRouter);
 app.use("/search", searchRouter);
 app.use("/notification", notificationRouter);
+app.use((req, res, next) => {
+    req.io = io;
+    req.onlineUsers = onlineUsers;
+    next();
+});
 app.use("/conversations", conversationRouter); 
 app.use("/comment", commentRouter);
 app.use("/community", communityRouter);
@@ -122,11 +130,6 @@ app.use("/hailing",(req,res)=>{
 app.get("/",(req, res)=>{
     return res.send(`<h1>Working..</h1>`)
 })
-
-
-// --- Socket.IO Real-Time Logic ---
-
-const onlineUsers = new Map(); // Tracks online users: { userId -> socketId }
 
 // Middleware for authenticating socket connections
 io.use(async (socket, next) => {
