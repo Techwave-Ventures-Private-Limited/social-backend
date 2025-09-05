@@ -32,7 +32,7 @@ exports.createCommunity = async (req, res) => {
             settings
         } = req.body;
 
-        const userId = req.user.id;
+        const userId = req.userId;
 
         // Check if community name already exists
         const existingCommunity = await Community.findOne({ 
@@ -273,7 +273,7 @@ exports.getCommunityById = async (req, res) => {
 exports.updateCommunity = async (req, res) => {
     try {
         const { id } = req.params;
-        const userId = req.user.id;
+        const userId = req.userId;
         const updates = req.body;
 
         const community = await Community.findById(id);
@@ -317,7 +317,7 @@ exports.updateCommunity = async (req, res) => {
 exports.deleteCommunity = async (req, res) => {
     try {
         const { id } = req.params;
-        const userId = req.user.id;
+        const userId = req.userId;
 
         const community = await Community.findById(id);
         if (!community) {
@@ -369,7 +369,7 @@ exports.deleteCommunity = async (req, res) => {
 exports.joinCommunity = async (req, res) => {
     try {
         const { id } = req.params;
-        const userId = req.user.id;
+        const userId = req.userId;
         const { message } = req.body;
 
         const community = await Community.findById(id);
@@ -447,7 +447,7 @@ exports.joinCommunity = async (req, res) => {
 exports.leaveCommunity = async (req, res) => {
     try {
         const { id } = req.params;
-        const userId = req.user.id;
+        const userId = req.userId;
 
         const community = await Community.findById(id);
         if (!community) {
@@ -492,7 +492,7 @@ exports.leaveCommunity = async (req, res) => {
 // Get user's joined communities
 exports.getUserCommunities = async (req, res) => {
     try {
-        const userId = req.user.id;
+        const userId = req.userId;
 
         const communities = await Community.find({
             members: userId,
@@ -539,7 +539,7 @@ exports.createCommunityPost = async (req, res) => {
             resourceType
         } = req.body;
 
-        const userId = req.user.id;
+        const userId = req.userId;
 
         const community = await Community.findById(id);
         if (!community) {
@@ -607,7 +607,7 @@ exports.createCommunityPost = async (req, res) => {
 // Get posts for home feed (implements your visibility rules)
 exports.getPostsForHomeFeed = async (req, res) => {
     try {
-        const userId = req.user.id;
+        const userId = req.userId;
         const { page = 1, limit = 20 } = req.query;
         const skip = (page - 1) * limit;
 
@@ -802,7 +802,7 @@ exports.getCommunityPosts = async (req, res) => {
 exports.likeCommunityPost = async (req, res) => {
     try {
         const { postId } = req.params;
-        const userId = req.user.id;
+        const userId = req.userId;
 
         const post = await CommunityPost.findById(postId);
         if (!post) {
@@ -853,7 +853,7 @@ exports.addCommentToCommunityPost = async (req, res) => {
     try {
         const { postId } = req.params;
         const { content } = req.body;
-        const userId = req.user.id;
+        const userId = req.userId;
 
         const post = await CommunityPost.findById(postId).populate('communityId');
         if (!post) {
@@ -926,7 +926,7 @@ exports.handleJoinRequest = async (req, res) => {
     try {
         const { requestId } = req.params;
         const { action } = req.body; // 'approve' or 'reject'
-        const userId = req.user.id;
+        const userId = req.userId;
 
         const joinRequest = await JoinRequest.findById(requestId);
         if (!joinRequest) {
@@ -979,7 +979,7 @@ exports.assignRole = async (req, res) => {
     try {
         const { id, memberId } = req.params; // community ID and member ID
         const { role } = req.body; // 'admin' or 'moderator'
-        const userId = req.user.id;
+        const userId = req.userId;
 
         const community = await Community.findById(id);
         if (!community) {
@@ -1038,7 +1038,7 @@ exports.assignRole = async (req, res) => {
 exports.removeMember = async (req, res) => {
     try {
         const { id, memberId } = req.params;
-        const userId = req.user.id;
+        const userId = req.userId;
 
         const community = await Community.findById(id);
         if (!community) {
@@ -1097,7 +1097,7 @@ exports.pinPost = async (req, res) => {
     try {
         const { postId } = req.params;
         const { pin = true } = req.body;
-        const userId = req.user.id;
+        const userId = req.userId;
 
         const post = await CommunityPost.findById(postId);
         if (!post) {
@@ -1140,7 +1140,7 @@ exports.pinPost = async (req, res) => {
 exports.deleteCommunityPost = async (req, res) => {
     try {
         const { postId } = req.params;
-        const userId = req.user.id;
+        const userId = req.userId;
 
         const post = await CommunityPost.findById(postId);
         if (!post) {
