@@ -5,6 +5,7 @@ const Community = require("../modules/community");
 const CommunityPost = require("../modules/communityPost");
 const { createNotification } = require('../utils/notificationUtils');
 const { uploadMultipleImagesToCloudinary, uploadVideoToCloudinary, uploadImageToCloudinary } = require("../utils/imageUploader");
+const mongoose = require("mongoose");
 
 exports.createPost = async (req, res) => {
     try {
@@ -156,8 +157,10 @@ exports.likePost = async (req, res) => {
         post.likes = post.likes + 1;
         await post.save();
 
-        user.likedPost.push(post._id);
-        await user.save();
+        if (!user.likedPost.some(id => id.toString() === post._id.toString())) {
+            user.likedPost.push(post._id);
+            await user.save();
+        }
 
         await createNotification(post.userId, userId, 'like', postId);
 
@@ -927,105 +930,102 @@ exports.getHomeFeedWithCommunities = async (req, res) => {
 };
 
 // DO NOT CHANGE THIS WITHOUT PERMISSION
-exports.getPosts = async(req, res) => {
-    try {
+exports.getPosts = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = parseInt(req.query.offset) || 0;
 
-        const userId = req.userId;
-        const limit = parseInt(req.query.limit) || 20;
-        const offset = parseInt(req.query.offset) || 0;
+    const user = await User.findById(userId);
 
-        const user = await User.findById(userId);
-
-        if (!user) {
-            return res.status(400).json({
-                success: false,
-                message: "User not found"
-            });
-        }
-
-        const following = user.following || [];
-        const followers = user.followers || [];
-        const people = [...new Set([...following, ...followers].map(id => id.toString()))]; 
-        //console.log(people);
-
-        const matchStage = people.length > 0 
-            ? { userId: { $in: people } } 
-            : {};
-
-        let posts = await Post.aggregate([
-            { $match: people.length > 0 ? { userId: { $in: people } } : { _id: null } },
-            {
-                $addFields: {
-                commentsCount: { $size: "$comments" }
-                }
-            },
-            {
-                $sort: {
-                likes: -1,
-                commentsCount: -1
-                }
-            },
-            { $skip: offset },
-            { $limit: limit }
-        ]);
-
-        if (posts.length < limit) {
-            const remaining = limit - posts.length;
-
-            const trendingPosts = await Post.aggregate([
-                { $match: people.length > 0 ? { userId: { $nin: people } } : {} }, // avoid duplicates
-                {
-                $addFields: {
-                    commentsCount: { $size: "$comments" }
-                }
-                },
-                {
-                $sort: {
-                    likes: -1,
-                    commentsCount: -1
-                }
-                },
-                { $limit: remaining }
-            ]);
-
-            posts = [...posts, ...trendingPosts];
-        }
-
-        posts = await Post.populate(posts, [
-        {
-            path: 'userId',
-            model: 'User',
-            populate: [
-            { path: 'about', model: 'About' },
-            { path: 'education', model: 'Education' },
-            { path: 'experience', model: 'Experience' }
-            ]
-        },
-        { path: 'comments' },
-        {
-            path: 'originalPostId',
-            populate: {
-            path: 'userId',
-            model: 'User',
-            populate: [
-                { path: 'about', model: 'About' },
-                { path: 'education', model: 'Education' },
-                { path: 'experience', model: 'Experience' }
-            ]
-            }
-        }
-        ]);
-        
-        const formattedPosts = await Promise.all(posts.map(post => formatPost(post, user)));
-
-        return res.status(200).json({
-            success: true,
-            body: formattedPosts
-        });
-    } catch(err) {
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        })
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found",
+      });
     }
-}
+
+    const following = user.following || [];
+    const followers = user.followers || [];
+    const people = [...new Set([...following, ...followers].map(id => id.toString()))];
+
+    const likedPosts = (user.likedPost || [])
+      .filter(id => mongoose.Types.ObjectId.isValid(id))
+      .map(id => new mongoose.Types.ObjectId(id));
+
+    const matchStage = {
+      _id: { $nin: likedPosts },
+    };
+
+    if (people.length > 0) {
+      matchStage.userId = { $in: people };
+    }
+
+    let posts = await Post.aggregate([
+      { $match: matchStage },
+      { $addFields: { commentsCount: { $size: "$comments" } } },
+      { $sort: { likes: -1, commentsCount: -1 } },
+      { $skip: offset },
+      { $limit: limit },
+    ]);
+
+    if (posts.length < limit) {
+      const remaining = limit - posts.length;
+
+      const trendingMatch = {
+        _id: { $nin: likedPosts },
+      };
+
+      if (people.length > 0) {
+        trendingMatch.userId = { $nin: people };
+      }
+
+      const trendingPosts = await Post.aggregate([
+        { $match: trendingMatch },
+        { $addFields: { commentsCount: { $size: "$comments" } } },
+        { $sort: { likes: -1, commentsCount: -1 } },
+        { $limit: remaining },
+      ]);
+
+      posts = [...posts, ...trendingPosts];
+    }
+
+    posts = await Post.populate(posts, [
+      {
+        path: "userId",
+        model: "User",
+        populate: [
+          { path: "about", model: "About" },
+          { path: "education", model: "Education" },
+          { path: "experience", model: "Experience" },
+        ],
+      },
+      { path: "comments" },
+      {
+        path: "originalPostId",
+        populate: {
+          path: "userId",
+          model: "User",
+          populate: [
+            { path: "about", model: "About" },
+            { path: "education", model: "Education" },
+            { path: "experience", model: "Experience" },
+          ],
+        },
+      },
+    ]);
+
+    const formattedPosts = await Promise.all(posts.map(post => formatPost(post, user)));
+
+    return res.status(200).json({
+      success: true,
+      body: formattedPosts,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
