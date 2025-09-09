@@ -23,6 +23,11 @@ const conversationSchema = new mongoose.Schema({
     initiatedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User"
+    },
+    rejectedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null
     }
 }, { timestamps: true });
 
