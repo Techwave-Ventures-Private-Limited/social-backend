@@ -74,11 +74,50 @@ exports.startConversation = async (req, res) => {
 };
 
 // 2. Get all active conversations for the logged-in user
+// exports.getConversations = async (req, res) => {
+//     try {
+//         const userId = req.userId;
+
+//         const conversations = await Conversation.find({ participants: userId, status: 'active' })
+//             .populate({
+//                 path: 'participants',
+//                 select: 'name profileImage' // Select fields to return
+//             })
+//             .populate({
+//                 path: 'lastMessage',
+//                 populate: {
+//                     path: 'sender',
+//                     select: 'name'
+//                 }
+//             })
+//             .sort({ updatedAt: -1 });
+
+//         // Filter out the current user from the participants list before sending
+//         const finalConversations = conversations.map(convo => {
+//             const conversationObject = convo.toObject();
+//             conversationObject.participants = conversationObject.participants.filter(p => p._id.toString() !== userId);
+//             return conversationObject;
+//         });
+
+//         return res.status(200).json({
+//             success: true,
+//             message: "Active conversations fetched successfully.",
+//             body: finalConversations,
+//         });
+
+//     } catch (err) {
+//         return res.status(500).json({ success: false, message: err.message });
+//     }
+// };
+
+
+// 2. Get all conversations (active and pending) for the logged-in user
 exports.getConversations = async (req, res) => {
     try {
         const userId = req.userId;
 
-        const conversations = await Conversation.find({ participants: userId, status: 'active' })
+        // **FIX**: Removed the `status: 'active'` filter to fetch ALL conversations (active and pending)
+        const conversations = await Conversation.find({ participants: userId, status: { $ne: 'rejected' } })
             .populate({
                 path: 'participants',
                 select: 'name profileImage' // Select fields to return
@@ -101,14 +140,20 @@ exports.getConversations = async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            message: "Active conversations fetched successfully.",
+            message: "All conversations fetched successfully.",
             body: finalConversations,
         });
 
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message });
+        console.error("💥 [BE FATAL ERROR] The getConversations controller crashed:", err);
+        return res.status(500).json({ 
+            success: false, 
+            message: "An internal server error occurred.",
+            error: err.message
+        });
     }
 };
+
 
 // 3. Get all pending message requests for the user
 exports.getMessageRequests = async (req, res) => {
@@ -475,5 +520,49 @@ exports.markMessagesAsSeen = async (req, res) => {
     } catch (err) {
         console.error("💥 [BE FATAL ERROR] The markMessagesAsSeen controller crashed:", err);
         return res.status(500).json({ success: false, message: "Failed to update seen status.", error: err.message });
+    }
+};
+
+
+// 8. UPDATED REJECT FUNCTION
+exports.rejectMessageRequest = async (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        const userId = req.userId;
+
+        const updatedConversation = await Conversation.findOneAndUpdate(
+            { 
+                _id: conversationId, 
+                participants: userId, 
+                status: 'pending' 
+            },
+            { 
+                status: 'rejected', 
+                rejectedBy: userId,
+                // `updatedAt` is automatically handled by `timestamps: true`
+            },
+            { new: true } // Return the updated document
+        );
+
+        if (!updatedConversation) {
+            return res.status(404).json({ 
+                success: false, 
+                message: "Request not found or you are not authorized to reject it." 
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Message request has been rejected.",
+            body: updatedConversation
+        });
+
+    } catch (err) {
+        console.error("💥 [BE FATAL ERROR] The rejectMessageRequest controller crashed:", err);
+        return res.status(500).json({ 
+            success: false, 
+            message: "An internal server error occurred.",
+            error: err.message
+        });
     }
 };

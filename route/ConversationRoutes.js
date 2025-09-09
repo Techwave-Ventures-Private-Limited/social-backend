@@ -10,7 +10,8 @@ const {
     acceptMessageRequest,
     getMessages,
     createMessage,
-    markMessagesAsSeen
+    markMessagesAsSeen,
+    rejectMessageRequest
 } = require('../controller/ConversationController');
 
 // Apply authentication middleware to all routes in this file
@@ -38,5 +39,8 @@ router.post('/:conversationId/messages', createMessage);
 
 // POST /conversations/:conversationId/seen -> Marks messages as seen
 router.post('/:conversationId/seen', markMessagesAsSeen);
+
+// POST /conversations/requests/:conversationId/reject -> Rejects a message request
+router.post('/requests/:conversationId/reject', rejectMessageRequest);
 
 module.exports = router;
