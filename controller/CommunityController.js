@@ -5,6 +5,7 @@ const JoinRequest = require('../modules/joinRequest');
 const CommunityAnnouncement = require('../modules/communityAnnouncement');
 const User = require('../modules/user');
 const Post = require('../modules/post');
+const Conversation = require('../modules/conversation');
 const {
     emitNewCommunityPost,
     emitNewCommunityComment,
@@ -77,6 +78,21 @@ exports.createCommunity = async (req, res) => {
 
         await newCommunity.save();
 
+        // --- NEW: Automatically create the group chat ---
+        const groupConversation = new Conversation({
+            participants: [userId], // Start with the owner
+            type: 'group',
+            communityId: newCommunity._id,
+            initiatedBy: userId,
+            status: 'active', // Group chats are active by default
+            messagingPermissions: 'members' // Default permission
+        });
+        await groupConversation.save();
+
+        // --- NEW: Link the conversation back to the community ---
+        newCommunity.groupChatId = groupConversation._id;
+        await newCommunity.save();
+
         // Update user's communities (if user schema supports it)
         await User.findByIdAndUpdate(userId, {
             $push: { communities: newCommunity._id }
@@ -87,7 +103,7 @@ exports.createCommunity = async (req, res) => {
 
         return res.status(201).json({
             success: true,
-            message: "Community created successfully",
+            message: "Community and group chat created successfully",
             community: newCommunity
         });
 
@@ -424,6 +440,11 @@ exports.joinCommunity = async (req, res) => {
             community.members.push(userId);
             community.memberCount += 1;
             community.lastActivity = new Date();
+            if (community.groupChatId) {
+                await Conversation.findByIdAndUpdate(community.groupChatId, {
+                    $addToSet: { participants: userId }
+                });
+            }
             await community.save();
 
             return res.status(200).json({
@@ -471,6 +492,12 @@ exports.leaveCommunity = async (req, res) => {
         community.moderators = community.moderators.filter(id => id.toString() !== userId);
         community.memberCount = Math.max(0, community.memberCount - 1);
         community.lastActivity = new Date();
+        if (community.groupChatId) {
+            const userToRemoveId = req.params.memberId || userId; // Get ID based on controller
+            await Conversation.findByIdAndUpdate(community.groupChatId, {
+                $pull: { participants: userToRemoveId }
+            });
+        }
 
         await community.save();
 
@@ -950,6 +977,11 @@ exports.handleJoinRequest = async (req, res) => {
             // Add user to community
             community.members.push(joinRequest.userId);
             community.memberCount += 1;
+            if (community.groupChatId) {
+                await Conversation.findByIdAndUpdate(community.groupChatId, {
+                    $addToSet: { participants: joinRequest.userId }
+                });
+            }
             joinRequest.status = 'approved';
         } else if (action === 'reject') {
             joinRequest.status = 'rejected';
@@ -1072,7 +1104,12 @@ exports.removeMember = async (req, res) => {
         community.moderators = community.moderators.filter(id => id.toString() !== memberId);
         community.memberCount = Math.max(0, community.memberCount - 1);
         community.lastActivity = new Date();
-
+        if (community.groupChatId) {
+            const userToRemoveId = req.params.memberId || userId; // Get ID based on controller
+            await Conversation.findByIdAndUpdate(community.groupChatId, {
+                $pull: { participants: userToRemoveId }
+            });
+        }
         await community.save();
 
         return res.status(200).json({
