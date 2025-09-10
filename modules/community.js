@@ -76,6 +76,11 @@ const communitySchema = new mongoose.Schema({
         ref: "User",
         required: true
     },
+    groupChatId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Conversation',
+        default: null
+    },
     isPrivate: {
         type: Boolean,
         default: false

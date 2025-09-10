@@ -5,6 +5,76 @@ const Message = require('../modules/message');
 
 // 1. Start a new conversation or return an existing one
 // Replace your existing startConversation function with this more robust version
+// exports.startConversation = async (req, res) => {
+//     try {
+//         const { recipientId } = req.body;
+//         const senderId = req.userId;
+        
+//         if (!recipientId || !mongoose.Types.ObjectId.isValid(recipientId)) {
+//             return res.status(400).json({ success: false, message: "Invalid or missing Recipient ID." });
+//         }
+        
+//         const sender = await User.findById(senderId);
+//         if (!sender) {
+//             return res.status(404).json({ success: false, message: "Authenticated user not found." });
+//         }
+
+//         // Check for an existing conversation
+//         const existingConversation = await Conversation.findOne({
+//             participants: { $all: [senderId, recipientId], $size: 2 }
+//         });
+        
+//         // **NEW**: Handle the rejected case
+//         if (existingConversation && existingConversation.status === 'rejected') {
+//             const oneMonthAgo = new Date();
+//             oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+            
+//             // Check if the rejection was less than a month ago
+//             if (existingConversation.updatedAt > oneMonthAgo) {
+//                 return res.status(403).json({
+//                     success: false,
+//                     message: "You cannot start a new conversation with this user yet.",
+//                 });
+//             }
+//             // If more than a month has passed, you can proceed to create a new one
+//             // by overwriting or deleting the old one. For simplicity, we'll allow a new one.
+//         }
+
+//         if (existingConversation && existingConversation.status !== 'rejected') {
+//             return res.status(200).json({
+//                 success: true,
+//                 message: "Conversation already exists.",
+//                 body: existingConversation,
+//             });
+//         }
+
+//         // --- The rest of the function remains the same ---
+//         const isFollowing = sender.following.includes(recipientId);
+//         const conversationStatus = isFollowing ? 'active' : 'pending';
+        
+//         const newConversation = new Conversation({
+//             participants: [senderId, recipientId],
+//             status: conversationStatus,
+//             initiatedBy: senderId,
+//         });
+
+//         await newConversation.save();
+        
+//         return res.status(201).json({
+//             success: true,
+//             message: `Conversation started. Status: ${conversationStatus}`,
+//             body: newConversation,
+//         });
+
+//     } catch (err) {
+//         console.error("💥 [BE FATAL ERROR] The startConversation controller crashed:", err);
+//         return res.status(500).json({ 
+//             success: false, 
+//             message: "An internal server error occurred.",
+//             error: err.message
+//         });
+//     }
+// };
 exports.startConversation = async (req, res) => {
     try {
         const { recipientId } = req.body;
@@ -438,6 +508,20 @@ exports.createMessage = async (req, res) => {
         const conversation = await Conversation.findByIdAndUpdate(conversationId, {
             lastMessage: newMessage._id,
         });
+
+        if (conversation.type === 'group' && conversation.messagingPermissions === 'admins_only') {
+            const community = await Community.findById(conversation.communityId);
+            const isOwner = community.owner.toString() === senderId;
+            const isAdmin = community.admins.map(id => id.toString()).includes(senderId);
+            const isModerator = community.moderators.map(id => id.toString()).includes(senderId);
+
+            if (!isOwner && !isAdmin && !isModerator) {
+                return res.status(403).json({ 
+                    success: false, 
+                    message: "Only admins and moderators can send messages in this chat." 
+                });
+            }
+        }
 
         // --- Populate all possible shared item types for the broadcast ---
         const populatedMessage = await Message.findById(newMessage._id)
