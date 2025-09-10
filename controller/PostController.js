@@ -369,7 +369,7 @@ exports.getCommentsForPost = async (req, res) => {
 
 exports.getCommentsByUser = async (req, res) => {
     try {
-        const userId  = req.userId;
+        const userId  = req.body.userId || req.userId;
 
         if (!userId) {
             return res.status(400).json({
