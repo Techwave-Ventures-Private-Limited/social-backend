@@ -5,6 +5,7 @@ const JoinRequest = require('../modules/joinRequest');
 const CommunityAnnouncement = require('../modules/communityAnnouncement');
 const User = require('../modules/user');
 const Post = require('../modules/post');
+const Conversation = require('../modules/conversation');
 const {
     emitNewCommunityPost,
     emitNewCommunityComment,
