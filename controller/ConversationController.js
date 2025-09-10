@@ -112,9 +112,9 @@ exports.startConversation = async (req, res) => {
         }
 
         // Determine the status based on the follow relationship
-        const isFollowing = sender.following.includes(recipientId);
-        const conversationStatus = isFollowing ? 'active' : 'pending';
-        console.log(`[BE LOG] Follow status: ${isFollowing}. New conversation status: ${conversationStatus}`);
+        const isFollower = sender.followers.includes(recipientId);
+        const conversationStatus = isFollower ? 'active' : 'pending';
+        // console.log(`[BE LOG] Follow status: ${isFollower}. New conversation status: ${conversationStatus}`);
         
         const newConversation = new Conversation({
             participants: [senderId, recipientId],
