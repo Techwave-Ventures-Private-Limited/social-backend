@@ -187,7 +187,7 @@ exports.getConversations = async (req, res) => {
         const userId = req.userId;
 
         // **FIX**: Removed the `status: 'active'` filter to fetch ALL conversations (active and pending)
-        const conversations = await Conversation.find({ participants: userId, status: { $ne: 'rejected' } })
+        const conversations = await Conversation.find({ participants: userId, status: { $ne: 'rejected' }, type: 'dm' })
             .populate({
                 path: 'participants',
                 select: 'name profileImage' // Select fields to return
