@@ -1,5 +1,5 @@
 const Community = require('../modules/community');
-const CommunityPost = require('../modules/communityPost');
+const CommunityPost = require('../modules/post');
 const CommunityComment = require('../modules/communityComment');
 const JoinRequest = require('../modules/joinRequest');
 const CommunityAnnouncement = require('../modules/communityAnnouncement');
@@ -559,7 +559,7 @@ exports.createCommunityPost = async (req, res) => {
     try {
         const { id } = req.params; // community ID
         const {
-            content,
+            discription,
             images,
             type = 'text',
             resourceUrl,
@@ -599,11 +599,13 @@ exports.createCommunityPost = async (req, res) => {
             authorId: userId,
             authorName: user.name,
             authorAvatar: user.profileImage,
-            content: content.trim(),
-            images: images || [],
-            type,
+            discription: discription.trim(),
+            media: images || [],
+            subtype: type,
+            type:"Community",
             resourceUrl,
-            resourceType
+            resourceType,
+            postType:"public",
         });
 
         await newPost.save();
