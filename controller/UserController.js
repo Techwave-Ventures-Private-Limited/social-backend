@@ -749,3 +749,29 @@ exports.getUserFollowing = async (req, res) => {
         });
     }
 };
+
+
+exports.getConnections = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const user = await User.findById(userId)
+            .populate('followers', 'name profileImage headline')
+            .populate('following', 'name profileImage headline');
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        // Use a Map to automatically handle duplicates
+        const connectionsMap = new Map();
+        user.followers.forEach(u => connectionsMap.set(u._id.toString(), u));
+        user.following.forEach(u => connectionsMap.set(u._id.toString(), u));
+
+        // Convert the map values back to an array
+        const uniqueConnections = Array.from(connectionsMap.values());
+
+        return res.status(200).json({ success: true, body: uniqueConnections });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error fetching connections', error: error.message });
+    }
+};

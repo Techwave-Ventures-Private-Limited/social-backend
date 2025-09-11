@@ -43,6 +43,7 @@ router.delete("/portfolio/:id", auth, deletePortfolio);
 
 
 router.post("/register-device-token", auth, registerDeviceToken);
+router.get('/connections', auth, getConnections);
 
 router.get("/:userId", auth, getAnotherUser);
 
