@@ -606,6 +606,7 @@ exports.createCommunityPost = async (req, res) => {
             resourceUrl,
             resourceType,
             postType:"public",
+            userId: userId
         });
 
         await newPost.save();
