@@ -99,7 +99,8 @@ exports.startConversation = async (req, res) => {
 
         // Check if a one-on-one conversation between these two users already exists
         const existingConversation = await Conversation.findOne({
-            participants: { $all: [senderId, recipientId], $size: 2 }
+            participants: { $all: [senderId, recipientId], $size: 2 },
+            type: 'dm'
         });
 
         if (existingConversation) {
@@ -120,6 +121,7 @@ exports.startConversation = async (req, res) => {
             participants: [senderId, recipientId],
             status: conversationStatus,
             initiatedBy: senderId,
+            type: 'dm',
         });
 
         await newConversation.save();
