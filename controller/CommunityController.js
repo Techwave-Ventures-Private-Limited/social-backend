@@ -743,7 +743,16 @@ exports.getCommunityPosts = async (req, res) => {
             limit = 20
         } = req.query;
 
-        const userId = req.user?.id;
+        const userId = req.userId;
+        const currentUser = await User.findById(userId);
+ 
+        if (!currentUser) {
+            return res.status(400).json({
+                success: false,
+                message: "User not found"
+            })
+        }
+
         const skip = (page - 1) * limit;
 
         const community = await Community.findById(id);
@@ -809,14 +818,29 @@ exports.getCommunityPosts = async (req, res) => {
             .limit(parseInt(limit))
             .lean();
 
+
         return res.status(200).json({
             success: true,
-            posts,
+            posts: posts.map(post => {
+                const isBookmarked = currentUser?.savedPost?.some(
+                id => id.toString() === post._id.toString()
+                ) || false;
+
+                const isLiked = currentUser?.likedPost?.some(
+                id => id.toString() === post._id.toString()
+                ) || false;
+
+                return {
+                ...post.toObject?.() || post, // ensure plain object
+                isLiked,
+                isBookmarked,
+                };
+            }),
             pagination: {
                 currentPage: parseInt(page),
-                hasNextPage: posts.length === parseInt(limit)
-            }
-        });
+                hasNextPage: posts.length === parseInt(limit),
+            },
+            });
 
     } catch (error) {
         console.error("Error fetching community posts:", error);
@@ -827,6 +851,8 @@ exports.getCommunityPosts = async (req, res) => {
         });
     }
 };
+
+
 
 // Like/Unlike community post
 exports.likeCommunityPost = async (req, res) => {

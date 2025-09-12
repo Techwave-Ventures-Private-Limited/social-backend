@@ -43,7 +43,7 @@ router.post('/:id/leave', authMiddleware, CommunityController.leaveCommunity);
 router.get('/feed/home', authMiddleware, CommunityController.getPostsForHomeFeed);
 
 // GET /community/:id/posts - Get community posts (public or member access)
-router.get('/:id/posts', CommunityController.getCommunityPosts);
+router.get('/:id/posts', authMiddleware, CommunityController.getCommunityPosts);
 
 // POST /community/:id/posts - Create post in community (requires auth + membership)
 router.post('/:id/posts', authMiddleware, CommunityController.createCommunityPost);
