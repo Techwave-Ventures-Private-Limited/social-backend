@@ -45,6 +45,11 @@ const eventSchema = new mongoose.Schema({
       type: String,
       required: true,
     },
+    communityId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Community',
+        default: null,        // This can be null if it's a global event not tied to a community
+    },
     category: {
       type: String,
       enum: [

@@ -1,4 +1,5 @@
 const pdf = require('html-pdf-node');
+const Community = require("../modules/community"); 
 const Event = require("../modules/event");
 const User = require("../modules/user");
 const Ticket = require("../modules/ticketPlan");
@@ -9,6 +10,33 @@ exports.createEvent = async(req,res) => {
     try{
         const eventObject = req.body;
         const userId = req.userId;
+
+        const { communityId } = eventObject;
+
+        if (communityId) {
+            const community = await Community.findById(communityId);
+            if (!community) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Community not found"
+                });
+            }
+
+            // PERMISSION CHECK: User must be owner or admin
+            const isOwner = community.owner.toString() === userId;
+            const isAdmin = community.admins.includes(userId);
+
+            if (!isOwner && !isAdmin) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Permission denied: Only community owners or admins can create events."
+                });
+            }
+            
+            // If permission check passes, link the event to the community
+            eventObject.communityId = communityId;
+        }
+
         eventObject.createdBy = userId;
         eventObject.organizerId = eventObject.organizerId || userId;
         // Remove deprecated/old fields if present
