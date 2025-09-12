@@ -580,7 +580,8 @@ const formatPost = (post, currentUser = null) => {
         isBookmarked,
         commentsList: post.comments || [],
         originalPost,
-        isReposted: post.isReposted
+        isReposted: post.isReposted,
+        type: post.type
     };
 };
 
@@ -949,29 +950,54 @@ exports.getPosts = async (req, res) => {
     const followers = user.followers || [];
     const people = [...new Set([...following, ...followers].map(id => id.toString()))];
 
+    const joinedCommunities = user.communities || [];
+
     const likedPosts = (user.likedPost || [])
       .filter(id => mongoose.Types.ObjectId.isValid(id))
       .map(id => new mongoose.Types.ObjectId(id));
 
-    const matchStage = {
+    const halfLimit = Math.floor(limit / 2);
+
+    /** ---------------- POSTS PIPELINE ---------------- */
+    const postMatch = {
       _id: { $nin: likedPosts },
+      type: "post",
     };
 
     if (people.length > 0) {
-      matchStage.userId = { $in: people };
+      postMatch.userId = { $in: people };
     }
 
     let posts = await Post.aggregate([
-      { $match: matchStage },
+      { $match: postMatch },
       { $addFields: { commentsCount: { $size: "$comments" } } },
       { $sort: { likes: -1, commentsCount: -1 } },
       { $skip: offset },
-      { $limit: limit },
+      { $limit: halfLimit },
     ]);
 
-    if (posts.length < limit) {
-      const remaining = limit - posts.length;
+    /** ---------------- COMMUNITY PIPELINE ---------------- */
+    const communityMatch = {
+      _id: { $nin: likedPosts },
+      type: "community",
+      communityId: { $in: joinedCommunities },
+    };
 
+    let communityPosts = await Post.aggregate([
+      { $match: communityMatch },
+      { $addFields: { commentsCount: { $size: "$comments" } } },
+      { $sort: { likes: -1, commentsCount: -1 } },
+      { $skip: offset },
+      { $limit: halfLimit },
+    ]);
+
+    /** ---------------- BACKFILL (if one side has fewer) ---------------- */
+    let combinedPosts = [...posts, ...communityPosts];
+
+    if (combinedPosts.length < limit) {
+      const remaining = limit - combinedPosts.length;
+
+      // Trending backfill (can come from either type)
       const trendingMatch = {
         _id: { $nin: likedPosts },
       };
@@ -987,10 +1013,11 @@ exports.getPosts = async (req, res) => {
         { $limit: remaining },
       ]);
 
-      posts = [...posts, ...trendingPosts];
+      combinedPosts = [...combinedPosts, ...trendingPosts];
     }
 
-    posts = await Post.populate(posts, [
+    /** ---------------- POPULATE ---------------- */
+    combinedPosts = await Post.populate(combinedPosts, [
       {
         path: "userId",
         model: "User",
@@ -1015,7 +1042,10 @@ exports.getPosts = async (req, res) => {
       },
     ]);
 
-    const formattedPosts = await Promise.all(posts.map(post => formatPost(post, user)));
+    /** ---------------- FORMAT ---------------- */
+    const formattedPosts = await Promise.all(
+      combinedPosts.map(post => formatPost(post, user))
+    );
 
     return res.status(200).json({
       success: true,
@@ -1028,4 +1058,5 @@ exports.getPosts = async (req, res) => {
     });
   }
 };
+
 
