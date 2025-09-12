@@ -104,7 +104,7 @@ const communitySchema = new mongoose.Schema({
     }],
     events: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: "CommunityEvent"
+        ref: 'Event'
     }],
     resources: [{
         type: mongoose.Schema.Types.ObjectId,
