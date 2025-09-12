@@ -860,6 +860,15 @@ exports.likeCommunityPost = async (req, res) => {
         const { postId } = req.params;
         const userId = req.userId;
 
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "User does not exists"
+            })
+        }
+
         const post = await CommunityPost.findById(postId);
         if (!post) {
             return res.status(404).json({
@@ -886,6 +895,11 @@ exports.likeCommunityPost = async (req, res) => {
         }
 
         await post.save();
+
+        if (!user.likedPost.some(id => id.toString() === post._id.toString())) {
+            user.likedPost.push(post._id);
+            await user.save();
+        }
 
         return res.status(200).json({
             success: true,
