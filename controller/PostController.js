@@ -543,6 +543,11 @@ const formatPost = (post, currentUser = null) => {
         originalPost = formatPost(post.originalPostId, currentUser);
     }
 
+    let communityName = "";
+    if (post.type === "Community") {
+        communityName = post.communityId?.name;
+    }
+
     return {
         id: post._id,
         author: {
@@ -581,88 +586,11 @@ const formatPost = (post, currentUser = null) => {
         commentsList: post.comments || [],
         originalPost,
         isReposted: post.isReposted,
-        type: post.type
+        type: post.type,
+        communityName
     };
 };
 
-
-exports.formatPost = (posts, currentUser) => {
-    const formattedPosts = posts.map(post => {
-            // Determine isBookmarked
-            let isBookmarked = false;
-            if (currentUser && currentUser.savedPost) {
-                isBookmarked = currentUser.savedPost.some(
-                    savedId => savedId.toString() === post._id.toString()
-                );
-            }
-
-            let isLiked = currentUser.likedPost.includes(post._id);
-
-            // Map author (user) to full User interface
-            const author = post.userId;
-          
-            
-            // Handle case where author might not be populated
-            if (!author) {
-                console.log('Author not found for post:', post._id);
-                return null; // Skip this post or handle as needed
-            }
-
-            let about = author.about || {};
-            let education = author.education || [];
-            let experience = author.experience || [];
-            let skills = (about.skills && Array.isArray(about.skills)) ? about.skills : [];
-
-            // Followers/following count
-            const followers = author.followers ? author.followers.length : 0;
-            const following = author.following ? author.following.length : 0;
-
-            // isFollowing: is currentUser following this author?
-            let isFollowing = false;
-            if (currentUser && author.followers) {
-                isFollowing = author.followers.some(f => f.toString() === currentUser._id.toString());
-            }
-
-            return {
-                id: post._id,
-                author: {
-                    id: author._id,
-                    name: author.name,
-                    username: null, // not in schema
-                    email: author.email,
-                    avatar: author.profileImage || null,
-                    coverImage: null, // not in schema
-                    headline: about.headline || null,
-                    bio: author.bio || null,
-                    location: about.location || null,
-                    website: about.website || null,
-                    joinedDate: author.createAt ? author.createAt.toISOString() : null,
-                    followers,
-                    following,
-                    streak: null, // not in schema
-                    lastStoryDate: null, // not in schema
-                    isFollowing,
-                    profileViews: null, // not in schema
-                    education,
-                    experience,
-                    skills,
-                    phone: about.phone || null,
-                    socialLinks: [], // not in schema
-                    isCounselor: false, // not in schema
-                    counselorInfo: null // not in schema
-                },
-                content: post.discription,
-                images: post.media,
-                createdAt: post.createdAt,
-                likes: post.likes,
-                comments: post.comments.length,
-                isLiked,
-                isBookmarked,
-                commentsList: post.comments
-            };
-        }).filter(post => post !== null); // Remove any null posts
-        return formattedPosts;
-}
 
 
 exports.deletePost = async(req,res) => {
@@ -984,12 +912,33 @@ exports.getPosts = async (req, res) => {
     };
 
     let communityPosts = await Post.aggregate([
-      { $match: communityMatch },
-      { $addFields: { commentsCount: { $size: "$comments" } } },
-      { $sort: { likes: -1, commentsCount: -1 } },
-      { $skip: offset },
-      { $limit: halfLimit },
-    ]);
+  { $match: communityMatch },
+  { $addFields: { commentsCount: { $size: "$comments" } } },
+  { $sort: { likes: -1, commentsCount: -1 } },
+  { $skip: offset },
+  { $limit: halfLimit },
+  {
+    $lookup: {
+      from: "communities",               // collection name in MongoDB
+      localField: "communityId",
+      foreignField: "_id",
+      as: "communityId"
+    }
+  },
+  { $unwind: "$communityId" },           // flatten array
+  { $project: { 
+      commentsCount: 1,
+      likes: 1,
+      title: 1,
+      content: 1,
+      "communityId._id": 1,
+      "communityId.name": 1,
+      "communityId.logo": 1,
+      "communityId.isPrivate": 1
+    }
+  }
+]);
+
 
     /** ---------------- BACKFILL (if one side has fewer) ---------------- */
     let combinedPosts = [...posts, ...communityPosts];
@@ -1040,6 +989,11 @@ exports.getPosts = async (req, res) => {
           ],
         },
       },
+       {
+        path: "communityId",      
+        model: "Community",
+        select: "name logo isPrivate"
+        }
     ]);
 
     /** ---------------- FORMAT ---------------- */
