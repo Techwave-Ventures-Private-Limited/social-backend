@@ -10,14 +10,14 @@ const sendPushNotification = async (recipientId, title, body, data = {}) => {
         const user = await User.findById(recipientId);
 
         if (!user || !user.deviceTokens || user.deviceTokens.length === 0) {
-            console.log("Push notification not sent: User has no registered device tokens.");
+            // console.log("Push notification not sent: User has no registered device tokens.");
             return;
         }
 
         const validTokens = user.deviceTokens.filter(token => typeof token === 'string' && token.startsWith('ExponentPushToken'));
 
         if (validTokens.length === 0) {
-            console.log("Push notification not sent: No valid ExpoPushTokens found for user.");
+            // console.log("Push notification not sent: No valid ExpoPushTokens found for user.");
             return;
         }
         
@@ -42,7 +42,7 @@ const sendPushNotification = async (recipientId, title, body, data = {}) => {
             body: JSON.stringify(message),
         });
 
-        console.log('Push notification request sent to Expo successfully.');
+        // console.log('Push notification request sent to Expo successfully.');
 
     } catch (error) {
         console.error('Error sending push notification via Expo service:', error);
@@ -86,7 +86,7 @@ exports.createNotification = async (recipient, sender, type, postId = null) => {
 
         const inAppNotification = new Notification({ recipient, sender, type, message, postId });
         await inAppNotification.save();
-        console.log("In-app notification created successfully.");
+        // console.log("In-app notification created successfully.");
 
         await sendPushNotification(recipient, title, message, pushData);
 

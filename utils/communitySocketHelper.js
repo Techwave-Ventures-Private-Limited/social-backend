@@ -14,7 +14,7 @@ const emitNewCommunityPost = (communityId, post) => {
             communityId,
             post
         });
-        console.log(`Emitted new post to community_${communityId}`);
+        // console.log(`Emitted new post to community_${communityId}`);
     }
 };
 
@@ -27,7 +27,7 @@ const emitNewCommunityComment = (communityId, comment, postId, isAnswer = false)
             postId,
             comment
         });
-        console.log(`Emitted new ${isAnswer ? 'answer' : 'comment'} to community_${communityId}`);
+        // console.log(`Emitted new ${isAnswer ? 'answer' : 'comment'} to community_${communityId}`);
     }
 };
 
@@ -39,7 +39,7 @@ const emitCommunityMemberUpdate = (communityId, member, action) => {
             communityId,
             member
         });
-        console.log(`Emitted member ${action} to community_${communityId}`);
+        // console.log(`Emitted member ${action} to community_${communityId}`);
     }
 };
 
@@ -52,7 +52,7 @@ const emitPostModerationAction = (communityId, postId, action, moderator) => {
             postId,
             moderator
         });
-        console.log(`Emitted post moderation ${action} to community_${communityId}`);
+        // console.log(`Emitted post moderation ${action} to community_${communityId}`);
     }
 };
 
@@ -66,7 +66,7 @@ const emitRoleChange = (communityId, userId, newRole, assignedBy) => {
             newRole,
             assignedBy
         });
-        console.log(`Emitted role change to community_${communityId}`);
+        // console.log(`Emitted role change to community_${communityId}`);
     }
 };
 
@@ -78,7 +78,7 @@ const emitCommunityAnnouncement = (communityId, announcement) => {
             communityId,
             announcement
         });
-        console.log(`Emitted announcement to community_${communityId}`);
+        // console.log(`Emitted announcement to community_${communityId}`);
     }
 };
 

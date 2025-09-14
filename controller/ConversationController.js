@@ -80,7 +80,7 @@ exports.startConversation = async (req, res) => {
         const { recipientId } = req.body;
         const senderId = req.userId;
         
-        console.log(`[BE LOG] startConversation called. Sender: ${senderId}, Recipient: ${recipientId}`);
+        // console.log(`[BE LOG] startConversation called. Sender: ${senderId}, Recipient: ${recipientId}`);
 
         // --- FIX 1: Add validation for the recipient's ID ---
         // This prevents crashes if an invalid ID is sent from the client.
@@ -104,7 +104,7 @@ exports.startConversation = async (req, res) => {
         });
 
         if (existingConversation) {
-            console.log(`[BE LOG] Conversation already exists. ID: ${existingConversation._id}`);
+            // console.log(`[BE LOG] Conversation already exists. ID: ${existingConversation._id}`);
             return res.status(200).json({
                 success: true,
                 message: "Conversation already exists.",
@@ -125,7 +125,7 @@ exports.startConversation = async (req, res) => {
         });
 
         await newConversation.save();
-        console.log(`[BE LOG] Successfully created new conversation. ID: ${newConversation._id}`);
+        // console.log(`[BE LOG] Successfully created new conversation. ID: ${newConversation._id}`);
 
         return res.status(201).json({
             success: true,
@@ -486,7 +486,7 @@ exports.createMessage = async (req, res) => {
         
         // --- Get io and onlineUsers from the request object ---
         const { io, onlineUsers } = req;
-        console.log('[DEBUG] onlineUsers map in controller:', onlineUsers); // <-- ADD THIS LOG
+        // console.log('[DEBUG] onlineUsers map in controller:', onlineUsers); // <-- ADD THIS LOG
 
 
         // --- Updated validation to include new shared types ---
@@ -538,7 +538,7 @@ exports.createMessage = async (req, res) => {
             // Loop through every participant in the conversation
             conversation.participants.forEach(participantId => {
                 // Check if the participant is currently online by looking them up in the map
-                console.log(`[DEBUG] Checking for participant: ${participantId.toString()}`);
+                // console.log(`[DEBUG] Checking for participant: ${participantId.toString()}`);
                 if (onlineUsers.has(participantId.toString())) {
                     // Get the participant's unique socket ID from the map
                     const participantSocketId = onlineUsers.get(participantId.toString());
@@ -546,9 +546,9 @@ exports.createMessage = async (req, res) => {
                     // Emit the 'newMessage' event directly to that user's socket connection
                     io.to(participantSocketId).emit('newMessage', populatedMessage.toObject());
                     
-                    console.log(`[REAL-TIME] Emitted 'newMessage' to participant: ${participantId}`);
+                    // console.log(`[REAL-TIME] Emitted 'newMessage' to participant: ${participantId}`);
                 } else {
-                    console.log(`[DEBUG] Participant ${participantId.toString()} NOT found in onlineUsers map.`); // <-- ADD THIS LOG
+                    // console.log(`[DEBUG] Participant ${participantId.toString()} NOT found in onlineUsers map.`); // <-- ADD THIS LOG
                 }
             });
         }
@@ -592,7 +592,7 @@ exports.markMessagesAsSeen = async (req, res) => {
             // A socket event should be emitted here to inform the other user(s)
             // that their messages have been seen in real-time.
             // E.g., io.to(conversationId).emit('messagesSeen', { conversationId, readerId: userId });
-            console.log(`[BE LOG] ${result.nModified} messages in conversation ${conversationId} marked as seen by user ${userId}.`);
+            // console.log(`[BE LOG] ${result.nModified} messages in conversation ${conversationId} marked as seen by user ${userId}.`);
         }
         
         return res.status(200).json({
