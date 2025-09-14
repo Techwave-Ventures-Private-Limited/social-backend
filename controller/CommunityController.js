@@ -1,6 +1,6 @@
 const Community = require('../modules/community');
 const CommunityPost = require('../modules/post');
-const CommunityComment = require('../modules/communityComment');
+const CommunityComment = require('../modules/comments');
 const JoinRequest = require('../modules/joinRequest');
 const CommunityAnnouncement = require('../modules/communityAnnouncement');
 const User = require('../modules/user');
@@ -681,7 +681,7 @@ exports.getPostsForHomeFeed = async (req, res) => {
             .populate('likes', 'name')
             .populate({
                 path: 'comments',
-                populate: { path: 'authorId', select: 'name profileImage' }
+                populate: { path: 'userId', select: 'name profileImage' }
             })
             .sort({ createdAt: -1 })
             .skip(skip)
@@ -946,10 +946,8 @@ exports.addCommentToCommunityPost = async (req, res) => {
 
         const newComment = new CommunityComment({
             postId,
-            authorId: userId,
-            authorName: user.name,
-            authorAvatar: user.profileImage,
-            content: content.trim()
+            userId: userId,
+            text: content.trim()
         });
 
         await newComment.save();
@@ -969,7 +967,7 @@ exports.addCommentToCommunityPost = async (req, res) => {
             lastActivity: new Date()
         });
 
-        await newComment.populate('authorId', 'name profileImage');
+        await newComment.populate('userId', 'name profileImage');
 
         return res.status(201).json({
             success: true,
