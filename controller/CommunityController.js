@@ -237,7 +237,7 @@ exports.getCommunityById = async (req, res) => {
                     { path: 'likes', select: 'name' },
                     {
                         path: 'comments',
-                        populate: { path: 'authorId', select: 'name profileImage' }
+                        populate: { path: 'userId', select: 'name profileImage' }
                     }
                 ],
                 options: { sort: { isPinned: -1, createdAt: -1 } }
@@ -810,7 +810,7 @@ exports.getCommunityPosts = async (req, res) => {
             .populate('likes', 'name')
             .populate({
                 path: 'comments',
-                populate: { path: 'authorId', select: 'name profileImage' },
+                populate: { path: 'userId', select: 'name profileImage' },
                 options: { sort: { createdAt: 1 } }
             })
             .sort(sortOptions)
