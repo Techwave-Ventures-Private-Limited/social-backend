@@ -1310,3 +1310,39 @@ function isOwnerAdminOrModerator(community, userId) {
            community.admins.some(admin => admin.toString() === userId) ||
            community.moderators.some(mod => mod.toString() === userId);
 }
+
+exports.getCommunityMembers = async(req,res) => {
+    try {
+
+        const userId = req.userId;
+        const communityId = req.params.id;
+
+        const community = await Community.findById(communityId).populate("members");
+        const user = await User.findById(userId);
+
+        if (!user.communities.includes(communityId)) {
+            return res.status(400).json({
+                success: false,
+                message: "You do not have permission to access this community since you are not a member."
+            })
+        }
+
+        if (!community) {
+            return res.status(400).json({
+                success: false,
+                message: "Community not found"
+            })
+        }
+
+        return res.status(200).json({
+            success: true,
+            members: community.members
+        })
+
+    } catch(err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
