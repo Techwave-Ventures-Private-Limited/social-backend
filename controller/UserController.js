@@ -518,8 +518,8 @@ exports.registerDeviceToken = async (req, res) => {
         const { token } = req.body;
         const userId = req.userId;
 
-        console.log(`[Push Token] Attempting to register token for userId: ${userId}`);
-        console.log(`[Push Token] Received token from client: ${token}`);
+        // console.log(`[Push Token] Attempting to register token for userId: ${userId}`);
+        // console.log(`[Push Token] Received token from client: ${token}`);
 
         if (!token) {
             return res.status(400).json({ success: false, message: "Device token is required." });
@@ -527,7 +527,7 @@ exports.registerDeviceToken = async (req, res) => {
 
         const user = await User.findById(userId);
         if (!user) {
-            console.error(`[Push Token] User not found for ID: ${userId}`);
+            // console.error(`[Push Token] User not found for ID: ${userId}`);
             return res.status(404).json({ success: false, message: "User not found." });
         }
 
@@ -540,9 +540,9 @@ exports.registerDeviceToken = async (req, res) => {
             // --- END OF FIX ---
 
             await user.save();
-            console.log(`[Push Token] Successfully saved token for userId: ${userId}`);
+            // console.log(`[Push Token] Successfully saved token for userId: ${userId}`);
         } else {
-            console.log(`[Push Token] Token already exists for userId: ${userId}. No action taken.`);
+            // console.log(`[Push Token] Token already exists for userId: ${userId}. No action taken.`);
         }
 
         return res.status(200).json({
@@ -551,7 +551,7 @@ exports.registerDeviceToken = async (req, res) => {
         });
 
     } catch (err) {
-        console.error(`[Push Token] Error during registration: ${err.message}`);
+        // console.error(`[Push Token] Error during registration: ${err.message}`);
         return res.status(500).json({
             success: false,
             message: err.message,
@@ -562,7 +562,7 @@ exports.registerDeviceToken = async (req, res) => {
 exports.getBulkUsers = async (req, res) => {
   try {
     const ids = req.body.ids;
-    console.log(ids)
+    // console.log(ids)
     if (!ids || !Array.isArray(ids)) {
         return res.status(400).json({
             success: false,
@@ -754,7 +754,7 @@ exports.getUserFollowing = async (req, res) => {
 exports.getConnections = async (req, res) => {
     try {
         const userId = req.userId;
-        console.log(`[CONNECTIONS] Fetching connections for authenticated user ID: ${userId}`);
+        // console.log(`[CONNECTIONS] Fetching connections for authenticated user ID: ${userId}`);
 
         if (!userId) {
             return res.status(401).json({ success: false, message: 'Authentication error: User ID not found.' });
@@ -770,10 +770,10 @@ exports.getConnections = async (req, res) => {
         }
 
         // --- Critical Debugging Logs ---
-        console.log(`[CONNECTIONS] Found user: ${user.name}`);
-        console.log(`[CONNECTIONS] Raw followers array (before populate):`, user.followers.map(f => f._id));
-        console.log(`[CONNECTIONS] Populated followers count: ${user.followers.length}`);
-        console.log(`[CONNECTIONS] Populated following count: ${user.following.length}`);
+        // console.log(`[CONNECTIONS] Found user: ${user.name}`);
+        // console.log(`[CONNECTIONS] Raw followers array (before populate):`, user.followers.map(f => f._id));
+        // console.log(`[CONNECTIONS] Populated followers count: ${user.followers.length}`);
+        // console.log(`[CONNECTIONS] Populated following count: ${user.following.length}`);
 
         // Use a Map to combine and de-duplicate the lists
         const connectionsMap = new Map();
@@ -790,7 +790,7 @@ exports.getConnections = async (req, res) => {
 
         // Convert the map values back to an array for the response
         const uniqueConnections = Array.from(connectionsMap.values());
-        console.log(`[CONNECTIONS] Total unique connections: ${uniqueConnections.length}`);
+        // console.log(`[CONNECTIONS] Total unique connections: ${uniqueConnections.length}`);
 
         return res.status(200).json({ success: true, body: uniqueConnections });
 

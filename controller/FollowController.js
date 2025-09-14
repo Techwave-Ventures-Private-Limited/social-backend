@@ -5,9 +5,9 @@ exports.followUser = async(req,res) => {
     try{
 
         const {userToFollowId} = req.body;
-        console.log("userToFollowId", userToFollowId);
+        // console.log("userToFollowId", userToFollowId);
         const userId = req.userId;
-        console.log("userId", userId);
+        // console.log("userId", userId);
 
         if(!userToFollowId) {
             return res.status(400).json({
