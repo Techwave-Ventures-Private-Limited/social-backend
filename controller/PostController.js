@@ -884,86 +884,59 @@ exports.getPosts = async (req, res) => {
       .filter(id => mongoose.Types.ObjectId.isValid(id))
       .map(id => new mongoose.Types.ObjectId(id));
 
-    const halfLimit = Math.floor(limit / 2);
-
-    /** ---------------- POSTS PIPELINE ---------------- */
-    const postMatch = {
+    /** ---------------- SINGLE AGGREGATE ---------------- */
+    let combinedPosts = await Post.aggregate([
+  { 
+    $match: { 
       _id: { $nin: likedPosts },
       type: "post",
-    };
-
-    if (people.length > 0) {
-      postMatch.userId = { $in: people };
-    }
-
-    let posts = await Post.aggregate([
-      { $match: postMatch },
-      { $addFields: { commentsCount: { $size: "$comments" } } },
-      { $sort: { likes: -1, commentsCount: -1 } },
-      { $skip: offset },
-      { $limit: halfLimit },
-    ]);
-
-    /** ---------------- COMMUNITY PIPELINE ---------------- */
-    const communityMatch = {
-      _id: { $nin: likedPosts },
-      type: "community",
-      communityId: { $in: joinedCommunities },
-    };
-
-    let communityPosts = await Post.aggregate([
-  { $match: communityMatch },
-  { $addFields: { commentsCount: { $size: "$comments" } } },
-  { $sort: { likes: -1, commentsCount: -1 } },
-  { $skip: offset },
-  { $limit: halfLimit },
+      ...(people.length > 0 ? { userId: { $in: people } } : {})
+    } 
+  },
   {
-    $lookup: {
-      from: "communities",               // collection name in MongoDB
-      localField: "communityId",
-      foreignField: "_id",
-      as: "communityId"
+    $unionWith: {
+      coll: "posts",
+      pipeline: [
+        { 
+          $match: { 
+            _id: { $nin: likedPosts },
+            type: "Community",
+            communityId: { $in: joinedCommunities }
+          } 
+        },
+        {
+          $lookup: {
+            from: "communities",
+            localField: "communityId",
+            foreignField: "_id",
+            as: "communityId"
+          }
+        },
+        { $unwind: "$communityId" },
+        {
+          $project: {
+            commentsCount: { $size: { $ifNull: ["$comments", []] } },
+            likes: 1,
+            title: 1,
+            content: 1,
+            userId: 1,
+            originalPostId: 1,
+            createdAt: 1,
+            "communityId._id": 1,
+            "communityId.name": 1,
+            "communityId.logo": 1,
+            "communityId.isPrivate": 1
+          }
+        }
+      ]
     }
   },
-  { $unwind: "$communityId" },           // flatten array
-  { $project: { 
-      commentsCount: 1,
-      likes: 1,
-      title: 1,
-      content: 1,
-      "communityId._id": 1,
-      "communityId.name": 1,
-      "communityId.logo": 1,
-      "communityId.isPrivate": 1
-    }
-  }
+  { $addFields: { commentsCount: { $size: { $ifNull: ["$comments", []] } } } },
+  { $sort: { likes: -1, commentsCount: -1, createdAt: -1 } },
+  { $skip: offset },
+  { $limit: limit }
 ]);
 
-
-    /** ---------------- BACKFILL (if one side has fewer) ---------------- */
-    let combinedPosts = [...posts, ...communityPosts];
-
-    if (combinedPosts.length < limit) {
-      const remaining = limit - combinedPosts.length;
-
-      // Trending backfill (can come from either type)
-      const trendingMatch = {
-        _id: { $nin: likedPosts },
-      };
-
-      if (people.length > 0) {
-        trendingMatch.userId = { $nin: people };
-      }
-
-      const trendingPosts = await Post.aggregate([
-        { $match: trendingMatch },
-        { $addFields: { commentsCount: { $size: "$comments" } } },
-        { $sort: { likes: -1, commentsCount: -1 } },
-        { $limit: remaining },
-      ]);
-
-      combinedPosts = [...combinedPosts, ...trendingPosts];
-    }
 
     /** ---------------- POPULATE ---------------- */
     combinedPosts = await Post.populate(combinedPosts, [
@@ -989,11 +962,11 @@ exports.getPosts = async (req, res) => {
           ],
         },
       },
-       {
-        path: "communityId",      
+      {
+        path: "communityId",
         model: "Community",
         select: "name logo isPrivate"
-        }
+      }
     ]);
 
     /** ---------------- FORMAT ---------------- */
@@ -1012,5 +985,6 @@ exports.getPosts = async (req, res) => {
     });
   }
 };
+
 
 
