@@ -11,6 +11,12 @@ exports.createEvent = async(req,res) => {
         const eventObject = req.body;
         const userId = req.userId;
 
+        console.log("--- Raw req.body received ---");
+        console.log(req.body);
+        console.log("Type of tags:", typeof req.body.tags);
+        console.log("Type of speakers:", typeof req.body.speakers);
+        console.log("-----------------------------");
+
         const { communityId } = eventObject;
 
         if (communityId) {
@@ -119,21 +125,8 @@ exports.createEvent = async(req,res) => {
             }
         }
 
-        // Handle tags array
-        try {
-            eventObject.tags = JSON.parse(eventObject.tags || '[]');
-        } catch (e) {
-            console.error("Error parsing tags:", eventObject.tags);
-            eventObject.tags = [];
-        }
-
-        // Handle speakers array
-        try {
-            eventObject.speakers = JSON.parse(eventObject.speakers || '[]');
-        } catch (e) {
-            console.error("Error parsing speakers:", eventObject.speakers);
-            eventObject.speakers = [];
-        }
+        eventObject.tags = eventObject.tags || [];
+        eventObject.speakers = eventObject.speakers || [];
 
         // Convert boolean strings to actual booleans
         if (typeof eventObject.isPaid === 'string') {
