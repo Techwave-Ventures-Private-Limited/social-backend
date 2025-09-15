@@ -4,7 +4,7 @@ const ticketPlanSchema = new mongoose.Schema({
     
     name: {
         type:String,
-        requried: true
+        required: true
     },
     price : {
         type: String,

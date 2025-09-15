@@ -433,7 +433,7 @@ exports.bookTicket = async (req, res) => {
                 message: "This email has already booked a ticket for this event"
             });
         }
-        event.attendees.push({ name, email, phone });
+        event.attendees.push({ name, email, phone, ticketTypeId: ticketType._id });
 
         // Decrement ticket count
         ticketType.remTicket -= 1;
