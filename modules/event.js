@@ -83,7 +83,7 @@ const eventSchema = new mongoose.Schema({
         name: { type: String },
         email: { type: String },
         phone: { type: String },
-        ticketType: {
+        ticketTypeId: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "TicketPlan",
           required: true,
