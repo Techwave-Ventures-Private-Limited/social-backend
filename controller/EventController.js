@@ -436,11 +436,11 @@ exports.bookTicket = async (req, res) => {
         event.attendees.push({ name, email, phone, ticketTypeId: ticketType._id });
 
         // Decrement ticket count
-        ticketType.remTicket -= 1;
+        await Ticket.findByIdAndUpdate(ticketType._id, { $inc: { remTicket: -1 } });
 
         // Save changes
         await event.save();
-        await ticketType.save && (await ticketType.save()); // In case ticketType is a mongoose doc
+        // await ticketType.save && (await ticketType.save());  // In case ticketType is a mongoose doc
 
         return res.status(200).json({
             success: true,
