@@ -522,7 +522,7 @@ exports.getAllPosts = async (req, res) => {
 };
 
 
-const formatPost = (post, currentUser = null) => {
+exports.formatPost = (post, currentUser = null) => {
     if (!post || !post.userId) return null;
 
     const author = post.userId;
@@ -591,6 +591,74 @@ const formatPost = (post, currentUser = null) => {
     };
 };
 
+const formatPost = (post, currentUser = null) => {
+    if (!post || !post.userId) return null;
+
+    const author = post.userId;
+    const about = author.about || {};
+    const education = author.education || [];
+    const experience = author.experience || [];
+    const skills = Array.isArray(about.skills) ? about.skills : [];
+
+    const followers = Array.isArray(author.followers) ? author.followers.length : 0;
+    const following = Array.isArray(author.following) ? author.following.length : 0;
+
+    const isFollowing = currentUser?.followers?.some(f => f.toString() === author._id.toString()) || false;
+    const isBookmarked = currentUser?.savedPost?.some(id => id.toString() === post._id.toString()) || false;
+    const isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
+
+    let originalPost = null;
+    if (post.originalPostId) {
+        originalPost = formatPost(post.originalPostId, currentUser);
+    }
+
+    let communityName = "";
+    if (post.type === "Community") {
+        communityName = post.communityId?.name;
+    }
+
+    return {
+        id: post._id,
+        author: {
+            id: author._id,
+            name: author.name,
+            username: null,
+            email: author.email,
+            avatar: author.profileImage || null,
+            coverImage: null,
+            headline: about.headline || null,
+            bio: author.bio || null,
+            location: about.location || null,
+            website: about.website || null,
+            joinedDate: author.createdAt ? author.createdAt.toISOString() : null,
+            followers,
+            following,
+            streak: null,
+            lastStoryDate: null,
+            isFollowing,
+            profileViews: null,
+            education,
+            experience,
+            skills,
+            phone: about.phone || null,
+            socialLinks: [],
+            isCounselor: false,
+            counselorInfo: null
+        },
+        content: post.discription,
+        images: post.media || [],
+        createdAt: post.createdAt,
+        likes: post.likes,
+        comments: post.comments?.length || 0,
+        isLiked,
+        isBookmarked,
+        commentsList: post.comments || [],
+        originalPost,
+        isReposted: post.isReposted,
+        type: post.type,
+        communityName
+    };
+};
 
 
 exports.deletePost = async(req,res) => {
