@@ -183,7 +183,7 @@ exports.createTicket = async(req,res) =>{
 
         const {name, price, remTicket} = req.body;
         const userId = req.userId;
-        const createdTicket = await Ticket.create({name, price, remTicket, userId});
+        const createdTicket = await Ticket.create({name, price, remTicket, totalTicket: remTicket, userId});
 
         return res.status(200).json({
             success:true,

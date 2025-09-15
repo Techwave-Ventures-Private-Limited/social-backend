@@ -14,6 +14,10 @@ const ticketPlanSchema = new mongoose.Schema({
         type : Number,
         required: true
     },
+    totalTicket: {
+        type : Number,
+        required: true
+    },
     userId:{
         type: String,
     },
