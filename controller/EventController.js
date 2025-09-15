@@ -120,25 +120,19 @@ exports.createEvent = async(req,res) => {
         }
 
         // Handle tags array
-        if (eventObject.tags && typeof eventObject.tags === 'string') {
-            try {
-                eventObject.tags = JSON.parse(eventObject.tags);
-            } catch (error) {
-                eventObject.tags = eventObject.tags.split(",");
-            }
-        }
-        // Ensure tags is an array
-        if (!eventObject.tags || !Array.isArray(eventObject.tags)) {
+        try {
+            eventObject.tags = JSON.parse(eventObject.tags || '[]');
+        } catch (e) {
+            console.error("Error parsing tags:", eventObject.tags);
             eventObject.tags = [];
         }
 
         // Handle speakers array
-        if (eventObject.speakers && typeof eventObject.speakers === 'string') {
-            try {
-                eventObject.speakers = JSON.parse(eventObject.speakers);
-            } catch (error) {
-                eventObject.speakers = eventObject.speakers.split(",");
-            }
+        try {
+            eventObject.speakers = JSON.parse(eventObject.speakers || '[]');
+        } catch (e) {
+            console.error("Error parsing speakers:", eventObject.speakers);
+            eventObject.speakers = [];
         }
 
         // Convert boolean strings to actual booleans

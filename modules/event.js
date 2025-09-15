@@ -90,16 +90,14 @@ const eventSchema = new mongoose.Schema({
         },
       },
     ],
-    tags: [
-      {
-        type: String,
-      },
-    ],
-    speakers: [
-      {
-        type: String,
-      },
-    ],
+    tags: {
+        type: [String],
+        default: []
+    },
+    speakers: {
+        type: [String],
+        default: []
+    },
     createdBy: {
       type: String,
       required: true,
