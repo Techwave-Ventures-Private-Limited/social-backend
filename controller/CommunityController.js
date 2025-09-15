@@ -13,6 +13,7 @@ const {
     emitPostModerationAction,
     emitRoleChange
 } = require('../utils/communitySocketHelper');
+const { uploadVideoToCloudinary, uploadImageToCloudinary } = require("../utils/imageUploader");
 
 // ================================
 // COMMUNITY CRUD OPERATIONS
@@ -24,14 +25,15 @@ exports.createCommunity = async (req, res) => {
         const {
             name,
             description,
-            coverImage,
-            logo,
             tags,
             location,
             isPrivate,
             requiresApproval,
             settings
         } = req.body;
+
+        let logo = req.files && req.files.logo;
+        let coverImage = req.files && req.files.coverImage;
 
         const userId = req.userId;
 
@@ -58,11 +60,14 @@ exports.createCommunity = async (req, res) => {
             ...settings
         };
 
+        const uploadedLogo = await uploadImageToCloudinary(logo, process.env.FOLDER_NAME || "community");
+        const uploadedCoverImage = await uploadImageToCloudinary(coverImage, process.env.FOLDER_NAME || "community");
+
         const newCommunity = new Community({
             name: name.trim(),
             description,
-            coverImage,
-            logo,
+            coverImage: uploadedCoverImage.secure_url,
+            logo: uploadedLogo.secure_url,
             tags: tags || [],
             location,
             owner: userId,
@@ -560,11 +565,13 @@ exports.createCommunityPost = async (req, res) => {
         const { id } = req.params; // community ID
         const {
             discription,
-            images,
             type = 'text',
             resourceUrl,
             resourceType
         } = req.body;
+
+        let files = req.files && req.files.images;
+        let mediaUrls = [];
 
         const userId = req.userId;
 
@@ -594,13 +601,28 @@ exports.createCommunityPost = async (req, res) => {
 
         const user = await User.findById(userId).select('name profileImage');
 
+        if (files) {
+            files = Array.isArray(files) ? files : [files];
+            for (const file of files) {    
+                const isVideo = file.mimetype.startsWith("video");
+                if (isVideo) {
+                    const uploadedVideo = await uploadVideoToCloudinary(file, process.env.FOLDER_NAME || "post", "auto");
+                    mediaUrls.push(uploadedVideo.secure_url);
+                }
+                else {
+                    const uploadedImage = await uploadImageToCloudinary(file, process.env.FOLDER_NAME || "post");
+                    mediaUrls.push(uploadedImage.secure_url);
+                }
+            }
+        }
+
         const newPost = new CommunityPost({
             communityId: id,
             authorId: userId,
             authorName: user.name,
             authorAvatar: user.profileImage,
             discription: discription.trim(),
-            media: images || [],
+            media: mediaUrls,
             subtype: type,
             type:"Community",
             resourceUrl,
@@ -1287,4 +1309,40 @@ function isOwnerAdminOrModerator(community, userId) {
     return community.owner.toString() === userId || 
            community.admins.some(admin => admin.toString() === userId) ||
            community.moderators.some(mod => mod.toString() === userId);
+}
+
+exports.getCommunityMembers = async(req,res) => {
+    try {
+
+        const userId = req.userId;
+        const communityId = req.params.id;
+
+        const community = await Community.findById(communityId).populate("members");
+        const user = await User.findById(userId);
+
+        if (!user.communities.includes(communityId)) {
+            return res.status(400).json({
+                success: false,
+                message: "You do not have permission to access this community since you are not a member."
+            })
+        }
+
+        if (!community) {
+            return res.status(400).json({
+                success: false,
+                message: "Community not found"
+            })
+        }
+
+        return res.status(200).json({
+            success: true,
+            members: community.members
+        })
+
+    } catch(err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
 }

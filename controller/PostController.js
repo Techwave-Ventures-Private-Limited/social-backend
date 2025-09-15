@@ -522,7 +522,7 @@ exports.getAllPosts = async (req, res) => {
 };
 
 
-const formatPost = (post, currentUser = null) => {
+exports.formatPost = (post, currentUser = null) => {
     if (!post || !post.userId) return null;
 
     const author = post.userId;
@@ -591,6 +591,74 @@ const formatPost = (post, currentUser = null) => {
     };
 };
 
+const formatPost = (post, currentUser = null) => {
+    if (!post || !post.userId) return null;
+
+    const author = post.userId;
+    const about = author.about || {};
+    const education = author.education || [];
+    const experience = author.experience || [];
+    const skills = Array.isArray(about.skills) ? about.skills : [];
+
+    const followers = Array.isArray(author.followers) ? author.followers.length : 0;
+    const following = Array.isArray(author.following) ? author.following.length : 0;
+
+    const isFollowing = currentUser?.followers?.some(f => f.toString() === author._id.toString()) || false;
+    const isBookmarked = currentUser?.savedPost?.some(id => id.toString() === post._id.toString()) || false;
+    const isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
+
+    let originalPost = null;
+    if (post.originalPostId) {
+        originalPost = formatPost(post.originalPostId, currentUser);
+    }
+
+    let communityName = "";
+    if (post.type === "Community") {
+        communityName = post.communityId?.name;
+    }
+
+    return {
+        id: post._id,
+        author: {
+            id: author._id,
+            name: author.name,
+            username: null,
+            email: author.email,
+            avatar: author.profileImage || null,
+            coverImage: null,
+            headline: about.headline || null,
+            bio: author.bio || null,
+            location: about.location || null,
+            website: about.website || null,
+            joinedDate: author.createdAt ? author.createdAt.toISOString() : null,
+            followers,
+            following,
+            streak: null,
+            lastStoryDate: null,
+            isFollowing,
+            profileViews: null,
+            education,
+            experience,
+            skills,
+            phone: about.phone || null,
+            socialLinks: [],
+            isCounselor: false,
+            counselorInfo: null
+        },
+        content: post.discription,
+        images: post.media || [],
+        createdAt: post.createdAt,
+        likes: post.likes,
+        comments: post.comments?.length || 0,
+        isLiked,
+        isBookmarked,
+        commentsList: post.comments || [],
+        originalPost,
+        isReposted: post.isReposted,
+        type: post.type,
+        communityName
+    };
+};
 
 
 exports.deletePost = async(req,res) => {
@@ -884,82 +952,73 @@ exports.getPosts = async (req, res) => {
       .filter(id => mongoose.Types.ObjectId.isValid(id))
       .map(id => new mongoose.Types.ObjectId(id));
 
-    const halfLimit = Math.floor(limit / 2);
-
-    /** ---------------- POSTS PIPELINE ---------------- */
-    const postMatch = {
-      _id: { $nin: likedPosts },
-      type: "post",
-    };
-
-    if (people.length > 0) {
-      postMatch.userId = { $in: people };
-    }
-
-    let posts = await Post.aggregate([
-      { $match: postMatch },
-      { $addFields: { commentsCount: { $size: "$comments" } } },
-      { $sort: { likes: -1, commentsCount: -1 } },
+    /** ---------------- MAIN PIPELINE ---------------- */
+    let combinedPosts = await Post.aggregate([
+      { 
+        $match: { 
+          _id: { $nin: likedPosts },
+          type: "Post",
+          ...(people.length > 0 ? { userId: { $in: people } } : {})
+        } 
+      },
+      {
+        $unionWith: {
+          coll: "posts",
+          pipeline: [
+            { 
+              $match: { 
+                _id: { $nin: likedPosts },
+                type: "Community",
+                ...(joinedCommunities.length > 0 ? { communityId: { $in: joinedCommunities } } : { communityId: null })
+              } 
+            },
+            {
+              $lookup: {
+                from: "communities",
+                localField: "communityId",
+                foreignField: "_id",
+                as: "communityId"
+              }
+            },
+            { $unwind: { path: "$communityId", preserveNullAndEmptyArrays: true } },
+            {
+              $project: {
+                commentsCount: { $size: { $ifNull: ["$comments", []] } },
+                likes: 1,
+                title: 1,
+                content: 1,
+                userId: 1,
+                originalPostId: 1,
+                createdAt: 1,
+                "communityId._id": 1,
+                "communityId.name": 1,
+                "communityId.logo": 1,
+                "communityId.isPrivate": 1
+              }
+            }
+          ]
+        }
+      },
+      { $addFields: { commentsCount: { $size: { $ifNull: ["$comments", []] } } } },
+      { $sort: { likes: -1, commentsCount: -1, createdAt: -1 } },
       { $skip: offset },
-      { $limit: halfLimit },
+      { $limit: limit }
     ]);
 
-    /** ---------------- COMMUNITY PIPELINE ---------------- */
-    const communityMatch = {
-      _id: { $nin: likedPosts },
-      type: "community",
-      communityId: { $in: joinedCommunities },
-    };
-
-    let communityPosts = await Post.aggregate([
-  { $match: communityMatch },
-  { $addFields: { commentsCount: { $size: "$comments" } } },
-  { $sort: { likes: -1, commentsCount: -1 } },
-  { $skip: offset },
-  { $limit: halfLimit },
-  {
-    $lookup: {
-      from: "communities",               // collection name in MongoDB
-      localField: "communityId",
-      foreignField: "_id",
-      as: "communityId"
-    }
-  },
-  { $unwind: "$communityId" },           // flatten array
-  { $project: { 
-      commentsCount: 1,
-      likes: 1,
-      title: 1,
-      content: 1,
-      "communityId._id": 1,
-      "communityId.name": 1,
-      "communityId.logo": 1,
-      "communityId.isPrivate": 1
-    }
-  }
-]);
-
-
-    /** ---------------- BACKFILL (if one side has fewer) ---------------- */
-    let combinedPosts = [...posts, ...communityPosts];
-
+    /** ---------------- BACKFILL WITH TRENDING ---------------- */
     if (combinedPosts.length < limit) {
       const remaining = limit - combinedPosts.length;
 
-      // Trending backfill (can come from either type)
-      const trendingMatch = {
-        _id: { $nin: likedPosts },
-      };
-
-      if (people.length > 0) {
-        trendingMatch.userId = { $nin: people };
-      }
-
       const trendingPosts = await Post.aggregate([
-        { $match: trendingMatch },
-        { $addFields: { commentsCount: { $size: "$comments" } } },
-        { $sort: { likes: -1, commentsCount: -1 } },
-        { $limit: remaining },
+        {
+          $match: {
+            _id: { $nin: likedPosts },
+            type: "post"
+          }
+        },
+        { $addFields: { commentsCount: { $size: { $ifNull: ["$comments", []] } } } },
+        { $sort: { likes: -1, commentsCount: -1, createdAt: -1 } },
+        { $limit: remaining }
       ]);
 
       combinedPosts = [...combinedPosts, ...trendingPosts];
@@ -989,11 +1048,11 @@ exports.getPosts = async (req, res) => {
           ],
         },
       },
-       {
-        path: "communityId",      
+      {
+        path: "communityId",
         model: "Community",
         select: "name logo isPrivate"
-        }
+      }
     ]);
 
     /** ---------------- FORMAT ---------------- */
@@ -1012,5 +1071,7 @@ exports.getPosts = async (req, res) => {
     });
   }
 };
+
+
 
 
