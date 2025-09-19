@@ -4,13 +4,17 @@ const ticketPlanSchema = new mongoose.Schema({
     
     name: {
         type:String,
-        requried: true
+        required: true
     },
     price : {
         type: String,
         required: true
     },
     remTicket: {
+        type : Number,
+        required: true
+    },
+    totalTicket: {
         type : Number,
         required: true
     },

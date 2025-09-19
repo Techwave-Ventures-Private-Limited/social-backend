@@ -1,42 +1,121 @@
 const mongoose = require("mongoose");
 
 const eventSchema = new mongoose.Schema({
-    title: { type: String, required: true },
-    description: { type: String, required: true }, // was 'des'
-    shortDescription: { type: String }, // optional
-    date: { type: String, required: true },
-    time: { type: String, required: true },
-    location: { type: String, required: true },
-    banner: { type: String, },
-    organizer: { type: String, required: true },
-    organizerId: { type: String, required: true }, // new
-    isPaid: { type: Boolean, default: true }, // was 'isPaidEvent'
-    isOnline: { type: Boolean, default: false }, // was 'isEventOnline'
-    onlineEventLink: { type: String }, // optional
-    category: {
+    userId: {
         type: String,
-        enum: ['Workshop', 'Meetup', 'Pitch', 'Seminar', 'Hackathon', 'Webinar', 'Conference', 'Networking'],
-        required: true
     },
-    ticketTypes: [{
+    title: {
+      type: String,
+      required: true,
+    },
+    description: {
+      type: String,
+      required: true,
+    },
+    shortDescription: {
+      type: String,
+    },
+    date: {
+      type: String,
+      required: true,
+    },
+    time: {
+      type: String,
+      required: true,
+    },
+    location: {
+      type: String,
+      required: true,
+    },
+    isOnline: {
+      type: Boolean,
+      default: false,
+    },
+    onlineEventLink: {
+      type: String,
+    },
+    banner: {
+      type: String,
+    },
+    organizer: {
+      type: String,
+      required: true,
+    },
+    organizerId: {
+      type: String,
+      required: true,
+    },
+    communityId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Community',
+        default: null,        // This can be null if it's a global event not tied to a community
+    },
+    category: {
+      type: String,
+      enum: [
+        "Workshop",
+        "Meetup",
+        "Pitch",
+        "Seminar",
+        "Hackathon",
+        "Webinar",
+        "Conference",
+        "Networking",
+      ],
+      required: true,
+    },
+    isPaid: {
+      type: Boolean,
+      default: true,
+    },
+    ticketTypes: [
+      {
         type: mongoose.Schema.Types.ObjectId,
         ref: "TicketPlan",
-        required: true
-    }],
-    maxAttendees: { type: Number }, // optional
-    attendees: [{
-        name: String,
-        email: String,
-        phone: String
-    }],
-    tags: [{ type: String }],
-    speakers: [{ type: String }],
-    createdBy: { type: String, required: true },
-    createdAt: { type: Date, default: Date.now },
-    likes: [{ type: String }], // array of user IDs
-    bookmarks: [{ type: String }], // array of user IDs
-    updatedAt: { type: Date, default: Date.now }
-});
+        required: true,
+      },
+    ],
+    maxAttendees: {
+      type: Number,
+    },
+    attendees: [
+      {
+        name: { type: String },
+        email: { type: String },
+        phone: { type: String },
+        ticketTypeId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "TicketPlan",
+          required: true,
+        },
+      },
+    ],
+    tags: {
+        type: [String],
+        default: []
+    },
+    speakers: {
+        type: [String],
+        default: []
+    },
+    createdBy: {
+      type: String,
+      required: true,
+    },
+    likes: [
+      {
+        type: String,
+      },
+    ],
+    bookmarks: [
+      {
+        type: String,
+      },
+    ],
+  },
+  {
+    timestamps: true,
+  }
+);
 
 module.exports = mongoose.model("Event", eventSchema);
-

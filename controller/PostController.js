@@ -1,8 +1,11 @@
 const Post = require("../modules/post");
 const User = require("../modules/user");
 const Comment = require("../modules/comments");
+const Community = require("../modules/community");
+const CommunityPost = require("../modules/communityPost");
 const { createNotification } = require('../utils/notificationUtils');
 const { uploadMultipleImagesToCloudinary, uploadVideoToCloudinary, uploadImageToCloudinary } = require("../utils/imageUploader");
+const mongoose = require("mongoose");
 
 exports.createPost = async (req, res) => {
     try {
@@ -154,8 +157,10 @@ exports.likePost = async (req, res) => {
         post.likes = post.likes + 1;
         await post.save();
 
-        user.likedPost.push(post._id);
-        await user.save();
+        if (!user.likedPost.some(id => id.toString() === post._id.toString())) {
+            user.likedPost.push(post._id);
+            await user.save();
+        }
 
         await createNotification(post.userId, userId, 'like', postId);
 
@@ -364,7 +369,7 @@ exports.getCommentsForPost = async (req, res) => {
 
 exports.getCommentsByUser = async (req, res) => {
     try {
-        const userId  = req.userId;
+        const userId  = req.body.userId || req.userId;
 
         if (!userId) {
             return res.status(400).json({
@@ -517,7 +522,7 @@ exports.getAllPosts = async (req, res) => {
 };
 
 
-const formatPost = (post, currentUser = null) => {
+exports.formatPost = (post, currentUser = null) => {
     if (!post || !post.userId) return null;
 
     const author = post.userId;
@@ -536,6 +541,11 @@ const formatPost = (post, currentUser = null) => {
     let originalPost = null;
     if (post.originalPostId) {
         originalPost = formatPost(post.originalPostId, currentUser);
+    }
+
+    let communityName = "";
+    if (post.type === "Community") {
+        communityName = post.communityId?.name;
     }
 
     return {
@@ -575,88 +585,80 @@ const formatPost = (post, currentUser = null) => {
         isBookmarked,
         commentsList: post.comments || [],
         originalPost,
-        isReposted: post.isReposted
+        isReposted: post.isReposted,
+        type: post.type,
+        communityName
     };
 };
 
+const formatPost = (post, currentUser = null) => {
+    if (!post || !post.userId) return null;
 
-exports.formatPost = (posts, currentUser) => {
-    const formattedPosts = posts.map(post => {
-            // Determine isBookmarked
-            let isBookmarked = false;
-            if (currentUser && currentUser.savedPost) {
-                isBookmarked = currentUser.savedPost.some(
-                    savedId => savedId.toString() === post._id.toString()
-                );
-            }
+    const author = post.userId;
+    const about = author.about || {};
+    const education = author.education || [];
+    const experience = author.experience || [];
+    const skills = Array.isArray(about.skills) ? about.skills : [];
 
-            let isLiked = currentUser.likedPost.includes(post._id);
+    const followers = Array.isArray(author.followers) ? author.followers.length : 0;
+    const following = Array.isArray(author.following) ? author.following.length : 0;
 
-            // Map author (user) to full User interface
-            const author = post.userId;
-          
-            
-            // Handle case where author might not be populated
-            if (!author) {
-                console.log('Author not found for post:', post._id);
-                return null; // Skip this post or handle as needed
-            }
+    const isFollowing = currentUser?.followers?.some(f => f.toString() === author._id.toString()) || false;
+    const isBookmarked = currentUser?.savedPost?.some(id => id.toString() === post._id.toString()) || false;
+    const isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
 
-            let about = author.about || {};
-            let education = author.education || [];
-            let experience = author.experience || [];
-            let skills = (about.skills && Array.isArray(about.skills)) ? about.skills : [];
+    let originalPost = null;
+    if (post.originalPostId) {
+        originalPost = formatPost(post.originalPostId, currentUser);
+    }
 
-            // Followers/following count
-            const followers = author.followers ? author.followers.length : 0;
-            const following = author.following ? author.following.length : 0;
+    let communityName = "";
+    if (post.type === "Community") {
+        communityName = post.communityId?.name;
+    }
 
-            // isFollowing: is currentUser following this author?
-            let isFollowing = false;
-            if (currentUser && author.followers) {
-                isFollowing = author.followers.some(f => f.toString() === currentUser._id.toString());
-            }
-
-            return {
-                id: post._id,
-                author: {
-                    id: author._id,
-                    name: author.name,
-                    username: null, // not in schema
-                    email: author.email,
-                    avatar: author.profileImage || null,
-                    coverImage: null, // not in schema
-                    headline: about.headline || null,
-                    bio: author.bio || null,
-                    location: about.location || null,
-                    website: about.website || null,
-                    joinedDate: author.createAt ? author.createAt.toISOString() : null,
-                    followers,
-                    following,
-                    streak: null, // not in schema
-                    lastStoryDate: null, // not in schema
-                    isFollowing,
-                    profileViews: null, // not in schema
-                    education,
-                    experience,
-                    skills,
-                    phone: about.phone || null,
-                    socialLinks: [], // not in schema
-                    isCounselor: false, // not in schema
-                    counselorInfo: null // not in schema
-                },
-                content: post.discription,
-                images: post.media,
-                createdAt: post.createdAt,
-                likes: post.likes,
-                comments: post.comments.length,
-                isLiked,
-                isBookmarked,
-                commentsList: post.comments
-            };
-        }).filter(post => post !== null); // Remove any null posts
-        return formattedPosts;
-}
+    return {
+        id: post._id,
+        author: {
+            id: author._id,
+            name: author.name,
+            username: null,
+            email: author.email,
+            avatar: author.profileImage || null,
+            coverImage: null,
+            headline: about.headline || null,
+            bio: author.bio || null,
+            location: about.location || null,
+            website: about.website || null,
+            joinedDate: author.createdAt ? author.createdAt.toISOString() : null,
+            followers,
+            following,
+            streak: null,
+            lastStoryDate: null,
+            isFollowing,
+            profileViews: null,
+            education,
+            experience,
+            skills,
+            phone: about.phone || null,
+            socialLinks: [],
+            isCounselor: false,
+            counselorInfo: null
+        },
+        content: post.discription,
+        images: post.media || [],
+        createdAt: post.createdAt,
+        likes: post.likes,
+        comments: post.comments?.length || 0,
+        isLiked,
+        isBookmarked,
+        commentsList: post.comments || [],
+        originalPost,
+        isReposted: post.isReposted,
+        type: post.type,
+        communityName
+    };
+};
 
 
 exports.deletePost = async(req,res) => {
@@ -764,3 +766,312 @@ exports.editPost = async (req, res) => {
         });
     }
 };
+
+// ================================
+// HOME FEED WITH COMMUNITY POSTS
+// ================================
+
+// Get combined home feed (regular posts + community posts based on privacy rules)
+exports.getHomeFeedWithCommunities = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { page = 1, limit = 20, filter = 'latest' } = req.query;
+        const skip = (page - 1) * limit;
+
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: "Authentication required"
+            });
+        }
+
+        // Get user's following list and joined communities
+        const currentUser = await User.findById(userId)
+            .populate('following', '_id name profileImage')
+            .populate('savedPost')
+            .populate('likedPost');
+
+        const followingIds = currentUser.following.map(f => f._id);
+
+        // Get communities user is member of
+        const userCommunities = await Community.find({
+            members: userId
+        }).select('_id isPrivate name logo');
+
+        const publicCommunityIds = userCommunities
+            .filter(c => !c.isPrivate)
+            .map(c => c._id);
+
+        // Get regular posts from following users
+        const regularPostsQuery = {
+            userId: { $in: followingIds },
+            postType: 'public'
+        };
+
+        const regularPosts = await Post.find(regularPostsQuery)
+            .populate({
+                path: 'userId',
+                populate: [
+                    { path: 'about', model: 'About' },
+                    { path: 'education', model: 'Education' },
+                    { path: 'experience', model: 'Experience' }
+                ]
+            })
+            .populate('comments')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        // Get community posts that should appear in home feed
+        let communityPosts = [];
+        if (publicCommunityIds.length > 0) {
+            communityPosts = await CommunityPost.find({
+                communityId: { $in: publicCommunityIds },
+                type: { $ne: 'question' }, // Q&A should not appear in home feed
+                isDeleted: { $ne: true }
+            })
+            .populate('authorId', 'name profileImage')
+            .populate('communityId', 'name logo isPrivate')
+            .populate('likes', 'name')
+            .populate({
+                path: 'comments',
+                populate: { path: 'authorId', select: 'name profileImage' }
+            })
+            .sort({ createdAt: -1 })
+            .lean();
+        }
+
+        // Format regular posts
+        const formattedRegularPosts = regularPosts.map(post => {
+            const formatted = formatPost(post, currentUser);
+            return {
+                ...formatted,
+                postSource: 'user',
+                community: null
+            };
+        }).filter(Boolean);
+
+        // Format community posts
+        const formattedCommunityPosts = communityPosts.map(post => {
+            const author = post.authorId;
+            if (!author) return null;
+
+            const isBookmarked = false; // Community posts bookmarking can be implemented later
+            const isLiked = post.likes.some(like => like._id?.toString() === userId || like.toString() === userId);
+
+            return {
+                id: post._id,
+                author: {
+                    id: author._id,
+                    name: author.name,
+                    username: null,
+                    email: author.email || null,
+                    avatar: author.profileImage || null,
+                    coverImage: null,
+                    headline: null,
+                    bio: null,
+                    location: null,
+                    website: null,
+                    joinedDate: null,
+                    followers: 0,
+                    following: 0,
+                    streak: null,
+                    lastStoryDate: null,
+                    isFollowing: false,
+                    profileViews: null,
+                    education: [],
+                    experience: [],
+                    skills: [],
+                    phone: null,
+                    socialLinks: [],
+                    isCounselor: false,
+                    counselorInfo: null
+                },
+                content: post.content,
+                images: post.images || [],
+                createdAt: post.createdAt,
+                likes: post.likes?.length || 0,
+                comments: post.comments?.length || 0,
+                isLiked,
+                isBookmarked,
+                commentsList: post.comments || [],
+                originalPost: null,
+                isReposted: false,
+                postSource: 'community',
+                community: post.communityId,
+                postType: post.type
+            };
+        }).filter(Boolean);
+
+        // Combine and sort all posts by creation date
+        const allPosts = [...formattedRegularPosts, ...formattedCommunityPosts]
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            .slice(skip, skip + parseInt(limit));
+
+        return res.status(200).json({
+            success: true,
+            body: allPosts,
+            pagination: {
+                currentPage: parseInt(page),
+                hasNextPage: allPosts.length === parseInt(limit)
+            }
+        });
+
+    } catch (error) {
+        console.error("Error fetching home feed with communities:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch home feed",
+            error: error.message
+        });
+    }
+};
+
+// DO NOT CHANGE THIS WITHOUT PERMISSION
+exports.getPosts = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = parseInt(req.query.offset) || 0;
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const following = user.following || [];
+    const followers = user.followers || [];
+    const people = [...new Set([...following, ...followers].map(id => id.toString()))];
+
+    const joinedCommunities = user.communities || [];
+
+    const likedPosts = (user.likedPost || [])
+      .filter(id => mongoose.Types.ObjectId.isValid(id))
+      .map(id => new mongoose.Types.ObjectId(id));
+
+    /** ---------------- MAIN PIPELINE ---------------- */
+    let combinedPosts = await Post.aggregate([
+      { 
+        $match: { 
+          _id: { $nin: likedPosts },
+          type: "Post",
+          ...(people.length > 0 ? { userId: { $in: people } } : {})
+        } 
+      },
+      {
+        $unionWith: {
+          coll: "posts",
+          pipeline: [
+            { 
+              $match: { 
+                _id: { $nin: likedPosts },
+                type: "Community",
+                ...(joinedCommunities.length > 0 ? { communityId: { $in: joinedCommunities } } : { communityId: null })
+              } 
+            },
+            {
+              $lookup: {
+                from: "communities",
+                localField: "communityId",
+                foreignField: "_id",
+                as: "communityId"
+              }
+            },
+            { $unwind: { path: "$communityId", preserveNullAndEmptyArrays: true } },
+            {
+              $project: {
+                commentsCount: { $size: { $ifNull: ["$comments", []] } },
+                likes: 1,
+                title: 1,
+                content: 1,
+                userId: 1,
+                originalPostId: 1,
+                createdAt: 1,
+                "communityId._id": 1,
+                "communityId.name": 1,
+                "communityId.logo": 1,
+                "communityId.isPrivate": 1
+              }
+            }
+          ]
+        }
+      },
+      { $addFields: { commentsCount: { $size: { $ifNull: ["$comments", []] } } } },
+      { $sort: { likes: -1, commentsCount: -1, createdAt: -1 } },
+      { $skip: offset },
+      { $limit: limit }
+    ]);
+
+    /** ---------------- BACKFILL WITH TRENDING ---------------- */
+    if (combinedPosts.length < limit) {
+      const remaining = limit - combinedPosts.length;
+
+      const trendingPosts = await Post.aggregate([
+        {
+          $match: {
+            _id: { $nin: likedPosts },
+            type: "post"
+          }
+        },
+        { $addFields: { commentsCount: { $size: { $ifNull: ["$comments", []] } } } },
+        { $sort: { likes: -1, commentsCount: -1, createdAt: -1 } },
+        { $limit: remaining }
+      ]);
+
+      combinedPosts = [...combinedPosts, ...trendingPosts];
+    }
+
+    /** ---------------- POPULATE ---------------- */
+    combinedPosts = await Post.populate(combinedPosts, [
+      {
+        path: "userId",
+        model: "User",
+        populate: [
+          { path: "about", model: "About" },
+          { path: "education", model: "Education" },
+          { path: "experience", model: "Experience" },
+        ],
+      },
+      { path: "comments" },
+      {
+        path: "originalPostId",
+        populate: {
+          path: "userId",
+          model: "User",
+          populate: [
+            { path: "about", model: "About" },
+            { path: "education", model: "Education" },
+            { path: "experience", model: "Experience" },
+          ],
+        },
+      },
+      {
+        path: "communityId",
+        model: "Community",
+        select: "name logo isPrivate"
+      }
+    ]);
+
+    /** ---------------- FORMAT ---------------- */
+    const formattedPosts = await Promise.all(
+      combinedPosts.map(post => formatPost(post, user))
+    );
+
+    return res.status(200).json({
+      success: true,
+      body: formattedPosts,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+
+
+

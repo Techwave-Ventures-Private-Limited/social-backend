@@ -1,13 +1,15 @@
 // index.js
 // This is the main entry point for the application.
 
-
+// Load environment variables first
+require('dotenv').config();
 
 // --- Core Modules ---
 const express = require('express');
 const http = require('http'); // Import the http module
 const { Server } = require("socket.io"); // Import the Server class from socket.io
 const jwt = require('jsonwebtoken'); // You'll need this for auth
+const { initializeCommunitySocket } = require('./utils/communitySocketHelper');
 
 // --- App Setup ---
 const app = express();
@@ -22,13 +24,18 @@ const io = new Server(server, {
     }
 });
 
+// --- Socket.IO Real-Time Logic ---
+const onlineUsers = new Map(); // Tracks online users: { userId -> socketId }
+
+// Initialize community socket helper
+initializeCommunitySocket(io);
+
 // --- Middleware and Config ---
 const cookieParser = require("cookie-parser");
 const database = require('./config/dbonfig');
 const cors = require("cors");
 const fileUpload = require("express-fileupload");
 const { cloudinaryConnect } = require("./config/cloudinary");
-const serviceAccount = require("./etc2/secrets/connektx-firebase-adminsdk-fbsvc-b76858ef61.json");
 const admin = require('firebase-admin');
 
 
@@ -43,21 +50,34 @@ const searchRouter = require("./route/searchRoute");
 const notificationRouter = require("./route/notificationRoute");
 const conversationRouter = require("./route/ConversationRoutes");
 const commentRouter = require("./route/commentRoute");
+const communityRouter = require("./route/communityRoute");
 
 
 // --- Models (needed for socket logic) ---
 const User = require('./modules/user');
 const Conversation = require('./modules/conversation');
-const Message = require('./modules/message'); 
+const Message = require('./modules/message');
+const Community = require('./modules/community');
+const CommunityPost = require('./modules/communityPost');
+const CommunityComment = require('./modules/communityComment');
 
 // --- Database and Cloudinary Connection ---
 database.connect();
 cloudinaryConnect();
 
-// Initialize Firebase Admin
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-});
+// Initialize Firebase Admin (conditional)
+const path = require('path');
+const serviceAccountPath = path.join(__dirname, 'config', 'firebase-service-account.json');
+try {
+    const serviceAccount = require(serviceAccountPath);
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+    console.log('Firebase Admin initialized successfully');
+} catch (error) {
+    console.warn('Firebase Admin initialization failed:', error.message);
+    console.warn('Firebase features will be disabled');
+}
 
 
 // --- Express Middleware ---
@@ -79,6 +99,14 @@ app.use(
 );
 
 
+// --- MIDDLEWARE TO ATTACH SOCKET.IO TO REQUESTS ---
+// This makes `io` and `onlineUsers` available in your controllers (e.g., req.io)
+app.use((req, res, next) => {
+    req.io = io;
+    req.onlineUsers = onlineUsers;
+    next();
+});
+
 // --- API Route Mounting ---
 app.use("/auth", authRouter);
 app.use("/user", userRouter);
@@ -90,6 +118,7 @@ app.use("/search", searchRouter);
 app.use("/notification", notificationRouter);
 app.use("/conversations", conversationRouter); 
 app.use("/comment", commentRouter);
+app.use("/community", communityRouter);
 
 // --- Health Check and Root Routes ---
 app.use("/hailing",(req,res)=>{
@@ -102,11 +131,6 @@ app.use("/hailing",(req,res)=>{
 app.get("/",(req, res)=>{
     return res.send(`<h1>Working..</h1>`)
 })
-
-
-// --- Socket.IO Real-Time Logic ---
-
-const onlineUsers = new Map(); // Tracks online users: { userId -> socketId }
 
 // Middleware for authenticating socket connections
 io.use(async (socket, next) => {
@@ -130,60 +154,85 @@ io.use(async (socket, next) => {
 });
 
 io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.userId}`);
-    
-    // Add user to the online users map and join their private room
+    console.log(`User connected: ${socket.userId} with socket ID: ${socket.id}`);
     onlineUsers.set(socket.userId, socket.id);
+    console.log('[DEBUG] onlineUsers map updated:', onlineUsers); // <-- ADD THIS LOG
     socket.join(socket.userId);
+    
+    // Join community rooms for real-time updates
+    socket.on('joinCommunityRooms', async (data) => {
+        try {
+            const { communityIds } = data;
+            if (Array.isArray(communityIds)) {
+                communityIds.forEach(communityId => {
+                    socket.join(`community_${communityId}`);
+                    console.log(`User ${socket.userId} joined community room: community_${communityId}`);
+                });
+            }
+        } catch (err) {
+            console.error('Error joining community rooms:', err);
+        }
+    });
+    
+    // Leave community room
+    socket.on('leaveCommunityRoom', (data) => {
+        try {
+            const { communityId } = data;
+            socket.leave(`community_${communityId}`);
+            console.log(`User ${socket.userId} left community room: community_${communityId}`);
+        } catch (err) {
+            console.error('Error leaving community room:', err);
+        }
+    });
 
     // Listen for new messages from a client
-    socket.on('sendMessage', async (data) => {
-        try {
-            // 1. Destructure the temporary ID from the client payload
-            const { conversationId, content, sharedPost, sharedNews, tempId } = data;
+    // socket.on('sendMessage', async (data) => {
+    //     try {
+    //         // 1. Destructure the temporary ID from the client payload
+    //         const { conversationId, content, sharedPost, sharedNews, tempId } = data;
             
-            // Basic validation
-            if (!conversationId || (!content && !sharedPost && !sharedNews)) {
-                return socket.emit('error', { message: 'Missing required message data.' });
-            }
+    //         // Basic validation
+    //         if (!conversationId || (!content && !sharedPost && !sharedNews)) {
+    //             return socket.emit('error', { message: 'Missing required message data.' });
+    //         }
 
-            const conversation = await Conversation.findById(conversationId);
-            if (!conversation || !conversation.participants.includes(socket.userId)) {
-                return socket.emit('error', { message: 'Cannot send message to this conversation.' });
-            }
+    //         const conversation = await Conversation.findById(conversationId);
+    //         if (!conversation || !conversation.participants.includes(socket.userId)) {
+    //             return socket.emit('error', { message: 'Cannot send message to this conversation.' });
+    //         }
 
-            // Create and save the new message
-            const newMessage = new Message({
-                conversationId,
-                sender: socket.userId,
-                content,
-                sharedPost,
-                sharedNews,
-            });
-            await newMessage.save();
+    //         // Create and save the new message
+    //         const newMessage = new Message({
+    //             conversationId,
+    //             sender: socket.userId,
+    //             content,
+    //             sharedPost,
+    //             sharedNews,
+    //         });
+    //         await newMessage.save();
 
-            // Update the conversation's last message
-            conversation.lastMessage = newMessage._id;
-            await conversation.save();
+    //         // Update the conversation's last message
+    //         conversation.lastMessage = newMessage._id;
+    //         await conversation.save();
             
-            const populatedMessage = await Message.findById(newMessage._id).populate('sender', 'name profileImage');
+    //         const populatedMessage = await Message.findById(newMessage._id).populate('sender', 'name profileImage');
 
-            // 2. Add the tempId to the message object before broadcasting
-            const messageToSend = populatedMessage.toObject();
-            messageToSend.tempId = tempId; // This is the key change
+    //         // 2. Add the tempId to the message object before broadcasting
+    //         const messageToSend = populatedMessage.toObject();
+    //         messageToSend.tempId = tempId; // This is the key change
 
-            // 3. Broadcast the enhanced message object
-            conversation.participants.forEach(participantId => {
-                if (onlineUsers.has(participantId.toString())) {
-                    io.to(participantId.toString()).emit('newMessage', messageToSend);
-                }
-        });
+    //         // 3. Broadcast the enhanced message object
+    //         conversation.participants.forEach(participantId => {
+    //             if (onlineUsers.has(participantId.toString())) {
+    //                 io.to(participantId.toString()).emit('newMessage', messageToSend);
+    //             }
+    //     });
         
-    } catch (err) {
-        console.error("Error in sendMessage event:", err);
-        socket.emit('error', { message: 'An error occurred while sending the message.' });
-    }
-    });
+    // } catch (err) {
+    //     console.error("Error in sendMessage event:", err);
+    //     socket.emit('error', { message: 'An error occurred while sending the message.' });
+    // }
+    // });
 
     // Handle user disconnection
     socket.on('disconnect', () => {

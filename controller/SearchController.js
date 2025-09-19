@@ -1,5 +1,6 @@
 const User = require("../modules/user");
 const Post = require("../modules/post");
+const Community = require("../modules/community");
 const { formatPost } = require("./PostController");
 
 exports.searchAll = async (req, res) => {
@@ -7,7 +8,7 @@ exports.searchAll = async (req, res) => {
     const { text } = req.params;
     const limit = parseInt(req.query.limit) || 5;
     const offset = parseInt(req.query.offset) || 0;
-    const { type } = req.query; // type = "users", "posts", or "all"
+    const { type } = req.query; // type = "users", "posts", "community" or "all"
     const userId = req.userId;
 
     const user = await User.findById(userId);
@@ -57,13 +58,34 @@ exports.searchAll = async (req, res) => {
       promises.push(Promise.resolve([]));
     }
 
-    [users, posts] = await Promise.all(promises);
+    if (type === "community" || type === "all") {
+      promises.push(
+        Community.find({ name: { $regex: text, $options: "i" }, isPrivate: false })
+          .populate('owner', 'name profileImage')
+          .populate('members', 'name profileImage')
+          .lean()
+          .then(communities => {
+            return communities.map(community => ({
+              ...community,
+              isUserMember: userId
+                ? community.members.some(member => member._id.toString() === userId)
+                : false,
+              userRole: userId ? getUserRoleInCommunity(community, userId) : null
+            }));
+          })
+      );
+    } else {
+      promises.push(Promise.resolve([]));
+    }
+
+    [users, posts, communities] = await Promise.all(promises);
     posts = formatPost(posts,user);
 
     return res.status(200).json({
       success: true,
       users,
       posts,
+      communities
     });
   } catch (err) {
     return res.status(500).json({
@@ -73,5 +95,11 @@ exports.searchAll = async (req, res) => {
   }
 };
 
-
+function getUserRoleInCommunity(community, userId) {
+    if (community.owner.toString() === userId) return 'owner';
+    if (community.admins.some(admin => admin._id ? admin._id.toString() === userId : admin.toString() === userId)) return 'admin';
+    if (community.moderators.some(mod => mod._id ? mod._id.toString() === userId : mod.toString() === userId)) return 'moderator';
+    if (community.members.some(member => member._id ? member._id.toString() === userId : member.toString() === userId)) return 'member';
+    return null;
+}
 

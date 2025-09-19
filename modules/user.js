@@ -128,6 +128,11 @@ const userSchema = new mongoose.Schema({
     likedComments: [{
         type: String,
         default: []
+    }],
+    communities: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Community",
+        default: []
     }]
 })
 
