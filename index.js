@@ -66,19 +66,17 @@ database.connect();
 cloudinaryConnect();
 
 // Initialize Firebase Admin (conditional)
-if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
-    try {
-        const serviceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
-        });
-        console.log('Firebase Admin initialized successfully');
-    } catch (error) {
-        console.warn('Firebase Admin initialization failed:', error.message);
-        console.warn('Firebase features will be disabled');
-    }
-} else {
-    console.log('Firebase service account path not provided - Firebase features disabled');
+const path = require('path');
+const serviceAccountPath = path.join(__dirname, 'config', 'firebase-service-account.json');
+try {
+    const serviceAccount = require(serviceAccountPath);
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+    console.log('Firebase Admin initialized successfully');
+} catch (error) {
+    console.warn('Firebase Admin initialization failed:', error.message);
+    console.warn('Firebase features will be disabled');
 }
 
 
