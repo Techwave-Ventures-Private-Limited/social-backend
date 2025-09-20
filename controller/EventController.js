@@ -11,6 +11,12 @@ exports.createEvent = async(req,res) => {
         const eventObject = req.body;
         const userId = req.userId;
 
+        console.log("--- Raw req.body received ---");
+        console.log(req.body);
+        console.log("Type of tags:", typeof req.body.tags);
+        console.log("Type of speakers:", typeof req.body.speakers);
+        console.log("-----------------------------");
+
         const { communityId } = eventObject;
 
         if (communityId) {
@@ -119,27 +125,8 @@ exports.createEvent = async(req,res) => {
             }
         }
 
-        // Handle tags array
-        if (eventObject.tags && typeof eventObject.tags === 'string') {
-            try {
-                eventObject.tags = JSON.parse(eventObject.tags);
-            } catch (error) {
-                eventObject.tags = eventObject.tags.split(",");
-            }
-        }
-        // Ensure tags is an array
-        if (!eventObject.tags || !Array.isArray(eventObject.tags)) {
-            eventObject.tags = [];
-        }
-
-        // Handle speakers array
-        if (eventObject.speakers && typeof eventObject.speakers === 'string') {
-            try {
-                eventObject.speakers = JSON.parse(eventObject.speakers);
-            } catch (error) {
-                eventObject.speakers = eventObject.speakers.split(",");
-            }
-        }
+        eventObject.tags = eventObject.tags || [];
+        eventObject.speakers = eventObject.speakers || [];
 
         // Convert boolean strings to actual booleans
         if (typeof eventObject.isPaid === 'string') {
@@ -183,7 +170,7 @@ exports.createTicket = async(req,res) =>{
 
         const {name, price, remTicket} = req.body;
         const userId = req.userId;
-        const createdTicket = await Ticket.create({name, price, remTicket, userId});
+        const createdTicket = await Ticket.create({name, price, remTicket, totalTicket: remTicket, userId});
 
         return res.status(200).json({
             success:true,
@@ -433,14 +420,14 @@ exports.bookTicket = async (req, res) => {
                 message: "This email has already booked a ticket for this event"
             });
         }
-        event.attendees.push({ name, email, phone });
+        event.attendees.push({ name, email, phone, ticketTypeId: ticketType._id });
 
         // Decrement ticket count
-        ticketType.remTicket -= 1;
+        await Ticket.findByIdAndUpdate(ticketType._id, { $inc: { remTicket: -1 } });
 
         // Save changes
         await event.save();
-        await ticketType.save && (await ticketType.save()); // In case ticketType is a mongoose doc
+        // await ticketType.save && (await ticketType.save());  // In case ticketType is a mongoose doc
 
         return res.status(200).json({
             success: true,

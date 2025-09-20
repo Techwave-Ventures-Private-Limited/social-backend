@@ -83,18 +83,21 @@ const eventSchema = new mongoose.Schema({
         name: { type: String },
         email: { type: String },
         phone: { type: String },
+        ticketTypeId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "TicketPlan",
+          required: true,
+        },
       },
     ],
-    tags: [
-      {
-        type: String,
-      },
-    ],
-    speakers: [
-      {
-        type: String,
-      },
-    ],
+    tags: {
+        type: [String],
+        default: []
+    },
+    speakers: {
+        type: [String],
+        default: []
+    },
     createdBy: {
       type: String,
       required: true,

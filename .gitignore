@@ -5,3 +5,4 @@ config/firebase.json
 etc2
 .dockerignore
 Dockerfile
+firebase-service-account.json
