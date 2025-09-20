@@ -10,7 +10,7 @@ const mongoose = require("mongoose");
 exports.createPost = async (req, res) => {
     try {
 
-        const { discription, postType, originalPostId } = req.body || "";
+        const { discription, postType, originalPostId, videoLink } = req.body || "";
         const { isReposted } = req.body || false;
         const userId = req.userId;
         // console.log("User request to upload a post", req.body)
@@ -38,6 +38,10 @@ exports.createPost = async (req, res) => {
                     mediaUrls.push(uploadedImage.secure_url);
                 }
             }
+        }
+
+        if (videoLink) {
+            mediaUrls.push(videoLink);
         }
 
         const user = await User.findById(userId);

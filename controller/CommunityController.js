@@ -567,7 +567,8 @@ exports.createCommunityPost = async (req, res) => {
             discription,
             type = 'text',
             resourceUrl,
-            resourceType
+            resourceType,
+            videoLink
         } = req.body;
 
         let files = req.files && req.files.images;
@@ -614,6 +615,10 @@ exports.createCommunityPost = async (req, res) => {
                     mediaUrls.push(uploadedImage.secure_url);
                 }
             }
+        }
+
+        if (videoLink) {
+            mediaUrls.push(videoLink);
         }
 
         const newPost = new CommunityPost({
