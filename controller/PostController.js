@@ -952,9 +952,11 @@ exports.getPosts = async (req, res) => {
 
     const joinedCommunities = user.communities || [];
 
-    const likedPosts = (user.likedPost || [])
+    /** const likedPosts = (user.likedPost || [])
       .filter(id => mongoose.Types.ObjectId.isValid(id))
-      .map(id => new mongoose.Types.ObjectId(id));
+      .map(id => new mongoose.Types.ObjectId(id)); */
+
+    const likedPosts = [];
 
     /** ---------------- MAIN PIPELINE ---------------- */
     let combinedPosts = await Post.aggregate([
