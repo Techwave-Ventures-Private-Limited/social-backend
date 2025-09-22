@@ -125,7 +125,24 @@ const communitySchema = new mongoose.Schema({
     settings: {
         type: communitySettingsSchema,
         default: () => ({})
-    }
+    },
+    category: {
+        type: String,
+        enum: [
+        "technology_it",
+        "healthcare_medicine",
+        "business_entrepreneurship",
+        "finance_accounting",
+        "law_policy",
+        "education_research",
+        "engineering_manufacturing",
+        "marketing_media",
+        "arts_design",
+        "sports_fitness",
+        "environment_sustainability",
+        "publicservice_nonprofits",
+        ],
+    },
 }, {
     timestamps: true
 });

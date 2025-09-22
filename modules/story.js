@@ -15,10 +15,6 @@ const StorySchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
-  files: {
-    type: mongoose.Schema.Types.Mixed,
-    required: true
-  },
   createdAt: {
     type: Date,
     default: Date.now

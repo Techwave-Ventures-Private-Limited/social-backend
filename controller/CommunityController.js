@@ -29,7 +29,8 @@ exports.createCommunity = async (req, res) => {
             location,
             isPrivate,
             requiresApproval,
-            settings
+            settings,
+            category
         } = req.body;
 
         let logo = req.files && req.files.logo;
@@ -78,7 +79,8 @@ exports.createCommunity = async (req, res) => {
             members: [userId],
             admins: [userId],
             moderators: [],
-            settings: defaultSettings
+            settings: defaultSettings,
+            category
         });
 
         await newCommunity.save();
@@ -567,7 +569,8 @@ exports.createCommunityPost = async (req, res) => {
             discription,
             type = 'text',
             resourceUrl,
-            resourceType
+            resourceType,
+            videoLink,
         } = req.body;
 
         let files = req.files && req.files.images;
@@ -616,6 +619,10 @@ exports.createCommunityPost = async (req, res) => {
             }
         }
 
+        if (videoLink) {
+            mediaUrls.push(videoLink);
+        }
+
         const newPost = new CommunityPost({
             communityId: id,
             authorId: userId,
@@ -628,7 +635,7 @@ exports.createCommunityPost = async (req, res) => {
             resourceUrl,
             resourceType,
             postType:"public",
-            userId: userId
+            userId: userId,
         });
 
         await newPost.save();
