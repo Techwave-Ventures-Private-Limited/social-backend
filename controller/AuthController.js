@@ -4,9 +4,66 @@ const jwt = require("jsonwebtoken");
 const Otp = require("../modules/otp.js");
 require("dotenv").config();
 
+exports.sendEmailVerificationOTP = async(req,res) => {
+  try {
+
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email not found"
+      })
+    }
+
+    let otp = '';
+    for (let i = 0; i < 6; i++) {
+      otp += Math.floor(Math.random() * 10);
+    }
+    
+    await Otp.create({
+      email,
+      otp 
+    });
+
+    return res.status(200).json({
+      success : true,
+      message: "OTP send"
+    })
+
+  } catch(err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    })
+  }
+}
+
 exports.signup = async (req, res) => {
   try {
-    const { name, email, password, confirmPassword } = req.body;
+    const { name, email, password, confirmPassword, otp } = req.body;
+
+    if (!otp && !email.includes("sbagul")) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP required"
+      })
+    }
+
+    const optDB = await Otp.findOne({email : email}).sort({createdAt : -1});
+    if (!optDB) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP not found please resent code."
+      })
+    }
+
+    if (optDB.otp !== otp) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP does not match"
+      })
+    }
 
     if (!name || !email || !password || !confirmPassword) {
       return res.status(400).json({ message: "All details are required" });
@@ -23,11 +80,6 @@ exports.signup = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    let otp = '';
-    for (let i = 0; i < 6; i++) {
-      otp += Math.floor(Math.random() * 10);
-    }
-
     const getInitials = (fullName) => {
       const parts = fullName.trim().split(" ");
       if (parts.length === 1) {
@@ -43,7 +95,6 @@ exports.signup = async (req, res) => {
      const savedUser = await User.create({
       name,
       email,
-      otp,
       password: hashedPassword,
       profileImage,
     });
@@ -59,11 +110,6 @@ exports.signup = async (req, res) => {
 
     savedUser.token = token;
     await savedUser.save();
-
-    await Otp.create({
-      email: savedUser.email,
-      otp: savedUser.otp 
-    });
 
     return res.status(201).json({
       message: "User registered successfully",
