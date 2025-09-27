@@ -26,3 +26,7 @@ jobs:
     - run: |
         touch .env
         echo "${{ secrets.PROD_ENV_FILE }}" > .env
+    - name: Restart PM2 process
+      run: |
+        pm2 restart backend2
+        pm2 save
