@@ -617,8 +617,10 @@ const formatPost = (post, currentUser = null) => {
     }
 
     let communityName = "";
+    let communityId = "";
     if (post.type === "Community") {
         communityName = post.communityId?.name;
+        communityId = post.communityId._id;
     }
 
     return {
@@ -660,7 +662,8 @@ const formatPost = (post, currentUser = null) => {
         originalPost,
         isReposted: post.isReposted,
         type: post.type,
-        communityName
+        communityName,
+        communityId
     };
 };
 
@@ -1057,7 +1060,7 @@ exports.getPosts = async (req, res) => {
       {
         path: "communityId",
         model: "Community",
-        select: "name logo isPrivate"
+        select: "name logo isPrivate _id"
       }
     ]);
 

@@ -31,7 +31,7 @@ exports.createCommunity = async (req, res) => {
             requiresApproval,
             settings,
             category
-        } = req.body;
+        } = req.body;        
 
         let logo = req.files && req.files.logo;
         let coverImage = req.files && req.files.coverImage;
@@ -565,18 +565,22 @@ exports.getUserCommunities = async (req, res) => {
 exports.createCommunityPost = async (req, res) => {
     try {
         const { id } = req.params; // community ID
-        const {
+        let {
             discription,
             type = 'text',
             resourceUrl,
             resourceType,
             videoLink,
+            pollOptions = null,
         } = req.body;
 
         let files = req.files && req.files.images;
         let mediaUrls = [];
 
         const userId = req.userId;
+        if (pollOptions !== null)
+            pollOptions = JSON.parse(pollOptions);
+
 
         const community = await Community.findById(id);
         if (!community) {
@@ -636,6 +640,7 @@ exports.createCommunityPost = async (req, res) => {
             resourceType,
             postType:"public",
             userId: userId,
+            pollOptions
         });
 
         await newPost.save();
