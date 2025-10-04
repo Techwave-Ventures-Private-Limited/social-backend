@@ -81,29 +81,43 @@ exports.createPost = async (req, res) => {
 
 exports.getPost = async (req, res) => {
     try {
-
         const { postId } = req.params;
 
         if (!postId) {
             return res.status(400).json({
                 success: false,
                 message: "PostId required"
-            })
+            });
         }
 
         const post = await Post.findById(postId).populate("comments");
+        if (!post) {
+            return res.status(404).json({
+                success: false,
+                message: "Post not found"
+            });
+        }
+
+        // Compute isLiked for the current user (consistent with feed responses)
+        let isLiked = false;
+        if (req.userId) {
+            const currentUser = await User.findById(req.userId).select("likedPost");
+            isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
+        }
+
+        // Return the post plus isLiked without changing the route shape
+        const body = { ...(post.toObject ? post.toObject() : post), isLiked };
 
         return res.status(200).json({
             success: true,
             message: "Post found",
-            body: post
-        })
-
+            body
+        });
     } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
-        })
+        });
     }
 }
 
