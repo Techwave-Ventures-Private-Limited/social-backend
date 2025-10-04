@@ -1,6 +1,6 @@
 const Community = require('../modules/community');
-const CommunityPost = require('../modules/post');
-const CommunityComment = require('../modules/comments');
+const CommunityPost = require('../modules/communityPost');
+const CommunityComment = require('../modules/communityComment');
 const JoinRequest = require('../modules/joinRequest');
 const CommunityAnnouncement = require('../modules/communityAnnouncement');
 const User = require('../modules/user');
@@ -722,6 +722,14 @@ exports.getPostsForHomeFeed = async (req, res) => {
             .limit(parseInt(limit))
             .lean();
 
+        // Compute isLiked for community posts for this user
+        const communityPostsWithLiked = communityPosts.map(post => {
+            const isLiked = Array.isArray(post?.likes)
+                ? post.likes.some(l => (l?._id ? l._id.toString() : l.toString()) === userId)
+                : false;
+            return { ...post, isLiked };
+        });
+
         // Get regular posts from following users
         const regularPosts = await Post.find({
             user: { $in: followingIds },
@@ -735,7 +743,7 @@ exports.getPostsForHomeFeed = async (req, res) => {
 
         // Combine and sort all posts by creation date
         const allPosts = [
-            ...communityPosts.map(post => ({
+            ...communityPostsWithLiked.map(post => ({
                 ...post,
                 postSource: 'community',
                 community: post.communityId
@@ -765,7 +773,6 @@ exports.getPostsForHomeFeed = async (req, res) => {
         });
     }
 };
-
 // Get community posts (for community feed)
 exports.getCommunityPosts = async (req, res) => {
     try {
@@ -857,17 +864,17 @@ exports.getCommunityPosts = async (req, res) => {
             success: true,
             posts: posts.map(post => {
                 const isBookmarked = currentUser?.savedPost?.some(
-                id => id.toString() === post._id.toString()
+                  id => id.toString() === post._id.toString()
                 ) || false;
 
-                const isLiked = currentUser?.likedPost?.some(
-                id => id.toString() === post._id.toString()
-                ) || false;
+                const isLiked = Array.isArray(post?.likes) 
+                  ? post.likes.some(l => (l?._id ? l._id.toString() : l.toString()) === userId)
+                  : false;
 
                 return {
-                ...post.toObject?.() || post, // ensure plain object
-                isLiked,
-                isBookmarked,
+                  ...(post.toObject?.() || post), // ensure plain object
+                  isLiked,
+                  isBookmarked,
                 };
             }),
             pagination: {
@@ -888,67 +895,58 @@ exports.getCommunityPosts = async (req, res) => {
 
 
 
-// Like/Unlike community post
+// Like/Unlike community post (idempotent toggle on likes array)
 exports.likeCommunityPost = async (req, res) => {
     try {
         const { postId } = req.params;
         const userId = req.userId;
 
         const user = await User.findById(userId);
-
         if (!user) {
-            return res.status(400).json({
-                success: false,
-                message: "User does not exists"
-            })
+            return res.status(400).json({ success: false, message: "User does not exists" });
         }
 
         const post = await CommunityPost.findById(postId);
         if (!post) {
-            return res.status(404).json({
-                success: false,
-                message: "Post not found"
-            });
+            return res.status(404).json({ success: false, message: "Post not found" });
         }
 
         // Check if user has access to the community
         const community = await Community.findById(post.communityId);
-        if (community.isPrivate && !community.members.includes(userId)) {
-            return res.status(403).json({
-                success: false,
-                message: "Access denied"
+        if (community?.isPrivate && !community.members.some(m => m.toString() === userId)) {
+            return res.status(403).json({ success: false, message: "Access denied" });
+        }
+
+        const alreadyLiked = Array.isArray(post.likes) && post.likes.some(id => id.toString() === userId);
+
+        if (alreadyLiked) {
+            // Unlike
+            post.likes = post.likes.filter(id => id.toString() !== userId);
+            await post.save();
+            // Maintain legacy likedPost by ensuring it does not contain this post (best-effort)
+            try { await User.updateOne({ _id: userId }, { $pull: { likedPost: post._id } }); } catch(_) {}
+            return res.status(200).json({
+                success: true,
+                message: "Post unliked",
+                isLiked: false,
+                likesCount: post.likes.length
+            });
+        } else {
+            // Like (idempotent add)
+            post.likes.push(userId);
+            await post.save();
+            // Maintain legacy likedPost for compatibility (no duplicates)
+            try { await User.updateOne({ _id: userId }, { $addToSet: { likedPost: post._id } }); } catch(_) {}
+            return res.status(200).json({
+                success: true,
+                message: "Post liked",
+                isLiked: true,
+                likesCount: post.likes.length
             });
         }
-
-        const hasLiked = post.likes.includes(userId);
-
-        if (hasLiked) {
-            post.likes = post.likes.filter(id => id.toString() !== userId);
-        } else {
-            post.likes.push(userId);
-        }
-
-        await post.save();
-
-        if (!user.likedPost.some(id => id.toString() === post._id.toString())) {
-            user.likedPost.push(post._id);
-            await user.save();
-        }
-
-        return res.status(200).json({
-            success: true,
-            message: hasLiked ? "Post unliked" : "Post liked",
-            isLiked: !hasLiked,
-            likesCount: post.likes.length
-        });
-
     } catch (error) {
         console.error("Error liking post:", error);
-        return res.status(500).json({
-            success: false,
-            message: "Failed to like post",
-            error: error.message
-        });
+        return res.status(500).json({ success: false, message: "Failed to like post", error: error.message });
     }
 };
 
@@ -1016,6 +1014,46 @@ exports.addCommentToCommunityPost = async (req, res) => {
             message: "Failed to add comment",
             error: error.message
         });
+    }
+};
+
+// Get a single community post by ID (with isLiked)
+exports.getCommunityPostById = async (req, res) => {
+    try {
+        const { postId } = req.params;
+        const userId = req.userId;
+
+        const post = await CommunityPost.findById(postId)
+            .populate('authorId', 'name profileImage')
+            .populate('communityId', 'name logo isPrivate')
+            .populate('likes', 'name')
+            .populate({
+                path: 'comments',
+                populate: { path: 'userId', select: 'name profileImage' }
+            });
+
+        if (!post) {
+            return res.status(404).json({ success: false, message: 'Post not found' });
+        }
+
+        // Access control for private communities
+        const community = await Community.findById(post.communityId);
+        if (community?.isPrivate && !community.members.some(m => m.toString() === userId)) {
+            return res.status(403).json({ success: false, message: 'Access denied' });
+        }
+
+        const plain = post.toObject ? post.toObject() : post;
+        const isLiked = Array.isArray(plain?.likes)
+            ? plain.likes.some(l => (l?._id ? l._id.toString() : l.toString()) === userId)
+            : false;
+
+        return res.status(200).json({
+            success: true,
+            post: { ...plain, isLiked, likesCount: Array.isArray(plain.likes) ? plain.likes.length : 0 }
+        });
+    } catch (error) {
+        console.error('Error fetching community post:', error);
+        return res.status(500).json({ success: false, message: 'Failed to fetch post', error: error.message });
     }
 };
 

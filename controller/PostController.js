@@ -6,6 +6,7 @@ const CommunityPost = require("../modules/communityPost");
 const { createNotification } = require('../utils/notificationUtils');
 const { uploadMultipleImagesToCloudinary, uploadVideoToCloudinary, uploadImageToCloudinary } = require("../utils/imageUploader");
 const mongoose = require("mongoose");
+const Like = require("../modules/like");
 
 exports.createPost = async (req, res) => {
     try {
@@ -166,35 +167,34 @@ exports.likePost = async (req, res) => {
             return res.status(400).json({ success: false, message: "Post not found" });
         }
 
-        // Add post to user's likedPost set. If already present, modifiedCount will be 0 (idempotent).
-        const likeResult = await User.updateOne(
-            { _id: userId },
-            { $addToSet: { likedPost: post._id } }
-        );
-
-        if (likeResult.modifiedCount === 0) {
-            // Already liked by this user; return current state without incrementing.
-            return res.status(200).json({
-                success: true,
-                message: "Post already liked",
-                body: post,
-                isLiked: true
-            });
+        // Idempotent like via likes collection
+        let inserted = false;
+        try {
+            await Like.create({ postId: post._id, userId });
+            inserted = true;
+        } catch (e) {
+            if (!e || e.code !== 11000) { // allow duplicate key as idempotent success
+                throw e;
+            }
         }
 
-        // Newly liked -> increment post.likes atomically
-        const updatedPost = await Post.findByIdAndUpdate(
-            postId,
-            { $inc: { likes: 1 } },
-            { new: true }
-        );
+        if (inserted) {
+            // Increment only on first like
+            await Post.updateOne({ _id: postId }, { $inc: { likes: 1 } });
+            // Maintain legacy likedPost array for compatibility
+            await User.updateOne({ _id: userId }, { $addToSet: { likedPost: post._id } });
+            // Notify only on newly created like
+            await createNotification(post.userId, userId, 'like', postId);
+        } else {
+            // Ensure legacy likedPost contains it (no-op if already)
+            await User.updateOne({ _id: userId }, { $addToSet: { likedPost: post._id } });
+        }
 
-        // Create notification only on new like
-        await createNotification(post.userId, userId, 'like', postId);
+        const updatedPost = await Post.findById(postId);
 
         return res.status(200).json({
             success: true,
-            message: "Post liked",
+            message: inserted ? "Post liked" : "Post already liked",
             body: updatedPost,
             isLiked: true
         });
@@ -223,29 +223,23 @@ exports.unlikePost = async (req, res) => {
             return res.status(400).json({ success: false, message: "Post not found" });
         }
 
-        // Pull post from user's likedPost. If it wasn't there, modifiedCount will be 0 (idempotent)
-        const pullResult = await User.updateOne(
-            { _id: userId },
-            { $pull: { likedPost: post._id } }
-        );
-
-        if (pullResult.modifiedCount === 0) {
-            // User hadn't liked this post; keep likes unchanged
-            return res.status(200).json({
-                success: true,
-                message: "Post already unliked",
-                body: post,
-                isLiked: false
-            });
+        // Idempotent unlike via likes collection
+        const del = await Like.deleteOne({ postId: post._id, userId });
+        if (del.deletedCount === 1) {
+            // Decrement only if a like existed; prevent negative
+            await Post.updateOne({ _id: postId, likes: { $gt: 0 } }, { $inc: { likes: -1 } });
+            // Maintain legacy likedPost array for compatibility
+            await User.updateOne({ _id: userId }, { $pull: { likedPost: post._id } });
+        } else {
+            // Ensure legacy likedPost pull (no-op if absent)
+            await User.updateOne({ _id: userId }, { $pull: { likedPost: post._id } });
         }
 
-        // Decrement likes only if current likes > 0 (avoid negative)
-        await Post.updateOne({ _id: postId, likes: { $gt: 0 } }, { $inc: { likes: -1 } });
         const updatedPost = await Post.findById(postId);
 
         return res.status(200).json({
             success: true,
-            message: "Post unliked",
+            message: del.deletedCount === 1 ? "Post unliked" : "Post already unliked",
             body: updatedPost,
             isLiked: false
         });
@@ -553,6 +547,13 @@ exports.getAllPosts = async (req, res) => {
             });
 
         const currentUser = req.userId ? await User.findById(req.userId) : null;
+
+        // Hydrate currentUser.likedPost from likes collection so formatPost emits correct isLiked
+        if (currentUser && posts.length > 0) {
+            const ids = posts.map(p => p._id);
+            const likes = await Like.find({ userId: currentUser._id, postId: { $in: ids } }).select('postId').lean();
+            currentUser.likedPost = likes.map(l => l.postId);
+        }
 
         const formattedPosts = await Promise.all(posts.map(post => formatPost(post, currentUser)));
 
@@ -873,6 +874,13 @@ exports.getHomeFeedWithCommunities = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
+        // Hydrate currentUser.likedPost for regular posts to preserve isLiked in formatPost
+        if (currentUser && regularPosts.length > 0) {
+            const ids = regularPosts.map(p => p._id);
+            const likes = await Like.find({ userId: currentUser._id, postId: { $in: ids } }).select('postId').lean();
+            currentUser.likedPost = likes.map(l => l.postId);
+        }
+
         // Get community posts that should appear in home feed
         let communityPosts = [];
         if (publicCommunityIds.length > 0) {
@@ -1109,7 +1117,12 @@ exports.getPosts = async (req, res) => {
       }
     ]);
 
-    /** ---------------- FORMAT ---------------- */
+/** ---------------- FORMAT ---------------- */
+    if (user && combinedPosts.length > 0) {
+      const ids = combinedPosts.map(p => p._id);
+      const likes = await Like.find({ userId: user._id, postId: { $in: ids } }).select('postId').lean();
+      user.likedPost = likes.map(l => l.postId);
+    }
     const formattedPosts = await Promise.all(
       combinedPosts.map(post => formatPost(post, user))
     );
