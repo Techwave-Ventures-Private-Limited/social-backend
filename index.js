@@ -271,6 +271,22 @@ function callSelfApi() {
         .catch(error => {
             console.error('Error calling API:', error.message);
         });
+
+    axios.get('https://newsscrapper-ccsc.onrender.com/hailing')
+        .then(response => {
+            console.log('API Response:', response.data);
+        })
+        .catch(error => {
+            console.error('Error calling API:', error.message);
+        });
+
+    axios.get('https://backend.connektx.com/hailing')
+        .then(response => {
+            console.log('API Response:', response.data);
+        })
+        .catch(error => {
+            console.error('Error calling API:', error.message);
+        });
 }
 
 function scheduleApiCall() {
