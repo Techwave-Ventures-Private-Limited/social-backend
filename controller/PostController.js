@@ -172,13 +172,18 @@ exports.likePost = async (req, res) => {
             })
         }
 
-        post.likes = post.likes + 1;
-        await post.save();
-
         if (!user.likedPost.some(id => id.toString() === post._id.toString())) {
             user.likedPost.push(post._id);
             await user.save();
+        } else {
+            return res.status(400).json({
+                success: false,
+                message: "User already liked post"
+            })
         }
+
+        post.likes = post.likes + 1;
+        await post.save();
 
         await createNotification(post.userId, userId, 'like', postId);
 
@@ -200,12 +205,24 @@ exports.unlikePost = async (req, res) => {
     try {
 
         const postId = req.body.postId;
+        const userId = req.userId;
         const post = await Post.findById(postId);
 
         if (!post) {
             return res.status(400).json({
                 success: false,
                 message: "Post not found"
+            })
+        }
+
+        const user = await User.findById(userId);
+         if (user.likedPost.some(id => id.toString() === post._id.toString())) {
+            user.likedPost.pull(post._id);
+            await user.save();
+        } else {
+            return res.status(400).json({
+                success: false,
+                message: "User has not liked post so he cannot unlike it."
             })
         }
 
