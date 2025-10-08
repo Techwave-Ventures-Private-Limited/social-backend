@@ -152,102 +152,78 @@ exports.getUserPosts = async (req, res) => {
 
 exports.likePost = async (req, res) => {
     try {
+
         const postId = req.body.postId;
-        const userId = req.userId;
-
-        if (!postId) {
-            return res.status(400).json({ success: false, message: "postId is required" });
-        }
-        if (!userId) {
-            return res.status(400).json({ success: false, message: "User not found" });
-        }
-
         const post = await Post.findById(postId);
+
+        const userId = req.userId;
+        const user = await User.findById(userId);
+
+        if (!userId) {
+            return res.status(400).json({
+                success:false,
+                message:"User not found"
+            })
+        }
+
         if (!post) {
-            return res.status(400).json({ success: false, message: "Post not found" });
+            return res.status(400).json({
+                success: false,
+                message: "Post not found"
+            })
         }
 
-        // Idempotent like via likes collection
-        let inserted = false;
-        try {
-            await Like.create({ postId: post._id, userId });
-            inserted = true;
-        } catch (e) {
-            if (!e || e.code !== 11000) { // allow duplicate key as idempotent success
-                throw e;
-            }
+        post.likes = post.likes + 1;
+        await post.save();
+
+        if (!user.likedPost.some(id => id.toString() === post._id.toString())) {
+            user.likedPost.push(post._id);
+            await user.save();
         }
 
-        if (inserted) {
-            // Increment only on first like
-            await Post.updateOne({ _id: postId }, { $inc: { likes: 1 } });
-            // Maintain legacy likedPost array for compatibility
-            await User.updateOne({ _id: userId }, { $addToSet: { likedPost: post._id } });
-            // Notify only on newly created like
-            await createNotification(post.userId, userId, 'like', postId);
-        } else {
-            // Ensure legacy likedPost contains it (no-op if already)
-            await User.updateOne({ _id: userId }, { $addToSet: { likedPost: post._id } });
-        }
-
-        const updatedPost = await Post.findById(postId);
+        await createNotification(post.userId, userId, 'like', postId);
 
         return res.status(200).json({
             success: true,
-            message: inserted ? "Post liked" : "Post already liked",
-            body: updatedPost,
-            isLiked: true
-        });
+            message: "Post liked",
+            body: post
+        })
+
     } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
-        });
+        })
     }
 }
 
 exports.unlikePost = async (req, res) => {
     try {
+
         const postId = req.body.postId;
-        const userId = req.userId;
-
-        if (!postId) {
-            return res.status(400).json({ success: false, message: "postId is required" });
-        }
-        if (!userId) {
-            return res.status(400).json({ success: false, message: "User not found" });
-        }
-
         const post = await Post.findById(postId);
+
         if (!post) {
-            return res.status(400).json({ success: false, message: "Post not found" });
+            return res.status(400).json({
+                success: false,
+                message: "Post not found"
+            })
         }
 
-        // Idempotent unlike via likes collection
-        const del = await Like.deleteOne({ postId: post._id, userId });
-        if (del.deletedCount === 1) {
-            // Decrement only if a like existed; prevent negative
-            await Post.updateOne({ _id: postId, likes: { $gt: 0 } }, { $inc: { likes: -1 } });
-            // Maintain legacy likedPost array for compatibility
-            await User.updateOne({ _id: userId }, { $pull: { likedPost: post._id } });
-        } else {
-            // Ensure legacy likedPost pull (no-op if absent)
-            await User.updateOne({ _id: userId }, { $pull: { likedPost: post._id } });
-        }
-
-        const updatedPost = await Post.findById(postId);
+        post.likes = post.likes - 1;
+        await post.save();
 
         return res.status(200).json({
             success: true,
-            message: del.deletedCount === 1 ? "Post unliked" : "Post already unliked",
-            body: updatedPost,
-            isLiked: false
-        });
+            message: "Post unliked",
+            body: post
+        })
+
     } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
-        });
+        })
     }
 }
 
