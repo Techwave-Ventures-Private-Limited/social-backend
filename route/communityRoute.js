@@ -15,7 +15,6 @@ router.get('/:id/posts', authMiddleware, CommunityController.getCommunityPosts);
 router.post('/:id/posts', authMiddleware, CommunityController.createCommunityPost);
 
 // Post actions
-router.get('/posts/:postId', authMiddleware, CommunityController.getCommunityPostById);
 router.post('/posts/:postId/like', authMiddleware, CommunityController.likeCommunityPost);
 router.post('/posts/:postId/comments', authMiddleware, CommunityController.addCommentToCommunityPost);
 router.post('/posts/:postId/pin', authMiddleware, CommunityController.pinPost);

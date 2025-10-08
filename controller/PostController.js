@@ -6,7 +6,6 @@ const CommunityPost = require("../modules/communityPost");
 const { createNotification } = require('../utils/notificationUtils');
 const { uploadMultipleImagesToCloudinary, uploadVideoToCloudinary, uploadImageToCloudinary } = require("../utils/imageUploader");
 const mongoose = require("mongoose");
-const Like = require("../modules/like");
 
 exports.createPost = async (req, res) => {
     try {
@@ -524,13 +523,6 @@ exports.getAllPosts = async (req, res) => {
 
         const currentUser = req.userId ? await User.findById(req.userId) : null;
 
-        // Hydrate currentUser.likedPost from likes collection so formatPost emits correct isLiked
-        if (currentUser && posts.length > 0) {
-            const ids = posts.map(p => p._id);
-            const likes = await Like.find({ userId: currentUser._id, postId: { $in: ids } }).select('postId').lean();
-            currentUser.likedPost = likes.map(l => l.postId);
-        }
-
         const formattedPosts = await Promise.all(posts.map(post => formatPost(post, currentUser)));
 
         return res.status(200).json({
@@ -850,13 +842,6 @@ exports.getHomeFeedWithCommunities = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
-        // Hydrate currentUser.likedPost for regular posts to preserve isLiked in formatPost
-        if (currentUser && regularPosts.length > 0) {
-            const ids = regularPosts.map(p => p._id);
-            const likes = await Like.find({ userId: currentUser._id, postId: { $in: ids } }).select('postId').lean();
-            currentUser.likedPost = likes.map(l => l.postId);
-        }
-
         // Get community posts that should appear in home feed
         let communityPosts = [];
         if (publicCommunityIds.length > 0) {
@@ -1093,12 +1078,7 @@ exports.getPosts = async (req, res) => {
       }
     ]);
 
-/** ---------------- FORMAT ---------------- */
-    if (user && combinedPosts.length > 0) {
-      const ids = combinedPosts.map(p => p._id);
-      const likes = await Like.find({ userId: user._id, postId: { $in: ids } }).select('postId').lean();
-      user.likedPost = likes.map(l => l.postId);
-    }
+    /** ---------------- FORMAT ---------------- */
     const formattedPosts = await Promise.all(
       combinedPosts.map(post => formatPost(post, user))
     );

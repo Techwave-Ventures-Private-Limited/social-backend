@@ -60,23 +60,10 @@ const Message = require('./modules/message');
 const Community = require('./modules/community');
 const CommunityPost = require('./modules/communityPost');
 const CommunityComment = require('./modules/communityComment');
-const Like = require('./modules/like');
 
 // --- Database and Cloudinary Connection ---
 database.connect();
 cloudinaryConnect();
-
-// Ensure unique index for likes collection at startup
-(async () => {
-    try {
-        if (Like && Like.collection && Like.collection.createIndex) {
-            await Like.collection.createIndex({ postId: 1, userId: 1 }, { unique: true, name: 'uniq_post_user' });
-            console.log('Ensured unique index on likes (postId,userId)');
-        }
-    } catch (e) {
-        console.warn('Could not ensure likes unique index:', e.message);
-    }
-})();
 
 // Initialize Firebase Admin (conditional)
 const path = require('path');
