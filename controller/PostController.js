@@ -6,11 +6,12 @@ const CommunityPost = require("../modules/communityPost");
 const { createNotification } = require('../utils/notificationUtils');
 const { uploadMultipleImagesToCloudinary, uploadVideoToCloudinary, uploadImageToCloudinary } = require("../utils/imageUploader");
 const mongoose = require("mongoose");
+const CompanyDetails = require("../modules/companyDetails");
 
 exports.createPost = async (req, res) => {
     try {
 
-        const { discription, postType, originalPostId, videoLink } = req.body || "";
+        let { discription, postType, originalPostId, videoLink, pollOptions } = req.body || "";
         const { isReposted } = req.body || false;
         const userId = req.userId;
         // console.log("User request to upload a post", req.body)
@@ -52,6 +53,8 @@ exports.createPost = async (req, res) => {
             })
         }
 
+        if (pollOptions !== null)
+            pollOptions = JSON.parse(pollOptions);
         
         const createdPost = await Post.create({
             discription,
@@ -60,7 +63,8 @@ exports.createPost = async (req, res) => {
             userId,
             user,
             originalPostId,
-            isReposted
+            isReposted,
+            pollOptions
         });
         user.posts.push(createdPost._id);
         await user.save();
@@ -521,7 +525,8 @@ exports.getAllPosts = async (req, res) => {
                 populate: [
                     { path: 'about', model: 'About' },
                     { path: 'education', model: 'Education' },
-                    { path: 'experience', model: 'Experience' }
+                    { path: 'experience', model: 'Experience' },
+                    { path: 'companyDetails', model: 'CompanyDetails'},
                 ]
             })
             .populate('comments')
@@ -622,7 +627,8 @@ exports.formatPost = (post, currentUser = null) => {
         originalPost,
         isReposted: post.isReposted,
         type: post.type,
-        communityName
+        communityName,
+        companyDetails: post.userId.companyDetails
     };
 };
 
@@ -1073,6 +1079,7 @@ exports.getPosts = async (req, res) => {
           { path: "about", model: "About" },
           { path: "education", model: "Education" },
           { path: "experience", model: "Experience" },
+          { path: 'companyDetails', model: 'CompanyDetails'},
         ],
       },
       { path: "comments" },
