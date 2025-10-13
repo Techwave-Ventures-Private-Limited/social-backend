@@ -10,6 +10,7 @@ const http = require('http'); // Import the http module
 const { Server } = require("socket.io"); // Import the Server class from socket.io
 const jwt = require('jsonwebtoken'); // You'll need this for auth
 const { initializeCommunitySocket } = require('./utils/communitySocketHelper');
+const nodemailer = require('nodemailer');
 
 // --- App Setup ---
 const app = express();
@@ -245,6 +246,28 @@ io.on('connection', (socket) => {
 // --- Server Listening ---
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running at ${PORT}`);
+    // Non-blocking SMTP connectivity check
+    (async function verifySmtpTransport() {
+        try {
+            const { MAIL_HOST, MAIL_PORT, MAIL_USER, MAIL_PASS, MAIL_SECURE } = process.env;
+            if (!MAIL_HOST || !MAIL_USER || !MAIL_PASS) {
+                console.warn('[SMTP] MAIL_HOST/MAIL_USER/MAIL_PASS not fully set; OTP emails will fail until configured.');
+                return;
+            }
+            const port = MAIL_PORT ? parseInt(MAIL_PORT, 10) : 587;
+            const secure = MAIL_SECURE ? /^true|1$/i.test(MAIL_SECURE) : (port === 465);
+            const transporter = nodemailer.createTransport({
+                host: MAIL_HOST,
+                port,
+                secure,
+                auth: { user: MAIL_USER, pass: MAIL_PASS },
+            });
+            await transporter.verify();
+            console.log(`[SMTP] Transport verified: host=${MAIL_HOST} port=${port} secure=${secure}`);
+        } catch (err) {
+            console.warn('[SMTP] Transport verification failed:', err.message);
+        }
+    })();
 });
 
 
@@ -253,26 +276,26 @@ const axios = require('axios');
 function callSelfApi() {
     axios.get('https://social-backend-y1rg.onrender.com/hailing')
         .then(response => {
-            console.log('API Response:', response.data);
+            console.log('Testing Backend API Response:', response.data);
         })
         .catch(error => {
-            console.error('Error calling API:', error.message);
+            console.error('Error calling Testing Backend API:', error.message);
         });
 
     axios.get('https://newsscrapper-ccsc.onrender.com/hailing')
         .then(response => {
-            console.log('API Response:', response.data);
+            console.log('NewsScrapper API Response:', response.data);
         })
         .catch(error => {
-            console.error('Error calling API:', error.message);
+            console.error('Error calling NewsScrapper API:', error.message);
         });
 
     axios.get('https://backend.connektx.com/hailing')
         .then(response => {
-            console.log('API Response:', response.data);
+            console.log('Backend API Response:', response.data);
         })
         .catch(error => {
-            console.error('Error calling API:', error.message);
+            console.error('Error calling Backend API:', error.message);
         });
 }
 
