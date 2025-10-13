@@ -11,7 +11,7 @@ const CompanyDetails = require("../modules/companyDetails");
 exports.createPost = async (req, res) => {
     try {
 
-        let { discription, postType, originalPostId, videoLink, pollOptions } = req.body || "";
+        let { discription, postType, originalPostId, videoLink, pollOptions  = null} = req.body || "";
         const { isReposted } = req.body || false;
         const userId = req.userId;
         // console.log("User request to upload a post", req.body)
