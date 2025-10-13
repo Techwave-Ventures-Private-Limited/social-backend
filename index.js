@@ -253,26 +253,26 @@ const axios = require('axios');
 function callSelfApi() {
     axios.get('https://social-backend-y1rg.onrender.com/hailing')
         .then(response => {
-            console.log('API Response:', response.data);
+            console.log('Testing Backend API Response:', response.data);
         })
         .catch(error => {
-            console.error('Error calling API:', error.message);
+            console.error('Error calling Testing Backend API:', error.message);
         });
 
     axios.get('https://newsscrapper-ccsc.onrender.com/hailing')
         .then(response => {
-            console.log('API Response:', response.data);
+            console.log('NewsScrapper API Response:', response.data);
         })
         .catch(error => {
-            console.error('Error calling API:', error.message);
+            console.error('Error calling NewsScrapper API:', error.message);
         });
 
     axios.get('https://backend.connektx.com/hailing')
         .then(response => {
-            console.log('API Response:', response.data);
+            console.log('Backend API Response:', response.data);
         })
         .catch(error => {
-            console.error('Error calling API:', error.message);
+            console.error('Error calling Backend API:', error.message);
         });
 }
 
