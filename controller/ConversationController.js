@@ -571,6 +571,7 @@ exports.markMessagesAsSeen = async (req, res) => {
     try {
         const { conversationId } = req.params;
         const userId = req.userId;
+        const { io, onlineUsers } = req; // Get socket instances from the request
 
         // Find all messages in the conversation that the user has not yet read
         // and update them by adding the user to the 'readBy' array.
@@ -589,10 +590,24 @@ exports.markMessagesAsSeen = async (req, res) => {
         );
 
         if (result.nModified > 0) {
-            // A socket event should be emitted here to inform the other user(s)
-            // that their messages have been seen in real-time.
-            // E.g., io.to(conversationId).emit('messagesSeen', { conversationId, readerId: userId });
-            // console.log(`[BE LOG] ${result.nModified} messages in conversation ${conversationId} marked as seen by user ${userId}.`);
+            const conversation = await Conversation.findById(conversationId);
+            if (conversation) {
+                // Find all other participants in the conversation
+                conversation.participants.forEach(participantId => {
+                    // Don't send a notification to the person who just read the messages
+                    if (participantId.toString() !== userId) {
+                        // Check if the other participant is online
+                        if (onlineUsers.has(participantId.toString())) {
+                            const participantSocketId = onlineUsers.get(participantId.toString());
+                            // Emit a specific event to the other participant
+                            io.to(participantSocketId).emit('messagesSeen', {
+                                conversationId,
+                                readerId: userId 
+                            });
+                        }
+                    }
+                });
+            }
         }
         
         return res.status(200).json({
