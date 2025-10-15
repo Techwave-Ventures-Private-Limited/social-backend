@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const User = require('../modules/user');
 const Conversation = require('../modules/conversation');
 const Message = require('../modules/message');
+const { sendPushNotification } = require('../utils/notificationUtils');
 
 // 1. Start a new conversation or return an existing one
 // Replace your existing startConversation function with this more robust version
@@ -534,23 +535,32 @@ exports.createMessage = async (req, res) => {
             .populate('sharedShowcase', 'projectTitle logo tagline');
 
         // --- REAL-TIME BROADCAST LOGIC ---
+        // --- 4. Broadcast Logic (Real-time & Push Notifications) ---
         if (conversation && populatedMessage) {
-            // Loop through every participant in the conversation
-            conversation.participants.forEach(participantId => {
-                // Check if the participant is currently online by looking them up in the map
-                // console.log(`[DEBUG] Checking for participant: ${participantId.toString()}`);
-                if (onlineUsers.has(participantId.toString())) {
-                    // Get the participant's unique socket ID from the map
-                    const participantSocketId = onlineUsers.get(participantId.toString());
-                    
-                    // Emit the 'newMessage' event directly to that user's socket connection
-                    io.to(participantSocketId).emit('newMessage', populatedMessage.toObject());
-                    
-                    // console.log(`[REAL-TIME] Emitted 'newMessage' to participant: ${participantId}`);
+            const senderName = populatedMessage.sender?.name || 'Someone';
+
+            for (const participantId of conversation.participants) {
+                if (participantId.toString() === senderId) continue;
+
+                if (req.onlineUsers.has(participantId.toString())) {
+                // ONLINE: in-app realtime only
+                const participantSocketId = req.onlineUsers.get(participantId.toString());
+                req.io.to(participantSocketId).emit('newMessage', populatedMessage.toObject());
                 } else {
-                    // console.log(`[DEBUG] Participant ${participantId.toString()} NOT found in onlineUsers map.`); // <-- ADD THIS LOG
+                // OFFLINE: Expo push only, no in-app Notification doc
+                await sendPushNotification(
+                    participantId,
+                    `New message from ${senderName}`,
+                    populatedMessage.content || 'Sent you an Message',
+                    {
+                    type: 'new_message',
+                    conversationId: conversation._id.toString(),
+                    senderId: senderId.toString(),
+                    messageId: populatedMessage._id.toString()
+                    }
+                );
                 }
-            });
+            }
         }
         // --- END OF REAL-TIME LOGIC ---
 
