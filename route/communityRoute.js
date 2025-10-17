@@ -26,7 +26,8 @@ router.post('/:id/leave', authMiddleware, CommunityController.leaveCommunity);
 
 // Member management
 router.get('/:id/members', authMiddleware, CommunityController.getCommunityMembers);
-router.post('/:id/members/:memberId/role', authMiddleware, CommunityController.assignRole);
+router.post('/:id/members/:memberId/assignRole', authMiddleware, CommunityController.assignRole);
+router.delete('/:id/members/:memberId/removeRole', authMiddleware, CommunityController.removeRole);
 router.delete('/:id/members/:memberId', authMiddleware, CommunityController.removeMember);
 
 // Join requests

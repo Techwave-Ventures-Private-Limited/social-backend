@@ -1141,6 +1141,43 @@ exports.assignRole = async (req, res) => {
     }
 };
 
+// Remove member from role
+exports.removeRole = async (req, res) => {
+    try {
+        const { id, memberId } = req.params;
+        const { userId } = req;
+
+        const community = await Community.findById(id);
+
+        if (!community) {
+            return res.status(404).json({ success: false, message: "Community not found" });
+        }
+
+        // Only owner and admins can remove roles
+        if (community.owner.toString() !== userId && !community.admins.includes(userId)) {
+            return res.status(403).json({ success: false, message: "Permission denied" });
+        }
+
+        // Use $pull to remove the memberId from both admins and moderators arrays
+        await Community.updateOne(
+            { _id: id },
+            {
+                $pull: {
+                    admins: memberId,
+                    moderators: memberId,
+                },
+            }
+        );
+
+        return res.status(200).json({ success: true, message: "User role removed successfully. The user is now a member." });
+
+    } catch (error) {
+        console.error("Error removing role:", error);
+        return res.status(500).json({ success: false, message: "Failed to remove role", error: error.message });
+    }
+};
+
+
 // Remove member from community
 exports.removeMember = async (req, res) => {
     try {
