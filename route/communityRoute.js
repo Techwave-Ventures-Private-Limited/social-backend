@@ -39,4 +39,7 @@ router.put('/:id', authMiddleware, CommunityController.updateCommunity);
 router.delete('/:id', authMiddleware, CommunityController.deleteCommunity);
 router.get('/:id', CommunityController.getCommunityById);
 
+// update logo and cover-image
+router.put('/:id/cover-image', authMiddleware, CommunityController.updateCoverImage);
+router.put('/:id/logo', authMiddleware, CommunityController.updateLogo);
 module.exports = router;

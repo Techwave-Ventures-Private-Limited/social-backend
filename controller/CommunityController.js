@@ -1337,6 +1337,92 @@ exports.deleteCommunityPost = async (req, res) => {
     }
 };
 
+// --- UPDATE COVER IMAGE ---
+exports.updateCoverImage = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.userId;
+
+        // 1. Check req.files from express-fileupload
+        if (!req.files || Object.keys(req.files).length === 0 || !req.files.coverImage) {
+            return res.status(400).json({ success: false, message: 'No cover image file uploaded' });
+        }
+        
+        // 2. Access the file directly from req.files
+        const coverImageFile = req.files.coverImage;
+
+        const community = await Community.findById(id);
+        if (!community) {
+            return res.status(404).json({ success: false, message: 'Community not found' });
+        }
+
+        // Permission check (remains the same)
+        if (!(community.owner.toString() === userId || community.admins.includes(userId))) {
+            return res.status(403).json({ success: false, message: 'Permission denied.' });
+        }
+
+        // Upload to Cloudinary (remains the same)
+        const uploadedImage = await uploadImageToCloudinary(coverImageFile, process.env.FOLDERNAME || 'community_assets');
+
+        // Update the community record
+        community.coverImage = uploadedImage.secure_url;
+        community.lastActivity = new Date();
+        await community.save();
+
+        return res.status(200).json({ 
+            success: true, 
+            message: 'Cover image updated successfully', 
+            coverImage: community.coverImage 
+        });
+
+    } catch (error) {
+        console.error('Error updating cover image:', error);
+        return res.status(500).json({ success: false, message: 'Failed to update cover image', error: error.message });
+    }
+};
+
+// --- UPDATE LOGO ---
+exports.updateLogo = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.userId;
+
+        if (!req.files || Object.keys(req.files).length === 0 || !req.files.logo) {
+            return res.status(400).json({ success: false, message: 'No logo file uploaded' });
+        }
+
+        const logoFile = req.files.logo;
+
+        const community = await Community.findById(id);
+        if (!community) {
+            return res.status(404).json({ success: false, message: 'Community not found' });
+        }
+
+        // Permission check
+        if (!(community.owner.toString() === userId || community.admins.includes(userId))) {
+            return res.status(403).json({ success: false, message: 'Permission denied.' });
+        }
+
+        // Upload
+        const uploadedImage = await uploadImageToCloudinary(logoFile, process.env.FOLDERNAME || 'community_assets');
+
+        // Update record
+        community.logo = uploadedImage.secure_url;
+        community.lastActivity = new Date();
+        await community.save();
+
+        return res.status(200).json({ 
+            success: true, 
+            message: 'Logo updated successfully', 
+            logo: community.logo 
+        });
+
+    } catch (error) {
+        console.error('Error updating logo:', error);
+        return res.status(500).json({ success: false, message: 'Failed to update logo', error: error.message });
+    }
+};
+
 // ================================
 // UTILITY FUNCTIONS
 // ================================
