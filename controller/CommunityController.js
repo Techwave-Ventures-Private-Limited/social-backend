@@ -415,6 +415,37 @@ exports.setAllowMemberPosts = async (req, res) => {
     }
 };
 
+// Set Community Private
+exports.updatePrivacy = async (req, res) => {
+    const communityId = req.params.id;
+    const { isPrivate } = req.body; // expects Boolean
+    const userId = req.userId;
+
+    try {
+        const community = await Community.findById(communityId);
+        if (!community) return res.status(404).json({ success: false, message: "Community not found" });
+
+        // Only owner or admins can update privacy
+        if (
+            community.owner.toString() !== userId &&
+            !community.admins.map(admin => admin.toString()).includes(userId)
+        ) {
+            return res.status(403).json({ success: false, message: "Permission denied" });
+        }
+
+        community.isPrivate = !!isPrivate;
+        await community.save();
+
+        return res.status(200).json({
+            success: true,
+            isPrivate: community.isPrivate,
+            message: `Community privacy updated to ${community.isPrivate ? "private" : "public"}`,
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 // ================================
 // COMMUNITY MEMBERSHIP OPERATIONS
 // ================================
@@ -1117,9 +1148,14 @@ exports.setRequireJoinApprovals = async (req, res) => {
             return res.status(403).json({ success: false, message: "Permission denied" });
         }
 
-        // Update both fields to keep consistent logic in place
-        community.settings.autoApproveJoins = !!autoApproveJoins;
-        community.requiresApproval = !autoApproveJoins;
+        // If community is private, require approval must always be true and autoApproveJoins false
+        if (community.isPrivate) {
+            community.requiresApproval = true;
+            community.settings.autoApproveJoins = false;
+        } else {
+            community.settings.autoApproveJoins = !!autoApproveJoins;
+            community.requiresApproval = !autoApproveJoins;
+        }
 
         await community.save();
 
@@ -1127,7 +1163,9 @@ exports.setRequireJoinApprovals = async (req, res) => {
             success: true,
             autoApproveJoins: community.settings.autoApproveJoins,
             requiresApproval: community.requiresApproval,
-            message: "autoApproveJoins and requiresApproval updated successfully"
+            message: community.isPrivate
+                ? "Community is private; join approval is required and cannot be disabled."
+                : "autoApproveJoins and requiresApproval updated successfully",
         });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });

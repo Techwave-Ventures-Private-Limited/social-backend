@@ -53,5 +53,6 @@ router.put('/:id/logo', authMiddleware, CommunityController.updateLogo);
 // Community Settings
 router.put('/:id/settings/allow-member-posts', authMiddleware, CommunityController.setAllowMemberPosts);
 router.put('/:id/settings/require-join-approval', authMiddleware, CommunityController.setRequireJoinApprovals);
+router.put('/:id/community-privacy', authMiddleware, CommunityController.updatePrivacy);
 
 module.exports = router;
