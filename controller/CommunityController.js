@@ -384,6 +384,37 @@ exports.deleteCommunity = async (req, res) => {
     }
 };
 
+// Set Allow Member Posts
+exports.setAllowMemberPosts = async (req, res) => {
+    const communityId = req.params.id;
+    const { allowMemberPosts } = req.body; // expects Boolean
+    const userId = req.userId;
+
+    try {
+        const community = await Community.findById(communityId);
+        if (!community) return res.status(404).json({ success: false, message: 'Community not found' });
+
+        // Only owner or admin allowed to update this setting
+        if (
+            community.owner.toString() !== userId &&
+            !community.admins.map(a => a.toString()).includes(userId)
+        ) {
+            return res.status(403).json({ success: false, message: 'Permission denied' });
+        }
+
+        community.settings.allowMemberPosts = !!allowMemberPosts;
+        await community.save();
+
+        return res.status(200).json({
+            success: true,
+            allowMemberPosts: community.settings.allowMemberPosts,
+            message: 'allowMemberPosts updated successfully',
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 // ================================
 // COMMUNITY MEMBERSHIP OPERATIONS
 // ================================

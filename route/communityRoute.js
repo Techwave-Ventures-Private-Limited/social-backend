@@ -33,9 +33,6 @@ router.delete('/:id/members/:memberId', authMiddleware, CommunityController.remo
 // Individual accept/reject Join requests
 router.post('/requests/:requestId/handle', authMiddleware, CommunityController.handleJoinRequest);
 
-// Set require join approvals
-router.put('/:id/settings/require-joins-approval', authMiddleware, CommunityController.setRequireJoinApprovals);
-
 // View all join requests for a community
 router.get('/:id/join-requests', authMiddleware, CommunityController.getAllJoinRequests);
 
@@ -51,4 +48,9 @@ router.get('/:id', CommunityController.getCommunityById);
 // update logo and cover-image
 router.put('/:id/cover-image', authMiddleware, CommunityController.updateCoverImage);
 router.put('/:id/logo', authMiddleware, CommunityController.updateLogo);
+
+// Community Settings
+router.put('/:id/settings/allow-member-posts', authMiddleware, CommunityController.setAllowMemberPosts);
+router.put('/:id/settings/require-join-approval', authMiddleware, CommunityController.setRequireJoinApprovals);
+
 module.exports = router;
