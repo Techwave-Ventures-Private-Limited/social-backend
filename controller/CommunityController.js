@@ -1133,7 +1133,7 @@ exports.addCommentToCommunityPost = async (req, res) => {
 // Set require join Approvals
 exports.setRequireJoinApprovals = async (req, res) => {
     const communityId = req.params.id;
-    const { autoApproveJoins } = req.body; // expects Boolean
+    const { requiresApproval } = req.body; // expects Boolean
     const userId = req.userId;
 
     try {
@@ -1153,19 +1153,19 @@ exports.setRequireJoinApprovals = async (req, res) => {
             community.requiresApproval = true;
             community.settings.autoApproveJoins = false;
         } else {
-            community.settings.autoApproveJoins = !!autoApproveJoins;
-            community.requiresApproval = !autoApproveJoins;
+            community.requiresApproval = !!requiresApproval;
+            community.settings.autoApproveJoins = !requiresApproval;
         }
 
         await community.save();
 
         return res.status(200).json({
             success: true,
-            autoApproveJoins: community.settings.autoApproveJoins,
             requiresApproval: community.requiresApproval,
+            autoApproveJoins: community.settings.autoApproveJoins,
             message: community.isPrivate
                 ? "Community is private; join approval is required and cannot be disabled."
-                : "autoApproveJoins and requiresApproval updated successfully",
+                : "requiresApproval and autoApproveJoins updated successfully",
         });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });
