@@ -1023,6 +1023,41 @@ exports.addCommentToCommunityPost = async (req, res) => {
 // MEMBER MANAGEMENT (ADMIN/OWNER)
 // ================================
 
+// Set require join Approvals
+exports.setRequireJoinApprovals = async (req, res) => {
+    const communityId = req.params.id;
+    const { autoApproveJoins } = req.body; // expects Boolean
+    const userId = req.userId;
+
+    try {
+        const community = await Community.findById(communityId);
+        if (!community) return res.status(404).json({ success: false, message: "Community not found" });
+
+        // Only owner or admin can update this setting
+        if (
+            community.owner.toString() !== userId &&
+            !community.admins.map(a => a.toString()).includes(userId)
+        ) {
+            return res.status(403).json({ success: false, message: "Permission denied" });
+        }
+
+        // Update both fields to keep consistent logic in place
+        community.settings.autoApproveJoins = !!autoApproveJoins;
+        community.requiresApproval = !autoApproveJoins;
+
+        await community.save();
+
+        return res.status(200).json({
+            success: true,
+            autoApproveJoins: community.settings.autoApproveJoins,
+            requiresApproval: community.requiresApproval,
+            message: "autoApproveJoins and requiresApproval updated successfully"
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 // Manage join requests
 exports.handleJoinRequest = async (req, res) => {
     try {
@@ -1080,6 +1115,71 @@ exports.handleJoinRequest = async (req, res) => {
         });
     }
 };
+
+// View all join requests
+exports.getAllJoinRequests = async (req, res) => {
+    try {
+        const communityId = req.params.id;
+        const userId = req.userId;
+        const community = await Community.findById(communityId);
+        if (!community) {
+            return res.status(404).json({ success: false, message: "Community not found" });
+        }
+        if (!isOwnerOrAdmin(community, userId)) {
+            return res.status(403).json({ success: false, message: "Permission denied" });
+        }
+        const joinRequests = await JoinRequest.find({ communityId, status: 'pending' });
+        return res.status(200).json({ success: true, joinRequests });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: "Failed to fetch join requests", error: error.message });
+    }
+};
+
+// Bulk handle join request
+exports.bulkHandleJoinRequests = async (req, res) => {
+    try {
+        const communityId = req.params.id;
+        const userId = req.userId;
+        const { requestIds, action } = req.body; // action: "approve" or "reject"
+        const community = await Community.findById(communityId);
+        if (!community) {
+            return res.status(404).json({ success: false, message: "Community not found" });
+        }
+        if (!isOwnerOrAdmin(community, userId)) {
+            return res.status(403).json({ success: false, message: "Permission denied" });
+        }
+        let results = { approved: [], rejected: [], errors: [] };
+
+        for (const requestId of requestIds) {
+            try {
+                const joinRequest = await JoinRequest.findById(requestId);
+                if (!joinRequest || joinRequest.status !== 'pending' || joinRequest.communityId.toString() !== communityId) {
+                    results.errors.push(requestId);
+                    continue;
+                }
+                if (action === "approve") {
+                    community.members.push(joinRequest.userId);
+                    community.memberCount += 1;
+                    joinRequest.status = "approved";
+                } else if (action === "reject") {
+                    joinRequest.status = "rejected";
+                }
+                joinRequest.processedBy = userId;
+                joinRequest.processedAt = new Date();
+                await Promise.all([joinRequest.save(), community.save()]);
+                if (action === "approve") results.approved.push(requestId);
+                if (action === "reject") results.rejected.push(requestId);
+            } catch (err) {
+                results.errors.push(requestId);
+            }
+        }
+
+        return res.status(200).json({ success: true, results });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: "Bulk join request handling failed", error: error.message });
+    }
+};
+
 
 // Assign role to member
 exports.assignRole = async (req, res) => {

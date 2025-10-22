@@ -30,8 +30,17 @@ router.post('/:id/members/:memberId/assignRole', authMiddleware, CommunityContro
 router.delete('/:id/members/:memberId/removeRole', authMiddleware, CommunityController.removeRole);
 router.delete('/:id/members/:memberId', authMiddleware, CommunityController.removeMember);
 
-// Join requests
+// Individual accept/reject Join requests
 router.post('/requests/:requestId/handle', authMiddleware, CommunityController.handleJoinRequest);
+
+// Set require join approvals
+router.put('/:id/settings/require-joins-approval', authMiddleware, CommunityController.setRequireJoinApprovals);
+
+// View all join requests for a community
+router.get('/:id/join-requests', authMiddleware, CommunityController.getAllJoinRequests);
+
+// Bulk accept/reject join requests
+router.post('/:id/join-requests/bulk-handle', authMiddleware, CommunityController.bulkHandleJoinRequests);
 
 // Community CRUD (generic routes last!)
 router.post('/', authMiddleware, CommunityController.createCommunity);
