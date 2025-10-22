@@ -419,6 +419,51 @@ exports.setAllowMemberPosts = async (req, res) => {
 // COMMUNITY MEMBERSHIP OPERATIONS
 // ================================
 
+// Ban User from Community
+exports.banUser = async (req, res) => {
+    const communityId = req.params.id;
+    const userIdToBan = req.params.memberId;
+    const actingUserId = req.userId;
+
+    try {
+        const community = await Community.findById(communityId);
+        if (!community) return res.status(404).json({ success: false, message: "Community not found" });
+
+        // Only owner or admin can ban users
+        if (
+            community.owner.toString() !== actingUserId &&
+            !community.admins.map(a => a.toString()).includes(actingUserId)
+        ) {
+            return res.status(403).json({ success: false, message: "Permission denied" });
+        }
+
+        // Check if user is member
+        if (!community.members.map(m => m.toString()).includes(userIdToBan)) {
+            return res.status(400).json({ success: false, message: "User is not a member" });
+        }
+
+        // Remove from members array
+        community.members = community.members.filter(m => m.toString() !== userIdToBan);
+        // Remove from admins/moderators if present
+        community.admins = community.admins.filter(a => a.toString() !== userIdToBan);
+        community.moderators = community.moderators.filter(m => m.toString() !== userIdToBan);
+
+        // Add to bannedUsers array if not already present
+        if (!community.bannedUsers.map(b => b.toString()).includes(userIdToBan)) {
+            community.bannedUsers.push(userIdToBan);
+        }
+
+        community.memberCount = Math.max(community.memberCount - 1, 0);
+        community.lastActivity = new Date();
+
+        await community.save();
+
+        return res.status(200).json({ success: true, message: "User banned successfully" });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 // Join community
 exports.joinCommunity = async (req, res) => {
     try {
