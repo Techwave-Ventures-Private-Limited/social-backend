@@ -531,6 +531,32 @@ exports.unbanUser = async (req, res) => {
     }
 };
 
+// View all banned Users
+exports.getBannedUsers = async (req, res) => {
+    const communityId = req.params.id;
+    const userId = req.userId;
+
+    try {
+        const community = await Community.findById(communityId).populate('bannedUsers', '_id name profileImage headline');
+        if (!community) return res.status(404).json({ success: false, message: "Community not found" });
+
+        // Only owner or admins can view banned users
+        if (
+            community.owner.toString() !== userId &&
+            !community.admins.map(a => a.toString()).includes(userId)
+        ) {
+            return res.status(403).json({ success: false, message: "Permission denied" });
+        }
+
+        return res.status(200).json({
+            success: true,
+            bannedUsers: community.bannedUsers
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 // Join community
 exports.joinCommunity = async (req, res) => {
     try {
