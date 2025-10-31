@@ -30,6 +30,7 @@ router.post('/:id/members/:memberId/assignRole', authMiddleware, CommunityContro
 router.delete('/:id/members/:memberId/removeRole', authMiddleware, CommunityController.removeRole);
 router.delete('/:id/members/:memberId', authMiddleware, CommunityController.removeMember);
 router.post('/:id/members/:memberId/ban', authMiddleware, CommunityController.banUser);
+router.post('/:id/members/:memberId/unban', authMiddleware, CommunityController.unbanUser);
 
 // Individual accept/reject Join requests
 router.post('/requests/:requestId/handle', authMiddleware, CommunityController.handleJoinRequest);

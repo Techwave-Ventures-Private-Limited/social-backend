@@ -495,6 +495,42 @@ exports.banUser = async (req, res) => {
     }
 };
 
+// Unban User from Community
+exports.unbanUser = async (req, res) => {
+    const communityId = req.params.id;
+    const userIdToUnban = req.params.memberId;
+    const actingUserId = req.userId;
+
+    try {
+        const community = await Community.findById(communityId);
+        if (!community) return res.status(404).json({ success: false, message: "Community not found" });
+
+        // Only owner or admin can unban users
+        if (
+            community.owner.toString() !== actingUserId &&
+            !community.admins.map(a => a.toString()).includes(actingUserId)
+        ) {
+            return res.status(403).json({ success: false, message: "Permission denied" });
+        }
+
+        // Check if user is actually banned
+        if (!community.bannedUsers.map(b => b.toString()).includes(userIdToUnban)) {
+            return res.status(400).json({ success: false, message: "User is not banned" });
+        }
+
+        // Remove user from bannedUsers array
+        community.bannedUsers = community.bannedUsers.filter(b => b.toString() !== userIdToUnban);
+
+        community.lastActivity = new Date();
+
+        await community.save();
+
+        return res.status(200).json({ success: true, message: "User unbanned successfully" });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 // Join community
 exports.joinCommunity = async (req, res) => {
     try {
