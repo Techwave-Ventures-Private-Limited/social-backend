@@ -11,7 +11,8 @@ const {
     getMessages,
     createMessage,
     markMessagesAsSeen,
-    rejectMessageRequest
+    rejectMessageRequest,
+    deleteMessage,
 } = require('../controller/ConversationController');
 
 // Apply authentication middleware to all routes in this file
@@ -42,5 +43,8 @@ router.post('/:conversationId/seen', markMessagesAsSeen);
 
 // POST /conversations/requests/:conversationId/reject -> Rejects a message request
 router.post('/requests/:conversationId/reject', rejectMessageRequest);
+
+// DELETE 
+router.delete('/:conversationId/messages/:messageId', deleteMessage);
 
 module.exports = router;

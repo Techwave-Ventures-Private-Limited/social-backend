@@ -677,3 +677,45 @@ exports.rejectMessageRequest = async (req, res) => {
         });
     }
 };
+
+
+// 9. Delete a mmessage
+exports.deleteMessage = async (req, res) => {
+  const { conversationId, messageId } = req.params;
+  const userId = req.userId;
+
+  try {
+    // Find message and check if it's sent by current user
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, message: 'Message not found.' });
+    }
+    if (message.sender.toString() !== userId) {
+      return res.status(403).json({ success: false, message: 'You can only delete your own messages.' });
+    }
+
+    // Delete the message
+    await Message.findByIdAndDelete(messageId);
+
+    // Remove reference from conversation
+    await Conversation.findByIdAndUpdate(
+      conversationId,
+      { $pull: { messages: messageId } }
+    );
+
+    // If this was the last message, update conversation's lastMessage field
+    const convo = await Conversation.findById(conversationId);
+    if (convo && convo.lastMessage && convo.lastMessage.toString() === messageId) {
+      // Find previous last message in this conversation
+      const lastMsg = await Message.find({ conversationId })
+        .sort({ createdAt: -1 })
+        .limit(1);
+      convo.lastMessage = lastMsg[0]?._id || null;
+      await convo.save();
+    }
+
+    return res.status(200).json({ success: true, message: 'Message deleted successfully.' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
