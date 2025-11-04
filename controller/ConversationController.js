@@ -399,6 +399,11 @@ exports.getMessages = async (req, res) => {
             .populate('sharedNews')
             .populate('sharedUser', 'name profileImage bio') 
             .populate('sharedShowcase', 'projectTitle logo tagline')
+            .populate('replyTo', 'content sender')  // replyTo content and sender reference
+            .populate({
+                path: 'replyTo.sender', // deep populate the replyTo sender's name
+                select: 'name'
+            })
             .sort({ createdAt: -1 })
             .limit(limit * 1)
             .skip((page - 1) * limit);
@@ -483,7 +488,7 @@ exports.createMessage = async (req, res) => {
         const senderId = req.userId;
 
         // --- Destructure shared item IDs from the body ---
-        const { content, sharedPostId, sharedNewsId, sharedUserId, sharedShowcaseId } = req.body;
+        const { content, sharedPostId, sharedNewsId, sharedUserId, sharedShowcaseId, replyTo } = req.body;
         
         // --- Get io and onlineUsers from the request object ---
         const { io, onlineUsers } = req;
@@ -495,6 +500,14 @@ exports.createMessage = async (req, res) => {
             return res.status(400).json({ success: false, message: "Message content cannot be empty." });
         }
 
+        // Optional: Validate replyTo message belongs to the same conversation
+        if (replyTo) {
+            const parentMessage = await Message.findOne({ _id: replyTo, conversationId });
+            if (!parentMessage) {
+                return res.status(400).json({ success: false, message: "Invalid replyTo message ID." });
+            }
+        }
+
         // --- Create message object with the new schema structure ---
         const newMessage = await Message.create({
             conversationId,
@@ -504,6 +517,7 @@ exports.createMessage = async (req, res) => {
             sharedNews: sharedNewsId || null,
             sharedUser: sharedUserId || null,
             sharedShowcase: sharedShowcaseId || null,
+            replyTo: replyTo || null,
             readBy: [{ user: senderId, seenAt: new Date() }]
         });
 
@@ -532,7 +546,8 @@ exports.createMessage = async (req, res) => {
             .populate('sharedPost')
             .populate('sharedNews')
             .populate('sharedUser', 'name profileImage bio')
-            .populate('sharedShowcase', 'projectTitle logo tagline');
+            .populate('sharedShowcase', 'projectTitle logo tagline')
+            .populate('replyTo');
 
         // --- REAL-TIME BROADCAST LOGIC ---
         // --- 4. Broadcast Logic (Real-time & Push Notifications) ---
