@@ -5,6 +5,7 @@ const {uploadImageToCloudinary, uploadVideoToCloudinary} = require("../utils/ima
 exports.createStory = async (req, res) => {
   try {
     const userId = req.userId;
+    const { caption, filter, overlayData } = req.body;
     let files = req.files && req.files.media;
 
     if (!files) {
@@ -31,6 +32,9 @@ exports.createStory = async (req, res) => {
         url: result.secure_url,
         type: isVideo ? "video" : "image",
         userId: userId,
+        caption: caption || '',
+        filter: filter || null,
+        overlayData: overlayData ? JSON.parse(overlayData) : null,
         createdAt: new Date() 
       })
 
