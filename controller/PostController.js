@@ -7,6 +7,7 @@ const { createNotification } = require('../utils/notificationUtils');
 const { uploadMultipleImagesToCloudinary, uploadVideoToCloudinary, uploadImageToCloudinary } = require("../utils/imageUploader");
 const mongoose = require("mongoose");
 const CompanyDetails = require("../modules/companyDetails");
+const Like = require("../modules/like");
 
 exports.createPost = async (req, res) => {
     try {
@@ -176,25 +177,35 @@ exports.likePost = async (req, res) => {
             })
         }
 
-        if (!user.likedPost.some(id => id.toString() === post._id.toString())) {
-            user.likedPost.push(post._id);
-            await user.save();
-        } else {
-            return res.status(400).json({
-                success: false,
-                message: "User already liked post"
+        // if (!user.likedPost.some(id => id.toString() === post._id.toString())) {
+        //     user.likedPost.push(post._id);
+        //     await user.save();
+        // } else {
+        //     return res.status(400).json({
+        //         success: false,
+        //         message: "User already liked post"
+        //     })
+        // }
+
+        //post.likes = post.likes + 1;
+        //await post.save();
+
+        const isLiked = await Like.find({userId : userId, postId : postId});
+        if (isLiked) {
+            return res.status(200).json({
+                message : "Already Liked post",
+                success : true
             })
         }
 
-        post.likes = post.likes + 1;
-        await post.save();
+        const newLiked = await Like.create(userId, postId);
 
         await createNotification(post.userId, userId, 'like', postId);
 
         return res.status(200).json({
             success: true,
             message: "Post liked",
-            body: post
+            body: newLiked
         })
 
     } catch (err) {
@@ -220,23 +231,33 @@ exports.unlikePost = async (req, res) => {
         }
 
         const user = await User.findById(userId);
-         if (user.likedPost.some(id => id.toString() === post._id.toString())) {
-            user.likedPost.pull(post._id);
-            await user.save();
-        } else {
-            return res.status(400).json({
-                success: false,
-                message: "User has not liked post so he cannot unlike it."
+        //  if (user.likedPost.some(id => id.toString() === post._id.toString())) {
+        //     user.likedPost.pull(post._id);
+        //     await user.save();
+        // } else {
+        //     return res.status(400).json({
+        //         success: false,
+        //         message: "User has not liked post so he cannot unlike it."
+        //     })
+        // }
+
+        // post.likes = post.likes - 1;
+        // await post.save();
+
+        const isLiked = await Like.find({userId : userId, postId : postId});
+        if (!isLiked) {
+            return res.status(200).json({
+                message : "Not Liked post",
+                success : true
             })
         }
 
-        post.likes = post.likes - 1;
-        await post.save();
+        const newUnLiked = await Like.findByIdAndDelete(isLiked._id);
 
         return res.status(200).json({
             success: true,
             message: "Post unliked",
-            body: post
+            newUnLiked
         })
 
     } catch (err) {
@@ -562,7 +583,7 @@ exports.getAllPosts = async (req, res) => {
 };
 
 
-exports.formatPost = (post, currentUser = null) => {
+exports.formatPost = async (post, currentUser = null) => {
     if (!post || !post.userId) return null;
 
     const author = post.userId;
@@ -576,7 +597,14 @@ exports.formatPost = (post, currentUser = null) => {
 
     const isFollowing = currentUser?.followers?.some(f => f.toString() === author._id.toString()) || false;
     const isBookmarked = currentUser?.savedPost?.some(id => id.toString() === post._id.toString()) || false;
-    const isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
+    //const isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
+    const like = await Like.find({userId : currentUser._id, postId : post._id });
+    let isLiked = false;
+    if (like) {
+        isLiked = true;
+    }
+
+    const likesCount = await Like.countDocuments({postId : post._id});
 
     let originalPost = null;
     if (post.originalPostId) {
@@ -619,7 +647,7 @@ exports.formatPost = (post, currentUser = null) => {
         content: post.discription,
         images: post.media || [],
         createdAt: post.createdAt,
-        likes: post.likes,
+        likes: likesCount,
         comments: post.comments?.length || 0,
         isLiked,
         isBookmarked,
@@ -632,7 +660,7 @@ exports.formatPost = (post, currentUser = null) => {
     };
 };
 
-const formatPost = (post, currentUser = null) => {
+const formatPost = async (post, currentUser = null) => {
     if (!post || !post.userId) return null;
 
     const author = post.userId;
@@ -646,7 +674,14 @@ const formatPost = (post, currentUser = null) => {
 
     const isFollowing = currentUser?.followers?.some(f => f.toString() === author._id.toString()) || false;
     const isBookmarked = currentUser?.savedPost?.some(id => id.toString() === post._id.toString()) || false;
-    const isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
+    //const isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
+    const like = await Like.find({userId : currentUser._id, postId : post._id });
+    let isLiked = false;
+    if (like) {
+        isLiked = true;
+    }
+    const likesCount = await Like.countDocuments({postId : post._id});
+
 
     let originalPost = null;
     if (post.originalPostId) {
@@ -691,7 +726,7 @@ const formatPost = (post, currentUser = null) => {
         content: post.discription,
         images: post.media || [],
         createdAt: post.createdAt,
-        likes: post.likes,
+        likes: likesCount,
         comments: post.comments?.length || 0,
         isLiked,
         isBookmarked,
