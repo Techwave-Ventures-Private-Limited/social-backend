@@ -52,6 +52,7 @@ const notificationRouter = require("./route/notificationRoute");
 const conversationRouter = require("./route/ConversationRoutes");
 const commentRouter = require("./route/commentRoute");
 const communityRouter = require("./route/communityRoute");
+const scrapperRouter = require("./route/ScrapperRoute");
 
 
 // --- Models (needed for socket logic) ---
@@ -120,6 +121,7 @@ app.use("/notification", notificationRouter);
 app.use("/conversations", conversationRouter); 
 app.use("/comment", commentRouter);
 app.use("/community", communityRouter);
+app.use("/scrapper", scrapperRouter);
 
 // --- Health Check and Root Routes ---
 app.use("/hailing",(req,res)=>{
