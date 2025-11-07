@@ -106,8 +106,10 @@ exports.getPost = async (req, res) => {
         // Compute isLiked for the current user (consistent with feed responses)
         let isLiked = false;
         if (req.userId) {
-            const currentUser = await User.findById(req.userId).select("likedPost");
-            isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
+            const like = await Like.find({userId : req.userId});
+            if (like.length > 0) {
+                isLiked = true;
+            }
         }
 
         // Return the post plus isLiked without changing the route shape
@@ -191,14 +193,15 @@ exports.likePost = async (req, res) => {
         //await post.save();
 
         const isLiked = await Like.find({userId : userId, postId : postId});
-        if (isLiked) {
+        console.log("Liked", isLiked);
+        if (isLiked.length !== 0) {
             return res.status(200).json({
                 message : "Already Liked post",
                 success : true
             })
         }
 
-        const newLiked = await Like.create(userId, postId);
+        const newLiked = await Like.create({userId, postId});
 
         await createNotification(post.userId, userId, 'like', postId);
 
@@ -245,9 +248,9 @@ exports.unlikePost = async (req, res) => {
         // await post.save();
 
         const isLiked = await Like.find({userId : userId, postId : postId});
-        if (!isLiked) {
+         if (isLiked.length !== 0) {
             return res.status(200).json({
-                message : "Not Liked post",
+                message : "Already Liked post",
                 success : true
             })
         }
@@ -600,7 +603,7 @@ exports.formatPost = async (post, currentUser = null) => {
     //const isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
     const like = await Like.find({userId : currentUser._id, postId : post._id });
     let isLiked = false;
-    if (like) {
+    if (like.length > 0) {
         isLiked = true;
     }
 
@@ -677,7 +680,7 @@ const formatPost = async (post, currentUser = null) => {
     //const isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
     const like = await Like.find({userId : currentUser._id, postId : post._id });
     let isLiked = false;
-    if (like) {
+    if (like.length > 0) {
         isLiked = true;
     }
     const likesCount = await Like.countDocuments({postId : post._id});
