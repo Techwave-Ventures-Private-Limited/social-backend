@@ -26,16 +26,35 @@ router.post('/:id/leave', authMiddleware, CommunityController.leaveCommunity);
 
 // Member management
 router.get('/:id/members', authMiddleware, CommunityController.getCommunityMembers);
-router.post('/:id/members/:memberId/role', authMiddleware, CommunityController.assignRole);
+router.post('/:id/members/:memberId/assignRole', authMiddleware, CommunityController.assignRole);
+router.delete('/:id/members/:memberId/removeRole', authMiddleware, CommunityController.removeRole);
 router.delete('/:id/members/:memberId', authMiddleware, CommunityController.removeMember);
+router.post('/:id/members/:memberId/ban', authMiddleware, CommunityController.banUser);
+router.post('/:id/members/:memberId/unban', authMiddleware, CommunityController.unbanUser);
+router.get('/:id/banned-users', authMiddleware, CommunityController.getBannedUsers);
 
-// Join requests
+// Individual accept/reject Join requests
 router.post('/requests/:requestId/handle', authMiddleware, CommunityController.handleJoinRequest);
+
+// View all join requests for a community
+router.get('/:id/join-requests', authMiddleware, CommunityController.getAllJoinRequests);
+
+// Bulk accept/reject join requests
+router.post('/:id/join-requests/bulk-handle', authMiddleware, CommunityController.bulkHandleJoinRequests);
 
 // Community CRUD (generic routes last!)
 router.post('/', authMiddleware, CommunityController.createCommunity);
 router.put('/:id', authMiddleware, CommunityController.updateCommunity);
 router.delete('/:id', authMiddleware, CommunityController.deleteCommunity);
 router.get('/:id', CommunityController.getCommunityById);
+
+// update logo and cover-image
+router.put('/:id/cover-image', authMiddleware, CommunityController.updateCoverImage);
+router.put('/:id/logo', authMiddleware, CommunityController.updateLogo);
+
+// Community Settings
+router.put('/:id/settings/allow-member-posts', authMiddleware, CommunityController.setAllowMemberPosts);
+router.put('/:id/settings/require-join-approval', authMiddleware, CommunityController.setRequireJoinApprovals);
+router.put('/:id/community-privacy', authMiddleware, CommunityController.updatePrivacy);
 
 module.exports = router;
