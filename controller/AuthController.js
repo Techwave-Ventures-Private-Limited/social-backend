@@ -4,6 +4,12 @@ const jwt = require("jsonwebtoken");
 const Otp = require("../modules/otp.js");
 const { listenerCount } = require("../modules/about.js");
 require("dotenv").config();
+const { followQueue } = require('../config/queue');
+
+const COFOUNDER_IDS = [
+    "6887c64a82ab245662a798b6",
+    "68bc34517ecc63040bf1421e",
+];
 
 exports.sendEmailVerificationOTP = async(req,res) => {
   try {
@@ -116,6 +122,39 @@ exports.signup = async (req, res) => {
 
     savedUser.token = token;
     await savedUser.save();
+
+    // =============== 2. JOB SCHEDULING LOGIC ===============
+    const newUserId = savedUser._id;
+
+    try {
+        // Job 1: Make the new user follow the co-founders (2 min delay)
+        // await followQueue.add('new-user-follows-founders', {
+        //     newUserId: newUserId,
+        //     usersToFollowIds: COFOUNDER_IDS
+        // }, {
+        //     delay: 2 * 60 * 1000, // 2 minutes in ms
+        //     removeOnComplete: true,
+        //     removeOnFail: true
+        // });
+
+        // Job 2: Make the co-founders follow the new user (5 min delay)
+        await followQueue.add('founders-follow-new-user', {
+            newUserId: newUserId,
+            followersIds: COFOUNDER_IDS
+        }, {
+            delay: 1 * 60 * 1000, // 5 minutes in ms
+            removeOnComplete: true,
+            removeOnFail: true
+        });
+
+        console.log(`[Signup] Jobs scheduled for new user ${newUserId}`);
+
+    } catch (queueError) {
+        // IMPORTANT: Don't fail the signup if the queue fails
+        // Just log the error and continue
+        console.error(`[Signup] FAILED to schedule jobs for ${newUserId}:`, queueError.message);
+    }
+    // =============== END OF JOB LOGIC ===============
 
     return res.status(201).json({
       message: "User registered successfully",

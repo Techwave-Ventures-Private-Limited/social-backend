@@ -491,7 +491,7 @@ exports.createMessage = async (req, res) => {
         const { content, sharedPostId, sharedNewsId, sharedUserId, sharedShowcaseId, replyTo } = req.body;
         
         // --- Get io and onlineUsers from the request object ---
-        const { io, onlineUsers } = req;
+        const { io } = req;
         // console.log('[DEBUG] onlineUsers map in controller:', onlineUsers); // <-- ADD THIS LOG
 
 
@@ -554,26 +554,33 @@ exports.createMessage = async (req, res) => {
         if (conversation && populatedMessage) {
             const senderName = populatedMessage.sender?.name || 'Someone';
 
+            // Use an async for...of loop to use 'await' inside
             for (const participantId of conversation.participants) {
                 if (participantId.toString() === senderId) continue;
 
-                if (req.onlineUsers.has(participantId.toString())) {
-                // ONLINE: in-app realtime only
-                const participantSocketId = req.onlineUsers.get(participantId.toString());
-                req.io.to(participantSocketId).emit('newMessage', populatedMessage.toObject());
-                } else {
-                // OFFLINE: Expo push only, no in-app Notification doc
-                await sendPushNotification(
-                    participantId,
-                    `New message from ${senderName}`,
-                    populatedMessage.content || 'Sent you an Message',
-                    {
-                    type: 'new_message',
-                    conversationId: conversation._id.toString(),
-                    senderId: senderId.toString(),
-                    messageId: populatedMessage._id.toString()
-                    }
-                );
+                // 1. Emit the message to the user's room.
+                // The Redis Adapter will find which server the user is on
+                // and send the message.
+                io.to(participantId.toString()).emit('newMessage', populatedMessage.toObject());
+
+                // 2. Check if the user is *actually* offline to send a push
+                // We ask the adapter if any sockets are in that user's room.
+                const sockets = await io.in(participantId.toString()).allSockets();
+                
+                // If the set of sockets is empty, the user is offline.
+                if (sockets.size === 0) {
+                    // OFFLINE: Send the push notification
+                    await sendPushNotification(
+                        participantId,
+                        `New message from ${senderName}`,
+                        populatedMessage.content || 'Sent you an Message',
+                        {
+                            type: 'new_message',
+                            conversationId: conversation._id.toString(),
+                            senderId: senderId.toString(),
+                            messageId: populatedMessage._id.toString()
+                        }
+                    );
                 }
             }
         }
@@ -621,15 +628,14 @@ exports.markMessagesAsSeen = async (req, res) => {
                 conversation.participants.forEach(participantId => {
                     // Don't send a notification to the person who just read the messages
                     if (participantId.toString() !== userId) {
-                        // Check if the other participant is online
-                        if (onlineUsers.has(participantId.toString())) {
-                            const participantSocketId = onlineUsers.get(participantId.toString());
-                            // Emit a specific event to the other participant
-                            io.to(participantSocketId).emit('messagesSeen', {
-                                conversationId,
-                                readerId: userId 
-                            });
-                        }
+                        
+                        // --- THE FIX ---
+                        // Just emit to the room. If the participant is online
+                        // (on any server), the adapter will deliver it.
+                        io.to(participantId.toString()).emit('messagesSeen', {
+                            conversationId,
+                            readerId: userId 
+                        });
                     }
                 });
             }
