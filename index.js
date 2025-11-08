@@ -8,9 +8,13 @@ require('dotenv').config();
 const express = require('express');
 const http = require('http'); // Import the http module
 const { Server } = require("socket.io"); // Import the Server class from socket.io
+const { createAdapter } = require("@socket.io/redis-adapter");
 const jwt = require('jsonwebtoken'); // You'll need this for auth
 const { initializeCommunitySocket } = require('./utils/communitySocketHelper');
 const nodemailer = require('nodemailer');
+
+// --- Import Redis Connection ---
+const { redisClient, subClient } = require("./config/redis");
 
 // --- App Setup ---
 const app = express();
@@ -25,8 +29,11 @@ const io = new Server(server, {
     }
 });
 
+// --- Use the imported clients for the adapter ---
+io.adapter(createAdapter(redisClient, subClient));
+
 // --- Socket.IO Real-Time Logic ---
-const onlineUsers = new Map(); // Tracks online users: { userId -> socketId }
+// const onlineUsers = new Map(); // Tracks online users: { userId -> socketId }
 
 // Initialize community socket helper
 initializeCommunitySocket(io);
@@ -105,7 +112,8 @@ app.use(
 // This makes `io` and `onlineUsers` available in your controllers (e.g., req.io)
 app.use((req, res, next) => {
     req.io = io;
-    req.onlineUsers = onlineUsers;
+    req.redis = redisClient;
+    // req.onlineUsers = onlineUsers;
     next();
 });
 
@@ -158,8 +166,6 @@ io.use(async (socket, next) => {
 
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.userId} with socket ID: ${socket.id}`);
-    onlineUsers.set(socket.userId, socket.id);
-    console.log('[DEBUG] onlineUsers map updated:', onlineUsers); // <-- ADD THIS LOG
     socket.join(socket.userId);
     
     // Join community rooms for real-time updates
@@ -240,7 +246,6 @@ io.on('connection', (socket) => {
     // Handle user disconnection
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.userId}`);
-        onlineUsers.delete(socket.userId);
     });
 });
 
