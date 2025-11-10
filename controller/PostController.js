@@ -688,7 +688,7 @@ const formatPost = async (post, currentUser = null) => {
 
     let originalPost = null;
     if (post.originalPostId) {
-        originalPost = formatPost(post.originalPostId, currentUser);
+        originalPost = await formatPost(post.originalPostId, currentUser);
     }
 
     let communityName = "";
