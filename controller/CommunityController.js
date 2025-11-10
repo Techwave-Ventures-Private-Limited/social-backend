@@ -33,10 +33,21 @@ exports.createCommunity = async (req, res) => {
             category
         } = req.body;        
 
-        let logo = req.files && req.files.logo;
+    let logo = req.files && req.files.logo;
         let coverImage = req.files && req.files.coverImage;
 
         const userId = req.userId;
+
+        // Parse tags if it comes as a JSON string
+        let parsedTags = tags;
+        if (typeof tags === 'string') {
+            try {
+                parsedTags = JSON.parse(tags);
+            } catch (e) {
+                // If parsing fails, treat it as a single tag or empty array
+                parsedTags = tags ? [tags] : [];
+            }
+        }
 
         // Check if community name already exists
         const existingCommunity = await Community.findOne({ 
@@ -69,7 +80,7 @@ exports.createCommunity = async (req, res) => {
             description,
             coverImage: uploadedCoverImage.secure_url,
             logo: uploadedLogo.secure_url,
-            tags: tags || [],
+            tags: parsedTags || [],
             location,
             owner: userId,
             createdBy: userId,
@@ -313,6 +324,16 @@ exports.updateCommunity = async (req, res) => {
                 success: false,
                 message: "Permission denied"
             });
+        }
+
+        // Parse tags if it comes as a JSON string
+        if (updates.tags && typeof updates.tags === 'string') {
+            try {
+                updates.tags = JSON.parse(updates.tags);
+            } catch (e) {
+                // If parsing fails, treat it as a single tag or keep empty array
+                updates.tags = updates.tags ? [updates.tags] : [];
+            }
         }
 
         // Update community
