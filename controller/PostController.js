@@ -541,7 +541,7 @@ exports.getAllPosts = async (req, res) => {
         const filter = req.query.filter;
         const sortOption = filter == 1 ? { createdAt: -1 } : {};
         
-        let posts = await Post.find({})
+        let posts = await Post.find({ subtype: { $ne: "question" } })
             .sort(sortOption)
             .populate({
                 path: 'userId',
@@ -688,7 +688,7 @@ const formatPost = async (post, currentUser = null) => {
 
     let originalPost = null;
     if (post.originalPostId) {
-        originalPost = formatPost(post.originalPostId, currentUser);
+        originalPost = await formatPost(post.originalPostId, currentUser);
     }
 
     let communityName = "";

@@ -7,6 +7,8 @@ on:
   push:
     branches: [ "prod" ]
 
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: self-hosted 
@@ -22,11 +24,13 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
-    - run: npm ci
-    - run: |
+    - name: Install Dependencies
+      run: npm ci
+    - name: Create .env file
+      run: |
         touch .env
         echo "${{ secrets.PROD_ENV_FILE }}" > .env
     - name: Restart PM2 process
       run: |
-        pm2 restart backend2
+        pm2 startOrRestart ecosystem.config.js
         pm2 save

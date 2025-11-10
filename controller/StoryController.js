@@ -25,7 +25,8 @@ exports.createStory = async (req, res) => {
       if (isVideo) {
         result = await uploadVideoToCloudinary(file, process.env.FOLDER_NAME || "stories", "auto", expiresAt);
       } else {
-        result = await uploadImageToCloudinary(file, process.env.FOLDER_NAME || "stories", 400, "auto", expiresAt);
+        // Store full-resolution original (no resize, no quality compression at upload)
+        result = await uploadImageToCloudinary(file, process.env.FOLDER_NAME || "stories", null, null, expiresAt);
       }
 
       const createdStory = await Story.create({
@@ -72,7 +73,7 @@ exports.createStory = async (req, res) => {
       success: true,
       message: "Stories uploaded successfully",
       body : user,
-      stories: User.stories
+      stories: user.stories
     });
 
   } catch (err) {
@@ -89,7 +90,7 @@ exports.getFollowingStories = async(req, res) => {
         const userId = req.userId;
         const user = await User.findById(userId);
         if (!user) {
-            return res.statu(404).json({
+            return res.status(404).json({
                 success: false,
                 message: "User not found"
             })
@@ -123,7 +124,7 @@ exports.getCurrentStory = async(req,res) => {
     })
 
   } catch(err) {
-    return res.statu(500).json({
+    return res.status(500).json({
       success : false,
       message : err.message
     })
