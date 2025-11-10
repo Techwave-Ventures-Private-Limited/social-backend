@@ -189,8 +189,8 @@ exports.likePost = async (req, res) => {
         //     })
         // }
 
-        //post.likes = post.likes + 1;
-        //await post.save();
+        post.likes = post.likes + 1;
+        await post.save();
 
         const isLiked = await Like.find({userId : userId, postId : postId});
         console.log("Liked", isLiked);
@@ -244,8 +244,8 @@ exports.unlikePost = async (req, res) => {
         //     })
         // }
 
-        // post.likes = post.likes - 1;
-        // await post.save();
+        post.likes = post.likes - 1;
+        await post.save();
 
         const isLiked = await Like.find({userId : userId, postId : postId});
          if (isLiked.length !== 0) {
@@ -607,7 +607,7 @@ exports.formatPost = async (post, currentUser = null) => {
         isLiked = true;
     }
 
-    const likesCount = await Like.countDocuments({postId : post._id});
+    // qconst likesCount = await Like.countDocuments({postId : post._id});
 
     let originalPost = null;
     if (post.originalPostId) {
@@ -650,7 +650,7 @@ exports.formatPost = async (post, currentUser = null) => {
         content: post.discription,
         images: post.media || [],
         createdAt: post.createdAt,
-        likes: likesCount,
+        likes: post.likes,
         comments: post.comments?.length || 0,
         isLiked,
         isBookmarked,
@@ -683,7 +683,7 @@ const formatPost = async (post, currentUser = null) => {
     if (like.length > 0) {
         isLiked = true;
     }
-    const likesCount = await Like.countDocuments({postId : post._id});
+    //const likesCount = await Like.countDocuments({postId : post._id});
 
 
     let originalPost = null;
@@ -729,7 +729,7 @@ const formatPost = async (post, currentUser = null) => {
         content: post.discription,
         images: post.media || [],
         createdAt: post.createdAt,
-        likes: likesCount,
+        likes : post.likes,
         comments: post.comments?.length || 0,
         isLiked,
         isBookmarked,
