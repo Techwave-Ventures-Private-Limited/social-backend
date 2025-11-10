@@ -6,3 +6,4 @@ etc2
 .dockerignore
 Dockerfile
 firebase-service-account.json
+Tools/

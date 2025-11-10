@@ -52,7 +52,7 @@ const sendPushNotification = async (recipientId, title, body, data = {}) => {
 /**
  * Creates an in-app notification and triggers a push notification.
  */
-exports.createNotification = async (recipient, sender, type, postId = null) => {
+const createNotification = async (recipient, sender, type, postId = null) => {
     try {
         if (recipient.toString() === sender.toString()) return;
 
@@ -93,4 +93,9 @@ exports.createNotification = async (recipient, sender, type, postId = null) => {
     } catch (error) {
         console.error("Error creating notification:", error);
     }
+};
+
+module.exports = {
+    sendPushNotification,
+    createNotification
 };

@@ -133,7 +133,19 @@ const userSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "Community",
         default: []
-    }]
+    }],
+    type: {
+        type: String,
+        enum: ["User", "Company"],
+        default: "User"
+    },
+    website: {
+        type: String,
+    },
+    companyDetails : {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "CompanyDetails"
+    }
 })
 
 module.exports = mongoose.model("User",userSchema);

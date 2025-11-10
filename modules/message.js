@@ -33,6 +33,11 @@ const messageSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "Showcase",
     },
+    replyTo: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Message",
+        default: null
+    },
     // Updated to store seen timestamps for each user
     readBy: [{
         user: {

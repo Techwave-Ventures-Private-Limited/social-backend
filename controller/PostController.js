@@ -6,11 +6,13 @@ const CommunityPost = require("../modules/communityPost");
 const { createNotification } = require('../utils/notificationUtils');
 const { uploadMultipleImagesToCloudinary, uploadVideoToCloudinary, uploadImageToCloudinary } = require("../utils/imageUploader");
 const mongoose = require("mongoose");
+const CompanyDetails = require("../modules/companyDetails");
+const Like = require("../modules/like");
 
 exports.createPost = async (req, res) => {
     try {
 
-        const { discription, postType, originalPostId, videoLink } = req.body || "";
+        let { discription, postType, originalPostId, videoLink, pollOptions  = null} = req.body || "";
         const { isReposted } = req.body || false;
         const userId = req.userId;
         // console.log("User request to upload a post", req.body)
@@ -52,6 +54,8 @@ exports.createPost = async (req, res) => {
             })
         }
 
+        if (pollOptions !== null)
+            pollOptions = JSON.parse(pollOptions);
         
         const createdPost = await Post.create({
             discription,
@@ -60,7 +64,8 @@ exports.createPost = async (req, res) => {
             userId,
             user,
             originalPostId,
-            isReposted
+            isReposted,
+            pollOptions
         });
         user.posts.push(createdPost._id);
         await user.save();
@@ -81,29 +86,45 @@ exports.createPost = async (req, res) => {
 
 exports.getPost = async (req, res) => {
     try {
-
         const { postId } = req.params;
 
         if (!postId) {
             return res.status(400).json({
                 success: false,
                 message: "PostId required"
-            })
+            });
         }
 
         const post = await Post.findById(postId).populate("comments");
+        if (!post) {
+            return res.status(404).json({
+                success: false,
+                message: "Post not found"
+            });
+        }
+
+        // Compute isLiked for the current user (consistent with feed responses)
+        let isLiked = false;
+        if (req.userId) {
+            const like = await Like.find({userId : req.userId});
+            if (like.length > 0) {
+                isLiked = true;
+            }
+        }
+
+        // Return the post plus isLiked without changing the route shape
+        const body = { ...(post.toObject ? post.toObject() : post), isLiked };
 
         return res.status(200).json({
             success: true,
             message: "Post found",
-            body: post
-        })
-
+            body
+        });
     } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
-        })
+        });
     }
 }
 
@@ -158,20 +179,36 @@ exports.likePost = async (req, res) => {
             })
         }
 
-        post.likes = post.likes + 1;
-        await post.save();
+        // if (!user.likedPost.some(id => id.toString() === post._id.toString())) {
+        //     user.likedPost.push(post._id);
+        //     await user.save();
+        // } else {
+        //     return res.status(400).json({
+        //         success: false,
+        //         message: "User already liked post"
+        //     })
+        // }
 
-        if (!user.likedPost.some(id => id.toString() === post._id.toString())) {
-            user.likedPost.push(post._id);
-            await user.save();
+        //post.likes = post.likes + 1;
+        //await post.save();
+
+        const isLiked = await Like.find({userId : userId, postId : postId});
+        console.log("Liked", isLiked);
+        if (isLiked.length !== 0) {
+            return res.status(200).json({
+                message : "Already Liked post",
+                success : true
+            })
         }
+
+        const newLiked = await Like.create({userId, postId});
 
         await createNotification(post.userId, userId, 'like', postId);
 
         return res.status(200).json({
             success: true,
             message: "Post liked",
-            body: post
+            body: newLiked
         })
 
     } catch (err) {
@@ -186,6 +223,7 @@ exports.unlikePost = async (req, res) => {
     try {
 
         const postId = req.body.postId;
+        const userId = req.userId;
         const post = await Post.findById(postId);
 
         if (!post) {
@@ -195,13 +233,34 @@ exports.unlikePost = async (req, res) => {
             })
         }
 
-        post.likes = post.likes - 1;
-        await post.save();
+        const user = await User.findById(userId);
+        //  if (user.likedPost.some(id => id.toString() === post._id.toString())) {
+        //     user.likedPost.pull(post._id);
+        //     await user.save();
+        // } else {
+        //     return res.status(400).json({
+        //         success: false,
+        //         message: "User has not liked post so he cannot unlike it."
+        //     })
+        // }
+
+        // post.likes = post.likes - 1;
+        // await post.save();
+
+        const isLiked = await Like.find({userId : userId, postId : postId});
+         if (isLiked.length !== 0) {
+            return res.status(200).json({
+                message : "Already Liked post",
+                success : true
+            })
+        }
+
+        const newUnLiked = await Like.findByIdAndDelete(isLiked._id);
 
         return res.status(200).json({
             success: true,
             message: "Post unliked",
-            body: post
+            newUnLiked
         })
 
     } catch (err) {
@@ -482,7 +541,7 @@ exports.getAllPosts = async (req, res) => {
         const filter = req.query.filter;
         const sortOption = filter == 1 ? { createdAt: -1 } : {};
         
-        let posts = await Post.find({})
+        let posts = await Post.find({ subtype: { $ne: "question" } })
             .sort(sortOption)
             .populate({
                 path: 'userId',
@@ -490,7 +549,8 @@ exports.getAllPosts = async (req, res) => {
                 populate: [
                     { path: 'about', model: 'About' },
                     { path: 'education', model: 'Education' },
-                    { path: 'experience', model: 'Experience' }
+                    { path: 'experience', model: 'Experience' },
+                    { path: 'companyDetails', model: 'CompanyDetails'},
                 ]
             })
             .populate('comments')
@@ -526,7 +586,7 @@ exports.getAllPosts = async (req, res) => {
 };
 
 
-exports.formatPost = (post, currentUser = null) => {
+exports.formatPost = async (post, currentUser = null) => {
     if (!post || !post.userId) return null;
 
     const author = post.userId;
@@ -540,7 +600,14 @@ exports.formatPost = (post, currentUser = null) => {
 
     const isFollowing = currentUser?.followers?.some(f => f.toString() === author._id.toString()) || false;
     const isBookmarked = currentUser?.savedPost?.some(id => id.toString() === post._id.toString()) || false;
-    const isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
+    //const isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
+    const like = await Like.find({userId : currentUser._id, postId : post._id });
+    let isLiked = false;
+    if (like.length > 0) {
+        isLiked = true;
+    }
+
+    const likesCount = await Like.countDocuments({postId : post._id});
 
     let originalPost = null;
     if (post.originalPostId) {
@@ -583,7 +650,7 @@ exports.formatPost = (post, currentUser = null) => {
         content: post.discription,
         images: post.media || [],
         createdAt: post.createdAt,
-        likes: post.likes,
+        likes: likesCount,
         comments: post.comments?.length || 0,
         isLiked,
         isBookmarked,
@@ -591,11 +658,12 @@ exports.formatPost = (post, currentUser = null) => {
         originalPost,
         isReposted: post.isReposted,
         type: post.type,
-        communityName
+        communityName,
+        companyDetails: post.userId.companyDetails
     };
 };
 
-const formatPost = (post, currentUser = null) => {
+const formatPost = async (post, currentUser = null) => {
     if (!post || !post.userId) return null;
 
     const author = post.userId;
@@ -609,7 +677,14 @@ const formatPost = (post, currentUser = null) => {
 
     const isFollowing = currentUser?.followers?.some(f => f.toString() === author._id.toString()) || false;
     const isBookmarked = currentUser?.savedPost?.some(id => id.toString() === post._id.toString()) || false;
-    const isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
+    //const isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
+    const like = await Like.find({userId : currentUser._id, postId : post._id });
+    let isLiked = false;
+    if (like.length > 0) {
+        isLiked = true;
+    }
+    const likesCount = await Like.countDocuments({postId : post._id});
+
 
     let originalPost = null;
     if (post.originalPostId) {
@@ -654,7 +729,7 @@ const formatPost = (post, currentUser = null) => {
         content: post.discription,
         images: post.media || [],
         createdAt: post.createdAt,
-        likes: post.likes,
+        likes: likesCount,
         comments: post.comments?.length || 0,
         isLiked,
         isBookmarked,
@@ -1042,6 +1117,7 @@ exports.getPosts = async (req, res) => {
           { path: "about", model: "About" },
           { path: "education", model: "Education" },
           { path: "experience", model: "Experience" },
+          { path: 'companyDetails', model: 'CompanyDetails'},
         ],
       },
       { path: "comments" },

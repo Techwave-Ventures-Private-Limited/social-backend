@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const User = require('../modules/user');
 const Conversation = require('../modules/conversation');
 const Message = require('../modules/message');
+const { sendPushNotification } = require('../utils/notificationUtils');
 
 // 1. Start a new conversation or return an existing one
 // Replace your existing startConversation function with this more robust version
@@ -398,6 +399,11 @@ exports.getMessages = async (req, res) => {
             .populate('sharedNews')
             .populate('sharedUser', 'name profileImage bio') 
             .populate('sharedShowcase', 'projectTitle logo tagline')
+            .populate('replyTo', 'content sender')  // replyTo content and sender reference
+            .populate({
+                path: 'replyTo.sender', // deep populate the replyTo sender's name
+                select: 'name'
+            })
             .sort({ createdAt: -1 })
             .limit(limit * 1)
             .skip((page - 1) * limit);
@@ -482,16 +488,24 @@ exports.createMessage = async (req, res) => {
         const senderId = req.userId;
 
         // --- Destructure shared item IDs from the body ---
-        const { content, sharedPostId, sharedNewsId, sharedUserId, sharedShowcaseId } = req.body;
+        const { content, sharedPostId, sharedNewsId, sharedUserId, sharedShowcaseId, replyTo } = req.body;
         
         // --- Get io and onlineUsers from the request object ---
-        const { io, onlineUsers } = req;
+        const { io } = req;
         // console.log('[DEBUG] onlineUsers map in controller:', onlineUsers); // <-- ADD THIS LOG
 
 
         // --- Updated validation to include new shared types ---
         if (!content && !sharedPostId && !sharedNewsId && !sharedUserId && !sharedShowcaseId) {
             return res.status(400).json({ success: false, message: "Message content cannot be empty." });
+        }
+
+        // Optional: Validate replyTo message belongs to the same conversation
+        if (replyTo) {
+            const parentMessage = await Message.findOne({ _id: replyTo, conversationId });
+            if (!parentMessage) {
+                return res.status(400).json({ success: false, message: "Invalid replyTo message ID." });
+            }
         }
 
         // --- Create message object with the new schema structure ---
@@ -503,6 +517,7 @@ exports.createMessage = async (req, res) => {
             sharedNews: sharedNewsId || null,
             sharedUser: sharedUserId || null,
             sharedShowcase: sharedShowcaseId || null,
+            replyTo: replyTo || null,
             readBy: [{ user: senderId, seenAt: new Date() }]
         });
 
@@ -531,26 +546,43 @@ exports.createMessage = async (req, res) => {
             .populate('sharedPost')
             .populate('sharedNews')
             .populate('sharedUser', 'name profileImage bio')
-            .populate('sharedShowcase', 'projectTitle logo tagline');
+            .populate('sharedShowcase', 'projectTitle logo tagline')
+            .populate('replyTo');
 
         // --- REAL-TIME BROADCAST LOGIC ---
+        // --- 4. Broadcast Logic (Real-time & Push Notifications) ---
         if (conversation && populatedMessage) {
-            // Loop through every participant in the conversation
-            conversation.participants.forEach(participantId => {
-                // Check if the participant is currently online by looking them up in the map
-                // console.log(`[DEBUG] Checking for participant: ${participantId.toString()}`);
-                if (onlineUsers.has(participantId.toString())) {
-                    // Get the participant's unique socket ID from the map
-                    const participantSocketId = onlineUsers.get(participantId.toString());
-                    
-                    // Emit the 'newMessage' event directly to that user's socket connection
-                    io.to(participantSocketId).emit('newMessage', populatedMessage.toObject());
-                    
-                    // console.log(`[REAL-TIME] Emitted 'newMessage' to participant: ${participantId}`);
-                } else {
-                    // console.log(`[DEBUG] Participant ${participantId.toString()} NOT found in onlineUsers map.`); // <-- ADD THIS LOG
+            const senderName = populatedMessage.sender?.name || 'Someone';
+
+            // Use an async for...of loop to use 'await' inside
+            for (const participantId of conversation.participants) {
+                if (participantId.toString() === senderId) continue;
+
+                // 1. Emit the message to the user's room.
+                // The Redis Adapter will find which server the user is on
+                // and send the message.
+                io.to(participantId.toString()).emit('newMessage', populatedMessage.toObject());
+
+                // 2. Check if the user is *actually* offline to send a push
+                // We ask the adapter if any sockets are in that user's room.
+                const sockets = await io.in(participantId.toString()).allSockets();
+                
+                // If the set of sockets is empty, the user is offline.
+                if (sockets.size === 0) {
+                    // OFFLINE: Send the push notification
+                    await sendPushNotification(
+                        participantId,
+                        `New message from ${senderName}`,
+                        populatedMessage.content || 'Sent you an Message',
+                        {
+                            type: 'new_message',
+                            conversationId: conversation._id.toString(),
+                            senderId: senderId.toString(),
+                            messageId: populatedMessage._id.toString()
+                        }
+                    );
                 }
-            });
+            }
         }
         // --- END OF REAL-TIME LOGIC ---
 
@@ -571,6 +603,7 @@ exports.markMessagesAsSeen = async (req, res) => {
     try {
         const { conversationId } = req.params;
         const userId = req.userId;
+        const { io, onlineUsers } = req; // Get socket instances from the request
 
         // Find all messages in the conversation that the user has not yet read
         // and update them by adding the user to the 'readBy' array.
@@ -589,10 +622,23 @@ exports.markMessagesAsSeen = async (req, res) => {
         );
 
         if (result.nModified > 0) {
-            // A socket event should be emitted here to inform the other user(s)
-            // that their messages have been seen in real-time.
-            // E.g., io.to(conversationId).emit('messagesSeen', { conversationId, readerId: userId });
-            // console.log(`[BE LOG] ${result.nModified} messages in conversation ${conversationId} marked as seen by user ${userId}.`);
+            const conversation = await Conversation.findById(conversationId);
+            if (conversation) {
+                // Find all other participants in the conversation
+                conversation.participants.forEach(participantId => {
+                    // Don't send a notification to the person who just read the messages
+                    if (participantId.toString() !== userId) {
+                        
+                        // --- THE FIX ---
+                        // Just emit to the room. If the participant is online
+                        // (on any server), the adapter will deliver it.
+                        io.to(participantId.toString()).emit('messagesSeen', {
+                            conversationId,
+                            readerId: userId 
+                        });
+                    }
+                });
+            }
         }
         
         return res.status(200).json({
@@ -651,4 +697,46 @@ exports.rejectMessageRequest = async (req, res) => {
             error: err.message
         });
     }
+};
+
+
+// 9. Delete a mmessage
+exports.deleteMessage = async (req, res) => {
+  const { conversationId, messageId } = req.params;
+  const userId = req.userId;
+
+  try {
+    // Find message and check if it's sent by current user
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, message: 'Message not found.' });
+    }
+    if (message.sender.toString() !== userId) {
+      return res.status(403).json({ success: false, message: 'You can only delete your own messages.' });
+    }
+
+    // Delete the message
+    await Message.findByIdAndDelete(messageId);
+
+    // Remove reference from conversation
+    await Conversation.findByIdAndUpdate(
+      conversationId,
+      { $pull: { messages: messageId } }
+    );
+
+    // If this was the last message, update conversation's lastMessage field
+    const convo = await Conversation.findById(conversationId);
+    if (convo && convo.lastMessage && convo.lastMessage.toString() === messageId) {
+      // Find previous last message in this conversation
+      const lastMsg = await Message.find({ conversationId })
+        .sort({ createdAt: -1 })
+        .limit(1);
+      convo.lastMessage = lastMsg[0]?._id || null;
+      await convo.save();
+    }
+
+    return res.status(200).json({ success: true, message: 'Message deleted successfully.' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
 };

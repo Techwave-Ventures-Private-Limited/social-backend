@@ -33,10 +33,21 @@ exports.createCommunity = async (req, res) => {
             category
         } = req.body;        
 
-        let logo = req.files && req.files.logo;
+    let logo = req.files && req.files.logo;
         let coverImage = req.files && req.files.coverImage;
 
         const userId = req.userId;
+
+        // Parse tags if it comes as a JSON string
+        let parsedTags = tags;
+        if (typeof tags === 'string') {
+            try {
+                parsedTags = JSON.parse(tags);
+            } catch (e) {
+                // If parsing fails, treat it as a single tag or empty array
+                parsedTags = tags ? [tags] : [];
+            }
+        }
 
         // Check if community name already exists
         const existingCommunity = await Community.findOne({ 
@@ -69,7 +80,7 @@ exports.createCommunity = async (req, res) => {
             description,
             coverImage: uploadedCoverImage.secure_url,
             logo: uploadedLogo.secure_url,
-            tags: tags || [],
+            tags: parsedTags || [],
             location,
             owner: userId,
             createdBy: userId,
@@ -315,6 +326,16 @@ exports.updateCommunity = async (req, res) => {
             });
         }
 
+        // Parse tags if it comes as a JSON string
+        if (updates.tags && typeof updates.tags === 'string') {
+            try {
+                updates.tags = JSON.parse(updates.tags);
+            } catch (e) {
+                // If parsing fails, treat it as a single tag or keep empty array
+                updates.tags = updates.tags ? [updates.tags] : [];
+            }
+        }
+
         // Update community
         Object.assign(community, updates);
         community.lastActivity = new Date();
@@ -384,9 +405,178 @@ exports.deleteCommunity = async (req, res) => {
     }
 };
 
+// Set Allow Member Posts
+exports.setAllowMemberPosts = async (req, res) => {
+    const communityId = req.params.id;
+    const { allowMemberPosts } = req.body; // expects Boolean
+    const userId = req.userId;
+
+    try {
+        const community = await Community.findById(communityId);
+        if (!community) return res.status(404).json({ success: false, message: 'Community not found' });
+
+        // Only owner or admin allowed to update this setting
+        if (
+            community.owner.toString() !== userId &&
+            !community.admins.map(a => a.toString()).includes(userId)
+        ) {
+            return res.status(403).json({ success: false, message: 'Permission denied' });
+        }
+
+        community.settings.allowMemberPosts = !!allowMemberPosts;
+        await community.save();
+
+        return res.status(200).json({
+            success: true,
+            allowMemberPosts: community.settings.allowMemberPosts,
+            message: 'allowMemberPosts updated successfully',
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// Set Community Private
+exports.updatePrivacy = async (req, res) => {
+    const communityId = req.params.id;
+    const { isPrivate } = req.body; // expects Boolean
+    const userId = req.userId;
+
+    try {
+        const community = await Community.findById(communityId);
+        if (!community) return res.status(404).json({ success: false, message: "Community not found" });
+
+        // Only owner or admins can update privacy
+        if (
+            community.owner.toString() !== userId &&
+            !community.admins.map(admin => admin.toString()).includes(userId)
+        ) {
+            return res.status(403).json({ success: false, message: "Permission denied" });
+        }
+
+        community.isPrivate = !!isPrivate;
+        await community.save();
+
+        return res.status(200).json({
+            success: true,
+            isPrivate: community.isPrivate,
+            message: `Community privacy updated to ${community.isPrivate ? "private" : "public"}`,
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 // ================================
 // COMMUNITY MEMBERSHIP OPERATIONS
 // ================================
+
+// Ban User from Community
+exports.banUser = async (req, res) => {
+    const communityId = req.params.id;
+    const userIdToBan = req.params.memberId;
+    const actingUserId = req.userId;
+
+    try {
+        const community = await Community.findById(communityId);
+        if (!community) return res.status(404).json({ success: false, message: "Community not found" });
+
+        // Only owner or admin can ban users
+        if (
+            community.owner.toString() !== actingUserId &&
+            !community.admins.map(a => a.toString()).includes(actingUserId)
+        ) {
+            return res.status(403).json({ success: false, message: "Permission denied" });
+        }
+
+        // Check if user is member
+        if (!community.members.map(m => m.toString()).includes(userIdToBan)) {
+            return res.status(400).json({ success: false, message: "User is not a member" });
+        }
+
+        // Remove from members array
+        community.members = community.members.filter(m => m.toString() !== userIdToBan);
+        // Remove from admins/moderators if present
+        community.admins = community.admins.filter(a => a.toString() !== userIdToBan);
+        community.moderators = community.moderators.filter(m => m.toString() !== userIdToBan);
+
+        // Add to bannedUsers array if not already present
+        if (!community.bannedUsers.map(b => b.toString()).includes(userIdToBan)) {
+            community.bannedUsers.push(userIdToBan);
+        }
+
+        community.memberCount = Math.max(community.memberCount - 1, 0);
+        community.lastActivity = new Date();
+
+        await community.save();
+
+        return res.status(200).json({ success: true, message: "User banned successfully" });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// Unban User from Community
+exports.unbanUser = async (req, res) => {
+    const communityId = req.params.id;
+    const userIdToUnban = req.params.memberId;
+    const actingUserId = req.userId;
+
+    try {
+        const community = await Community.findById(communityId);
+        if (!community) return res.status(404).json({ success: false, message: "Community not found" });
+
+        // Only owner or admin can unban users
+        if (
+            community.owner.toString() !== actingUserId &&
+            !community.admins.map(a => a.toString()).includes(actingUserId)
+        ) {
+            return res.status(403).json({ success: false, message: "Permission denied" });
+        }
+
+        // Check if user is actually banned
+        if (!community.bannedUsers.map(b => b.toString()).includes(userIdToUnban)) {
+            return res.status(400).json({ success: false, message: "User is not banned" });
+        }
+
+        // Remove user from bannedUsers array
+        community.bannedUsers = community.bannedUsers.filter(b => b.toString() !== userIdToUnban);
+
+        community.lastActivity = new Date();
+
+        await community.save();
+
+        return res.status(200).json({ success: true, message: "User unbanned successfully" });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// View all banned Users
+exports.getBannedUsers = async (req, res) => {
+    const communityId = req.params.id;
+    const userId = req.userId;
+
+    try {
+        const community = await Community.findById(communityId).populate('bannedUsers', '_id name profileImage headline');
+        if (!community) return res.status(404).json({ success: false, message: "Community not found" });
+
+        // Only owner or admins can view banned users
+        if (
+            community.owner.toString() !== userId &&
+            !community.admins.map(a => a.toString()).includes(userId)
+        ) {
+            return res.status(403).json({ success: false, message: "Permission denied" });
+        }
+
+        return res.status(200).json({
+            success: true,
+            bannedUsers: community.bannedUsers
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
 
 // Join community
 exports.joinCommunity = async (req, res) => {
@@ -1023,6 +1213,48 @@ exports.addCommentToCommunityPost = async (req, res) => {
 // MEMBER MANAGEMENT (ADMIN/OWNER)
 // ================================
 
+// Set require join Approvals
+exports.setRequireJoinApprovals = async (req, res) => {
+    const communityId = req.params.id;
+    const { requiresApproval } = req.body; // expects Boolean
+    const userId = req.userId;
+
+    try {
+        const community = await Community.findById(communityId);
+        if (!community) return res.status(404).json({ success: false, message: "Community not found" });
+
+        // Only owner or admin can update this setting
+        if (
+            community.owner.toString() !== userId &&
+            !community.admins.map(a => a.toString()).includes(userId)
+        ) {
+            return res.status(403).json({ success: false, message: "Permission denied" });
+        }
+
+        // If community is private, require approval must always be true and autoApproveJoins false
+        if (community.isPrivate) {
+            community.requiresApproval = true;
+            community.settings.autoApproveJoins = false;
+        } else {
+            community.requiresApproval = !!requiresApproval;
+            community.settings.autoApproveJoins = !requiresApproval;
+        }
+
+        await community.save();
+
+        return res.status(200).json({
+            success: true,
+            requiresApproval: community.requiresApproval,
+            autoApproveJoins: community.settings.autoApproveJoins,
+            message: community.isPrivate
+                ? "Community is private; join approval is required and cannot be disabled."
+                : "requiresApproval and autoApproveJoins updated successfully",
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 // Manage join requests
 exports.handleJoinRequest = async (req, res) => {
     try {
@@ -1080,6 +1312,71 @@ exports.handleJoinRequest = async (req, res) => {
         });
     }
 };
+
+// View all join requests
+exports.getAllJoinRequests = async (req, res) => {
+    try {
+        const communityId = req.params.id;
+        const userId = req.userId;
+        const community = await Community.findById(communityId);
+        if (!community) {
+            return res.status(404).json({ success: false, message: "Community not found" });
+        }
+        if (!isOwnerOrAdmin(community, userId)) {
+            return res.status(403).json({ success: false, message: "Permission denied" });
+        }
+        const joinRequests = await JoinRequest.find({ communityId, status: 'pending' });
+        return res.status(200).json({ success: true, joinRequests });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: "Failed to fetch join requests", error: error.message });
+    }
+};
+
+// Bulk handle join request
+exports.bulkHandleJoinRequests = async (req, res) => {
+    try {
+        const communityId = req.params.id;
+        const userId = req.userId;
+        const { requestIds, action } = req.body; // action: "approve" or "reject"
+        const community = await Community.findById(communityId);
+        if (!community) {
+            return res.status(404).json({ success: false, message: "Community not found" });
+        }
+        if (!isOwnerOrAdmin(community, userId)) {
+            return res.status(403).json({ success: false, message: "Permission denied" });
+        }
+        let results = { approved: [], rejected: [], errors: [] };
+
+        for (const requestId of requestIds) {
+            try {
+                const joinRequest = await JoinRequest.findById(requestId);
+                if (!joinRequest || joinRequest.status !== 'pending' || joinRequest.communityId.toString() !== communityId) {
+                    results.errors.push(requestId);
+                    continue;
+                }
+                if (action === "approve") {
+                    community.members.push(joinRequest.userId);
+                    community.memberCount += 1;
+                    joinRequest.status = "approved";
+                } else if (action === "reject") {
+                    joinRequest.status = "rejected";
+                }
+                joinRequest.processedBy = userId;
+                joinRequest.processedAt = new Date();
+                await Promise.all([joinRequest.save(), community.save()]);
+                if (action === "approve") results.approved.push(requestId);
+                if (action === "reject") results.rejected.push(requestId);
+            } catch (err) {
+                results.errors.push(requestId);
+            }
+        }
+
+        return res.status(200).json({ success: true, results });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: "Bulk join request handling failed", error: error.message });
+    }
+};
+
 
 // Assign role to member
 exports.assignRole = async (req, res) => {
@@ -1140,6 +1437,43 @@ exports.assignRole = async (req, res) => {
         });
     }
 };
+
+// Remove member from role
+exports.removeRole = async (req, res) => {
+    try {
+        const { id, memberId } = req.params;
+        const { userId } = req;
+
+        const community = await Community.findById(id);
+
+        if (!community) {
+            return res.status(404).json({ success: false, message: "Community not found" });
+        }
+
+        // Only owner and admins can remove roles
+        if (community.owner.toString() !== userId && !community.admins.includes(userId)) {
+            return res.status(403).json({ success: false, message: "Permission denied" });
+        }
+
+        // Use $pull to remove the memberId from both admins and moderators arrays
+        await Community.updateOne(
+            { _id: id },
+            {
+                $pull: {
+                    admins: memberId,
+                    moderators: memberId,
+                },
+            }
+        );
+
+        return res.status(200).json({ success: true, message: "User role removed successfully. The user is now a member." });
+
+    } catch (error) {
+        console.error("Error removing role:", error);
+        return res.status(500).json({ success: false, message: "Failed to remove role", error: error.message });
+    }
+};
+
 
 // Remove member from community
 exports.removeMember = async (req, res) => {
@@ -1297,6 +1631,92 @@ exports.deleteCommunityPost = async (req, res) => {
             message: "Failed to delete post",
             error: error.message
         });
+    }
+};
+
+// --- UPDATE COVER IMAGE ---
+exports.updateCoverImage = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.userId;
+
+        // 1. Check req.files from express-fileupload
+        if (!req.files || Object.keys(req.files).length === 0 || !req.files.coverImage) {
+            return res.status(400).json({ success: false, message: 'No cover image file uploaded' });
+        }
+        
+        // 2. Access the file directly from req.files
+        const coverImageFile = req.files.coverImage;
+
+        const community = await Community.findById(id);
+        if (!community) {
+            return res.status(404).json({ success: false, message: 'Community not found' });
+        }
+
+        // Permission check (remains the same)
+        if (!(community.owner.toString() === userId || community.admins.includes(userId))) {
+            return res.status(403).json({ success: false, message: 'Permission denied.' });
+        }
+
+        // Upload to Cloudinary (remains the same)
+        const uploadedImage = await uploadImageToCloudinary(coverImageFile, process.env.FOLDERNAME || 'community_assets');
+
+        // Update the community record
+        community.coverImage = uploadedImage.secure_url;
+        community.lastActivity = new Date();
+        await community.save();
+
+        return res.status(200).json({ 
+            success: true, 
+            message: 'Cover image updated successfully', 
+            coverImage: community.coverImage 
+        });
+
+    } catch (error) {
+        console.error('Error updating cover image:', error);
+        return res.status(500).json({ success: false, message: 'Failed to update cover image', error: error.message });
+    }
+};
+
+// --- UPDATE LOGO ---
+exports.updateLogo = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.userId;
+
+        if (!req.files || Object.keys(req.files).length === 0 || !req.files.logo) {
+            return res.status(400).json({ success: false, message: 'No logo file uploaded' });
+        }
+
+        const logoFile = req.files.logo;
+
+        const community = await Community.findById(id);
+        if (!community) {
+            return res.status(404).json({ success: false, message: 'Community not found' });
+        }
+
+        // Permission check
+        if (!(community.owner.toString() === userId || community.admins.includes(userId))) {
+            return res.status(403).json({ success: false, message: 'Permission denied.' });
+        }
+
+        // Upload
+        const uploadedImage = await uploadImageToCloudinary(logoFile, process.env.FOLDERNAME || 'community_assets');
+
+        // Update record
+        community.logo = uploadedImage.secure_url;
+        community.lastActivity = new Date();
+        await community.save();
+
+        return res.status(200).json({ 
+            success: true, 
+            message: 'Logo updated successfully', 
+            logo: community.logo 
+        });
+
+    } catch (error) {
+        console.error('Error updating logo:', error);
+        return res.status(500).json({ success: false, message: 'Failed to update logo', error: error.message });
     }
 };
 

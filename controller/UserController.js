@@ -9,6 +9,7 @@ const { forgotPassowordTemplate } = require("../utils/emailTemplate");
 const Otp = require("../modules/otp");
 const bcrypt = require("bcrypt");
 const Portfolio = require("../modules/portfolio");
+const CompanyDetails = require("../modules/companyDetails");
 
 
 exports.getUser = async(req,res) => {
@@ -122,6 +123,8 @@ exports.updateUser = async(req,res) => {
             skills = [], location = "", phone = "", website = ""
         } = req.body;
 
+        const details = req.body || {};
+
         user.name = name || user.name;
         user.bio = bio || user.bio;
         user.headline = headline || user.headline;
@@ -211,6 +214,28 @@ exports.updateUser = async(req,res) => {
 
         await about.save();
         user.about = about._id;
+
+        if (user.type === "Company") {
+            // Try to find existing company details for this user
+            let existingCompany = await CompanyDetails.findOne({ userId: user._id });
+
+            if (!existingCompany) {
+                const companyData = { ...details, userId: user._id };
+                const newCompany = await CompanyDetails.create(companyData);
+                user.companyDetails = newCompany._id;
+                await user.save();
+            } else {
+                const updatedCompany = await CompanyDetails.findByIdAndUpdate(
+                    existingCompany._id,
+                    { ...details, userId: user._id },
+                    { new: true }
+                );
+
+                user.companyDetails = updatedCompany._id;
+                await user.save();
+            }
+        }
+
         await user.save();
 
         return res.status(200).json({

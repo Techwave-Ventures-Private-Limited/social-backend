@@ -3,16 +3,33 @@ require("dotenv").config();
 
 const mailSender = async (email, title, body) => {
     try{
+            const {
+                MAIL_HOST,
+                MAIL_PORT,
+                MAIL_USER,
+                MAIL_PASS,
+                MAIL_SECURE
+            } = process.env;
+
+            if (!MAIL_HOST || !MAIL_USER || !MAIL_PASS) {
+                throw new Error("Email transport is not configured. Set MAIL_HOST, MAIL_USER, and MAIL_PASS.");
+            }
+
+            const port = MAIL_PORT ? parseInt(MAIL_PORT, 10) : 587;
+            const secure = MAIL_SECURE ? /^true|1$/i.test(MAIL_SECURE) : (port === 465);
+
             let transporter = nodemailer.createTransport({
-                host:process.env.MAIL_HOST,
+                host: MAIL_HOST,
+                port,
+                secure,
                 auth:{
-                    user: process.env.MAIL_USER,
-                    pass: process.env.MAIL_PASS,
+                    user: MAIL_USER,
+                    pass: MAIL_PASS,
                 }
             })
 
             let info = await transporter.sendMail({
-                from: `Connektx ${process.env.MAIL_USER}`,
+                from: `Connektx <${MAIL_USER}>`,
                 to:`${email}`,
                 subject: `${title}`,
                 html: `${body}`,
@@ -22,6 +39,7 @@ const mailSender = async (email, title, body) => {
     }
     catch(error) {
         console.log(error.message);
+        throw error;
     }
 }
 

@@ -8,8 +8,13 @@ require('dotenv').config();
 const express = require('express');
 const http = require('http'); // Import the http module
 const { Server } = require("socket.io"); // Import the Server class from socket.io
+const { createAdapter } = require("@socket.io/redis-adapter");
 const jwt = require('jsonwebtoken'); // You'll need this for auth
 const { initializeCommunitySocket } = require('./utils/communitySocketHelper');
+const nodemailer = require('nodemailer');
+
+// --- Import Redis Connection ---
+const { redisClient, subClient } = require("./config/redis");
 
 // --- App Setup ---
 const app = express();
@@ -24,8 +29,11 @@ const io = new Server(server, {
     }
 });
 
+// --- Use the imported clients for the adapter ---
+io.adapter(createAdapter(redisClient, subClient));
+
 // --- Socket.IO Real-Time Logic ---
-const onlineUsers = new Map(); // Tracks online users: { userId -> socketId }
+// const onlineUsers = new Map(); // Tracks online users: { userId -> socketId }
 
 // Initialize community socket helper
 initializeCommunitySocket(io);
@@ -51,6 +59,7 @@ const notificationRouter = require("./route/notificationRoute");
 const conversationRouter = require("./route/ConversationRoutes");
 const commentRouter = require("./route/commentRoute");
 const communityRouter = require("./route/communityRoute");
+const scrapperRouter = require("./route/ScrapperRoute");
 
 
 // --- Models (needed for socket logic) ---
@@ -103,7 +112,8 @@ app.use(
 // This makes `io` and `onlineUsers` available in your controllers (e.g., req.io)
 app.use((req, res, next) => {
     req.io = io;
-    req.onlineUsers = onlineUsers;
+    req.redis = redisClient;
+    // req.onlineUsers = onlineUsers;
     next();
 });
 
@@ -119,6 +129,7 @@ app.use("/notification", notificationRouter);
 app.use("/conversations", conversationRouter); 
 app.use("/comment", commentRouter);
 app.use("/community", communityRouter);
+app.use("/scrapper", scrapperRouter);
 
 // --- Health Check and Root Routes ---
 app.use("/hailing",(req,res)=>{
@@ -155,8 +166,6 @@ io.use(async (socket, next) => {
 
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.userId} with socket ID: ${socket.id}`);
-    onlineUsers.set(socket.userId, socket.id);
-    console.log('[DEBUG] onlineUsers map updated:', onlineUsers); // <-- ADD THIS LOG
     socket.join(socket.userId);
     
     // Join community rooms for real-time updates
@@ -237,7 +246,6 @@ io.on('connection', (socket) => {
     // Handle user disconnection
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.userId}`);
-        onlineUsers.delete(socket.userId);
     });
 });
 
@@ -245,6 +253,28 @@ io.on('connection', (socket) => {
 // --- Server Listening ---
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running at ${PORT}`);
+    // Non-blocking SMTP connectivity check
+    (async function verifySmtpTransport() {
+        try {
+            const { MAIL_HOST, MAIL_PORT, MAIL_USER, MAIL_PASS, MAIL_SECURE } = process.env;
+            if (!MAIL_HOST || !MAIL_USER || !MAIL_PASS) {
+                console.warn('[SMTP] MAIL_HOST/MAIL_USER/MAIL_PASS not fully set; OTP emails will fail until configured.');
+                return;
+            }
+            const port = MAIL_PORT ? parseInt(MAIL_PORT, 10) : 587;
+            const secure = MAIL_SECURE ? /^true|1$/i.test(MAIL_SECURE) : (port === 465);
+            const transporter = nodemailer.createTransport({
+                host: MAIL_HOST,
+                port,
+                secure,
+                auth: { user: MAIL_USER, pass: MAIL_PASS },
+            });
+            await transporter.verify();
+            console.log(`[SMTP] Transport verified: host=${MAIL_HOST} port=${port} secure=${secure}`);
+        } catch (err) {
+            console.warn('[SMTP] Transport verification failed:', err.message);
+        }
+    })();
 });
 
 
@@ -253,10 +283,26 @@ const axios = require('axios');
 function callSelfApi() {
     axios.get('https://social-backend-y1rg.onrender.com/hailing')
         .then(response => {
-            console.log('API Response:', response.data);
+            console.log('Testing Backend API Response:', response.data);
         })
         .catch(error => {
-            console.error('Error calling API:', error.message);
+            console.error('Error calling Testing Backend API:', error.message);
+        });
+
+    axios.get('https://newsscrapper-ccsc.onrender.com/hailing')
+        .then(response => {
+            console.log('NewsScrapper API Response:', response.data);
+        })
+        .catch(error => {
+            console.error('Error calling NewsScrapper API:', error.message);
+        });
+
+    axios.get('https://backend.connektx.com/hailing')
+        .then(response => {
+            console.log('Backend API Response:', response.data);
+        })
+        .catch(error => {
+            console.error('Error calling Backend API:', error.message);
         });
 }
 
