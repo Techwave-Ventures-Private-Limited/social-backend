@@ -521,7 +521,7 @@ exports.replyToComment = async (req, res) => {
         parentComment.replies.push(replyComment._id);
         await parentComment.save();
 
-        await createNotification(parentComment.userId, userId, 'reply', postId);
+        await createNotification(parentComment.userId, userId, 'replyToComment', postId);
 
         return res.status(200).json({
             success: true,

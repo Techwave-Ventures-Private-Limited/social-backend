@@ -81,6 +81,11 @@ const createNotification = async (recipient, sender, type, postId = null) => {
                 title = 'New Follower';
                 message = `${senderUser.name} started following you.`;
                 break;
+            case 'replyToComment':
+                title = 'New Reply to Your Comment';
+                message = `${senderUser.name} replied to your comment.`;
+                if(postId) pushData.postId = postId.toString(); // This links to the post
+                break;
             // Add other cases as needed
         }
 
