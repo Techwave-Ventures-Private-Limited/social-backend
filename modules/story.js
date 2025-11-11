@@ -112,13 +112,14 @@ const StorySchema = new mongoose.Schema({
   // Story expires after 24 hours
   expiresAt: {
     type: Date,
-    default: Date.now,
+    // Set expiry 24h in the future by default so MongoDB TTL removes it at the correct time
+    default: () => new Date(Date.now() + 24 * 60 * 60 * 1000),
     index: { expireAfterSeconds: 0 }
   }
 });
 
 // Index for efficient querying
 StorySchema.index({ userId: 1, createdAt: -1 });
-StorySchema.index({ expiresAt: 1 });
+// TTL index on expiresAt is declared above; no need for an additional plain index.
 
 module.exports = mongoose.model('Story', StorySchema);

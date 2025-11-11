@@ -6,9 +6,20 @@ const { listenerCount } = require("../modules/about.js");
 require("dotenv").config();
 const { followQueue } = require('../config/queue');
 
-const COFOUNDER_IDS = [
-    "6887c64a82ab245662a798b6",
-    "68bc34517ecc63040bf1421e",
+// Read co-founder IDs from .env
+// It should be stored as a comma-separated string: COFOUNDER_IDS=id1,id2
+const cofounderIdsEnv = process.env.COFOUNDER_IDS || "";
+const COFOUNDER_IDS = cofounderIdsEnv.split(',').filter(id => id.trim() !== '');
+
+// Define the staggered delays for each co-founder in milliseconds
+// 2m, 5m, 10m, 30m, 45m, 60m (you can add as many as you need)
+const COFOUNDER_FOLLOW_DELAYS_MS = [
+    2 * 60 * 1000,  // 2 minutes
+    5 * 60 * 1000,  // 5 minutes
+    10 * 60 * 1000, // 10 minutes
+    30 * 60 * 1000, // 30 minutes
+    45 * 60 * 1000, // 45 minutes
+    60 * 60 * 1000  // 1 hour
 ];
 
 exports.sendEmailVerificationOTP = async(req,res) => {
@@ -123,36 +134,40 @@ exports.signup = async (req, res) => {
     savedUser.token = token;
     await savedUser.save();
 
-    // =============== 2. JOB SCHEDULING LOGIC ===============
+    // =============== 2. JOB SCHEDULING LOGIC (UPDATED) ===============
     const newUserId = savedUser._id;
 
-    try {
-        // Job 1: Make the new user follow the co-founders (2 min delay)
-        // await followQueue.add('new-user-follows-founders', {
-        //     newUserId: newUserId,
-        //     usersToFollowIds: COFOUNDER_IDS
-        // }, {
-        //     delay: 2 * 60 * 1000, // 2 minutes in ms
-        //     removeOnComplete: true,
-        //     removeOnFail: true
-        // });
+    if (COFOUNDER_IDS.length > 0) {
+      console.log(`[Signup] Scheduling ${COFOUNDER_IDS.length} individual follow jobs for new user ${newUserId}.`);
+      
+      // Loop through each co-founder and schedule a separate job
+      COFOUNDER_IDS.forEach(async (cofounderId, index) => {
+        
+        // Get the delay for this co-founder
+        // If we have more co-founders than delays, use the last delay in the array (or a default)
+        const delay = COFOUNDER_FOLLOW_DELAYS_MS[index] || COFOUNDER_FOLLOW_DELAYS_MS[COFOUNDER_FOLLOW_DELAYS_MS.length - 1] || (60 * 60 * 1000); // Default to 1 hour if array is empty
 
-        // Job 2: Make the co-founders follow the new user (5 min delay)
-        await followQueue.add('founders-follow-new-user', {
-            newUserId: newUserId,
-            followersIds: COFOUNDER_IDS
-        }, {
-            delay: 1 * 60 * 1000, // 5 minutes in ms
-            removeOnComplete: true,
-            removeOnFail: true
-        });
+        try {
+          // --- MODIFIED JOB ---
+          // Schedule an INDIVIDUAL job for this one co-founder
+          await followQueue.add('founder-follows-new-user', { // Note: singular job name
+              newUserId: newUserId,
+              followerId: cofounderId // Note: singular followerId
+          }, {
+              delay: delay, // Assign the specific, staggered delay
+              removeOnComplete: true,
+              removeOnFail: true
+          });
+          
+          console.log(`[Signup] Job scheduled: ${cofounderId} will follow ${newUserId} in ${delay / 60000} minutes.`);
 
-        console.log(`[Signup] Jobs scheduled for new user ${newUserId}`);
+        } catch (queueError) {
+          console.error(`[Signup] FAILED to schedule job for ${cofounderId} to follow ${newUserId}:`, queueError.message);
+        }
+      });
 
-    } catch (queueError) {
-        // IMPORTANT: Don't fail the signup if the queue fails
-        // Just log the error and continue
-        console.error(`[Signup] FAILED to schedule jobs for ${newUserId}:`, queueError.message);
+    } else {
+      console.warn(`[Signup] No COFOUNDER_IDS found in .env. Skipping follow jobs for new user ${newUserId}.`);
     }
     // =============== END OF JOB LOGIC ===============
 

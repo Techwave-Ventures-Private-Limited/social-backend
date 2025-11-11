@@ -37,7 +37,9 @@ exports.createStory = async (req, res) => {
         filter: filter || null,
         hasOverlays: hasOverlays || false,
         overlayData: overlayData ? JSON.parse(overlayData) : null,
-        createdAt: new Date() 
+        createdAt: new Date(),
+        // Ensure TTL field is set explicitly to 24h ahead (MongoDB TTL will delete when this time passes)
+        expiresAt: new Date(expiresAt)
       })
 
       uploadedStoriesIds.push(createdStory._id);

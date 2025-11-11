@@ -160,55 +160,42 @@ exports.likePost = async (req, res) => {
     try {
 
         const postId = req.body.postId;
-        const post = await Post.findById(postId);
-
         const userId = req.userId;
-        const user = await User.findById(userId);
 
-        if (!userId) {
-            return res.status(400).json({
-                success:false,
-                message:"User not found"
-            })
-        }
-
-        if (!post) {
+        // 1. Check if the like already exists to avoid duplicates
+        const existingLike = await Like.findOne({ userId, postId });
+        if (existingLike) {
             return res.status(400).json({
                 success: false,
-                message: "Post not found"
-            })
+                message: "Post already liked by this user"
+            });
         }
 
-        // if (!user.likedPost.some(id => id.toString() === post._id.toString())) {
-        //     user.likedPost.push(post._id);
-        //     await user.save();
-        // } else {
-        //     return res.status(400).json({
-        //         success: false,
-        //         message: "User already liked post"
-        //     })
-        // }
+        // 2. Create the like document (the source of truth)
+        const newLike = await Like.create({ userId, postId });
 
-        post.likes = post.likes + 1;
-        await post.save();
+        // 3. Atomically increment the likes counter on the Post document
+        // This is the key change for scalability.
+        const updatedPost = await Post.findByIdAndUpdate(
+            postId,
+            { $inc: { likes: 1 } },
+            { new: true } // This option returns the updated document
+        );
 
-        const isLiked = await Like.find({userId : userId, postId : postId});
-        console.log("Liked", isLiked);
-        if (isLiked.length !== 0) {
-            return res.status(200).json({
-                message : "Already Liked post",
-                success : true
-            })
+        if (!updatedPost) {
+            // If the post was deleted in the meantime, clean up the like
+            await Like.findByIdAndDelete(newLike._id);
+            return res.status(404).json({ success: false, message: "Post not found" });
         }
 
-        const newLiked = await Like.create({userId, postId});
+        await createNotification(updatedPost.userId, userId, 'like', postId);
 
-        await createNotification(post.userId, userId, 'like', postId);
+        // console.log("Post liked:", newLike);
 
         return res.status(200).json({
             success: true,
-            message: "Post liked",
-            body: newLiked
+            message: "Post liked Successfully",
+            body: newLike
         })
 
     } catch (err) {
@@ -221,47 +208,52 @@ exports.likePost = async (req, res) => {
 
 exports.unlikePost = async (req, res) => {
     try {
-
         const postId = req.body.postId;
         const userId = req.userId;
-        const post = await Post.findById(postId);
 
-        if (!post) {
+        // 1. Find and delete the like document
+        const deletedLike = await Like.findOneAndDelete({ userId, postId });
+
+        if (!deletedLike) {
             return res.status(400).json({
                 success: false,
-                message: "Post not found"
-            })
+                message: "Post was not liked by this user"
+            });
         }
 
-        const user = await User.findById(userId);
-        //  if (user.likedPost.some(id => id.toString() === post._id.toString())) {
-        //     user.likedPost.pull(post._id);
-        //     await user.save();
-        // } else {
-        //     return res.status(400).json({
-        //         success: false,
-        //         message: "User has not liked post so he cannot unlike it."
-        //     })
-        // }
+        // 2. Atomically decrement the likes counter
+        let updatedPost = await Post.findByIdAndUpdate(
+            postId,
+            { $inc: { likes: -1 } },
+            { new: true }
+        );
 
-        post.likes = post.likes - 1;
-        await post.save();
-
-        const isLiked = await Like.find({userId : userId, postId : postId});
-         if (isLiked.length !== 0) {
-            return res.status(200).json({
-                message : "Already Liked post",
-                success : true
-            })
+        if (!updatedPost) {
+            return res.status(404).json({ success: false, message: "Post not found" });
         }
 
-        const newUnLiked = await Like.findByIdAndDelete(isLiked._id);
+        // --- YOUR RECONCILIATION LOGIC ---
+        // 3. Check if the count has gone negative (due to a past sync error)
+        if (updatedPost.likes < 0) {
+            
+            // Recalculate the true count from the 'likes' collection
+            const actualLikeCount = await Like.countDocuments({ postId: postId });
+
+            // Set the count to the correct number
+            updatedPost = await Post.findByIdAndUpdate(
+                postId,
+                { $set: { likes: actualLikeCount } },
+                { new: true }
+            );
+        }
+
+        // console.log("Post unliked:", deletedLike);
 
         return res.status(200).json({
             success: true,
-            message: "Post unliked",
-            newUnLiked
-        })
+            message: "Post unliked successfully",
+            body: { post: updatedPost }
+        });
 
     } catch (err) {
         return res.status(500).json({
