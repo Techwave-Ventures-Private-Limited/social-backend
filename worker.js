@@ -30,12 +30,14 @@ const worker = new Worker(QUEUE_NAME, async (job) => {
                 await createFollowship(newUserId, cofounderId);
             }
         
-        } else if (job.name === 'founders-follow-new-user') {
-            const { followersIds } = job.data;
-            console.log(`[Worker] Job: ${followersIds.length} founders will follow ${newUserId}.`);
-            for (const cofounderId of followersIds) {
-                await createFollowship(cofounderId, newUserId);
-            }
+        } else if (job.name === 'founder-follows-new-user') { // Note: singular name
+            
+            // Get the single follower ID from the job data
+            const { followerId } = job.data;
+            
+            console.log(`[Worker] Job: Founder ${followerId} will follow new user ${newUserId}.`);
+            
+            await createFollowship(followerId, newUserId);
         }
 
         console.log(`[Worker] Completed job: ${job.name} (ID: ${job.id})`);
