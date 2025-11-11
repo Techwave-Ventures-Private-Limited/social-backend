@@ -6,10 +6,10 @@ const { listenerCount } = require("../modules/about.js");
 require("dotenv").config();
 const { followQueue } = require('../config/queue');
 
-const COFOUNDER_IDS = [
-    "6887c64a82ab245662a798b6",
-    "68bc34517ecc63040bf1421e",
-];
+// Read co-founder IDs from .env
+// It should be stored as a comma-separated string: COFOUNDER_IDS=id1,id2
+const cofounderIdsEnv = process.env.COFOUNDER_IDS || "";
+const COFOUNDER_IDS = cofounderIdsEnv.split(',').filter(id => id.trim() !== '');
 
 exports.sendEmailVerificationOTP = async(req,res) => {
   try {
