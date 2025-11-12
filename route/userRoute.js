@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const {getUser, updateUser, uploadProfileImage, sendForgotPasswordEmail, verifyForgotPasswordOtp, changePassword, uploadBannerImage, getAnotherUser, addPortfolio, registerDeviceToken, deletePortfolio, getBulkUsers, getSelfFollowers, getSelfFollowing, getUserFollowers, getUserFollowing, getConnections, getRecommendedUsers,} = require("../controller/UserController");
+const {getUser, updateUser, uploadProfileImage, sendForgotPasswordEmail, verifyForgotPasswordOtp, changePassword, uploadBannerImage, getAnotherUser, addPortfolio, registerDeviceToken, deletePortfolio, getBulkUsers, getSelfFollowers, getSelfFollowing, getUserFollowers, getUserFollowing, getConnections, getRecommendedUsers, getUserPortfolio, getAnotherUserPortfolio} = require("../controller/UserController");
 const {createStory, getFollowingStories, getCurrentStory, deleteStory} = require("../controller/StoryController");
 const {auth}  = require("../middleware/authMiddleware");
 const { followUser, unFollowUser } = require("../controller/FollowController");
@@ -38,6 +38,8 @@ router.post("/verifyForgotPassword", verifyForgotPasswordOtp);
 router.post("/changePassword", changePassword);
 router.post("/uploadBannerImage", auth, uploadBannerImage);
 router.delete("/story/:storyId", auth, deleteStory);
+router.get("/portfolio", auth, getUserPortfolio);
+router.get("/:userId/portfolio", auth, getAnotherUserPortfolio);
 router.post("/portfolio", auth, addPortfolio);
 router.delete("/portfolio/:id", auth, deletePortfolio);
 

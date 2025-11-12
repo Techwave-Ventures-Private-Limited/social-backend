@@ -58,6 +58,83 @@ exports.getUser = async(req,res) => {
     }
 }
 
+exports.getUserPortfolio = async (req, res) => {
+    try {
+        const userId = req.userId; // Get the logged-in user's ID from auth
+
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized request",
+            });
+        }
+
+        // Find the user and specifically populate their portfolio items
+        const user = await User.findById(userId)
+            .select('portfolio') // We only need the portfolio field
+            .populate('portfolio') // Get the full document for each portfolio ID
+            .lean(); // Use .lean() for a fast, read-only query
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Portfolio fetched successfully",
+            body: user.portfolio || [], // Return the populated array or an empty one
+        });
+
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message,
+        });
+    }
+};
+
+exports.getAnotherUserPortfolio = async (req, res) => {
+    try {
+        // Get the user ID from the URL parameters
+        const { userId } = req.params;
+
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                message: "User ID is required in the URL.",
+            });
+        }
+
+        // Find the user by the ID from the URL
+        const user = await User.findById(userId)
+            .select('portfolio')    // We only need the portfolio field
+            .populate('portfolio')  // Get the full document for each portfolio ID
+            .lean();                // Use .lean() for a fast, read-only query
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Portfolio fetched successfully",
+            body: user.portfolio || [], // Return the populated array
+        });
+
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message,
+        });
+    }
+};
+
 exports.getAnotherUser = async(req,res) => {
     try{
         const userId = req.params.userId;
