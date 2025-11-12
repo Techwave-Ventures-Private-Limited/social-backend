@@ -45,9 +45,9 @@ router.delete("/portfolio/:id", auth, deletePortfolio);
 router.post("/register-device-token", auth, registerDeviceToken);
 router.get('/connections', auth, getConnections);
 
-router.get("/:userId", auth, getAnotherUser);
-
 // NEW RECOMMENDATION ROUTE
 router.get("/recommendations", auth, getRecommendedUsers);
+
+router.get("/:userId", auth, getAnotherUser);
 
 module.exports = router;

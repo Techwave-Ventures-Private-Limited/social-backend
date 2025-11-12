@@ -114,9 +114,11 @@ exports.getAnotherUser = async(req,res) => {
 exports.getRecommendedUsers = async (req, res) => {
   try {
     // The 'auth' middleware adds the user's ID to req.user.id
-    const userId = req.user.id; 
+    const userId = req.userId; 
 
     const users = await getRecommendations(userId);
+
+    // console.log(`[GetRecommendations] Found ${users.length} users for ${userId}:`, JSON.stringify(users, null, 2));
 
     res.status(200).json({
       success: true,
