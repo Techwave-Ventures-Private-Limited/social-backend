@@ -10,6 +10,7 @@ const Otp = require("../modules/otp");
 const bcrypt = require("bcrypt");
 const Portfolio = require("../modules/portfolio");
 const CompanyDetails = require("../modules/companyDetails");
+const { getRecommendations } = require("../services/recommendationService");
 
 
 exports.getUser = async(req,res) => {
@@ -108,6 +109,30 @@ exports.getAnotherUser = async(req,res) => {
         })
     }
 }
+
+
+exports.getRecommendedUsers = async (req, res) => {
+  try {
+    // The 'auth' middleware adds the user's ID to req.user.id
+    const userId = req.user.id; 
+
+    const users = await getRecommendations(userId);
+
+    res.status(200).json({
+      success: true,
+      message: "Recommendations fetched successfully",
+      users: users,
+    });
+  } catch (error) {
+    console.error("[GetRecommendations Error]", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch recommendations",
+      error: error.message,
+    });
+  }
+};
+
 
 exports.updateUser = async(req,res) => {
     try{

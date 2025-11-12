@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const {getUser, updateUser, uploadProfileImage, sendForgotPasswordEmail, verifyForgotPasswordOtp, changePassword, uploadBannerImage, getAnotherUser, addPortfolio, registerDeviceToken, deletePortfolio, getBulkUsers, getSelfFollowers, getSelfFollowing, getUserFollowers, getUserFollowing, getConnections} = require("../controller/UserController");
+const {getUser, updateUser, uploadProfileImage, sendForgotPasswordEmail, verifyForgotPasswordOtp, changePassword, uploadBannerImage, getAnotherUser, addPortfolio, registerDeviceToken, deletePortfolio, getBulkUsers, getSelfFollowers, getSelfFollowing, getUserFollowers, getUserFollowing, getConnections, getRecommendedUsers,} = require("../controller/UserController");
 const {createStory, getFollowingStories, getCurrentStory, deleteStory} = require("../controller/StoryController");
 const {auth}  = require("../middleware/authMiddleware");
 const { followUser, unFollowUser } = require("../controller/FollowController");
@@ -46,5 +46,8 @@ router.post("/register-device-token", auth, registerDeviceToken);
 router.get('/connections', auth, getConnections);
 
 router.get("/:userId", auth, getAnotherUser);
+
+// NEW RECOMMENDATION ROUTE
+router.get("/recommendations", auth, getRecommendedUsers);
 
 module.exports = router;
