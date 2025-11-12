@@ -58,6 +58,10 @@ const showcaseSchema = new mongoose.Schema({
             ref: "ShowcaseComment",
             default : ""
     }],
+    opportunities: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Opportunity"
+    }],
     createdAt: {
         type: Date,
         default: Date.now

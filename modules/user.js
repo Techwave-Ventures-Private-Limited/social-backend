@@ -70,6 +70,10 @@ const userSchema = new mongoose.Schema({
         ref:"User",
         default: [] //show their stories
     }],
+    applicationsSent: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Application"
+    }],
     about:{
         type:mongoose.Schema.Types.ObjectId,
         ref:"About"
