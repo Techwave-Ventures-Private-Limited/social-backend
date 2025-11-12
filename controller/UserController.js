@@ -33,6 +33,7 @@ exports.getUser = async(req,res) => {
             })
             .populate('education')
             .populate('experience')
+            .populate('companyDetails')
             .lean();
 
         if(!user) {
@@ -79,6 +80,7 @@ exports.getAnotherUser = async(req,res) => {
             })
             .populate('education')
             .populate('experience')
+            .populate('companyDetails')
             .lean();
 
         if(!user) {
@@ -597,7 +599,8 @@ exports.getBulkUsers = async (req, res) => {
 
     //const userIds = ids.split(",");
 
-    const users = await User.find({ _id: { $in: ids } });
+    const users = await User.find({ _id: { $in: ids } })
+      .populate('companyDetails');
 
     return res.status(200).json({
       success: true,
@@ -665,6 +668,7 @@ exports.getSelfFollowers = async (req, res) => {
         // Find all users who are following the current user
         const followers = await User.find({ following: userId })
             .select('_id name profileImage bio headline')
+            .populate('companyDetails')
             .lean();
 
         return res.status(200).json({
@@ -692,7 +696,8 @@ exports.getSelfFollowing = async (req, res) => {
         const user = await User.findById(userId)
             .populate({
                 path: 'following',
-                select: '_id name profileImage bio headline'
+                select: '_id name profileImage bio headline',
+                populate: { path: 'companyDetails', model: 'CompanyDetails' }
             })
             .lean();
 
@@ -725,6 +730,7 @@ exports.getUserFollowers = async (req, res) => {
         // Find all users who are following the specified userId
         const followers = await User.find({ following: userId })
             .select('_id name profileImage bio headline')
+            .populate('companyDetails')
             .lean();
 
         return res.status(200).json({
@@ -752,7 +758,8 @@ exports.getUserFollowing = async (req, res) => {
         const user = await User.findById(userId)
             .populate({
                 path: 'following',
-                select: '_id name profileImage bio headline'
+                select: '_id name profileImage bio headline',
+                populate: { path: 'companyDetails', model: 'CompanyDetails' }
             })
             .lean();
 
@@ -786,8 +793,16 @@ exports.getConnections = async (req, res) => {
         }
 
         const user = await User.findById(userId)
-            .populate('followers', 'name profileImage headline') // Populate with specific fields for efficiency
-            .populate('following', 'name profileImage headline');
+            .populate({
+                path: 'followers',
+                select: 'name profileImage headline',
+                populate: { path: 'companyDetails', model: 'CompanyDetails' }
+            })
+            .populate({
+                path: 'following',
+                select: 'name profileImage headline',
+                populate: { path: 'companyDetails', model: 'CompanyDetails' }
+            });
 
         if (!user) {
             console.error(`[CONNECTIONS] User with ID ${userId} not found in database.`);
