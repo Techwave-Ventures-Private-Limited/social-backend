@@ -86,4 +86,54 @@ exports.applyToOpportunity = async (req, res) => {
     }
 }
 
-// (You can add other controllers here later, e.g., getApplicants, closeOpportunity)
+/**
+ * --- NEW FUNCTION ---
+ * Gets all applicants for a specific opportunity.
+ * Only the owner of the opportunity can access this.
+ */
+exports.getApplicantsForOpportunity = async (req, res) => {
+    try {
+        const { opportunityId } = req.params;
+        const ownerId = req.userId; // This is the person making the request
+
+        // 1. Find the opportunity
+        const opportunity = await Opportunity.findById(opportunityId);
+        if (!opportunity) {
+            return res.status(404).json({
+                success: false,
+                message: "Opportunity not found"
+            });
+        }
+
+        // 2. --- CRITICAL SECURITY CHECK ---
+        //    Verify that the person making the request is the one who posted it.
+        if (opportunity.postedBy.toString() !== ownerId) {
+            return res.status(403).json({
+                success: false,
+                message: "Unauthorized: You are not the owner of this opportunity."
+            });
+        }
+
+        // 3. Find all applications for this opportunity
+        //    We populate 'applicantId' to get the user's details.
+        //    We select only the fields we need from the user.
+        const applications = await Application.find({ opportunityId: opportunityId })
+            .populate({
+                path: 'applicantId',
+                select: 'name email profileImage headline' // Select fields you want to show
+            })
+            .sort({ createdAt: -1 }); // Show newest applicants first
+
+        return res.status(200).json({
+            success: true,
+            message: `Found ${applications.length} applicants`,
+            body: applications
+        });
+
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+}
