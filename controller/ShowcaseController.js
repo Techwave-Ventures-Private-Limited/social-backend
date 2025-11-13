@@ -106,7 +106,11 @@ exports.createShowcase = async(req,res) => {
 exports.getShowcases = async(req,res) => {
     try {
 
-        const showcases = await Showcase.find();
+        const showcases = await Showcase.find()
+            .populate('opportunities')
+            .lean();
+        
+        console.log(showcases);
         
         return res.status(200).json({
             success: true,
