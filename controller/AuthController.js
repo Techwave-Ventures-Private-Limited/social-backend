@@ -15,11 +15,16 @@ const COFOUNDER_IDS = cofounderIdsEnv.split(',').filter(id => id.trim() !== '');
 // 2m, 5m, 10m, 30m, 45m, 60m (you can add as many as you need)
 const COFOUNDER_FOLLOW_DELAYS_MS = [
     2 * 60 * 1000,  // 2 minutes
-    5 * 60 * 1000,  // 5 minutes
+    // 5 * 60 * 1000,  // 5 minutes
     10 * 60 * 1000, // 10 minutes
-    30 * 60 * 1000, // 30 minutes
+    // 30 * 60 * 1000, // 30 minutes
     45 * 60 * 1000, // 45 minutes
-    60 * 60 * 1000  // 1 hour
+    // 60 * 60 * 1000,  // 1 hour
+    2 * 60 * 60 * 1000,  // 2 hour
+    6 * 60 * 60 * 1000,  // 6 hour
+    18 * 60 * 60 * 1000,  // 18 hour
+    36 * 60 * 60 * 1000,  // 36 hour
+    72 * 60 * 60 * 1000,  // 6 hour
 ];
 
 exports.sendEmailVerificationOTP = async(req,res) => {
