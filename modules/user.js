@@ -122,6 +122,10 @@ const userSchema = new mongoose.Schema({
         type: Number,
         default:0 
     },
+    lastStreakUpdate: {
+        type: Date,
+        default: null
+    },
     portfolio: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: "Portfolio"

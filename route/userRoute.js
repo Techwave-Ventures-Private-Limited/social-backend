@@ -4,8 +4,11 @@ const router = express.Router();
 const {getUser, updateUser, uploadProfileImage, sendForgotPasswordEmail, verifyForgotPasswordOtp, changePassword, uploadBannerImage, getAnotherUser, addPortfolio, registerDeviceToken, deletePortfolio, getBulkUsers, getSelfFollowers, getSelfFollowing, getUserFollowers, getUserFollowing, getConnections, getRecommendedUsers, getUserPortfolio, getAnotherUserPortfolio} = require("../controller/UserController");
 const {createStory, getFollowingStories, getCurrentStory, deleteStory} = require("../controller/StoryController");
 const {auth}  = require("../middleware/authMiddleware");
+const { checkStreak } = require('../middleware/checkStreak');
 const { followUser, unFollowUser } = require("../controller/FollowController");
 const {commentOnStory,getCommentsByStoryId,saveCommentslikeByStoryId} = require("../controller/commentController");
+
+router.use(checkStreak);
 
 router.get("/getUser", auth, getUser);
 router.get("/story", auth, getFollowingStories);

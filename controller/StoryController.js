@@ -2,6 +2,13 @@ const User = require("../modules/user");
 const Story = require("../modules/story");
 const {uploadImageToCloudinary, uploadVideoToCloudinary} = require("../utils/imageUploader");
 
+function isSameDay(d1, d2) {
+  if (!d1 || !d2) return false;
+  return d1.getFullYear() === d2.getFullYear() &&
+         d1.getMonth() === d2.getMonth() &&
+         d1.getDate() === d2.getDate();
+}
+
 exports.createStory = async (req, res) => {
   try {
     const userId = req.userId;
@@ -52,20 +59,29 @@ exports.createStory = async (req, res) => {
             message: "User not found"
         })
     }
-    const now = new Date(Date.now());
-    if (Object.keys(user.stories).length !== 0) {
-        let flag = true;
-        for (const story of user.stories) {
-            if (story.createdAt.getDate() === now.getDate()) {
-                flag = false;
-            }
-            if (!flag) break;
+
+    const today = new Date();
+    const lastUpdate = user.lastStreakUpdate;
+
+    // Only update streak if they haven't already posted today
+    if (!lastUpdate || !isSameDay(today, lastUpdate)) {
+        
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+
+        if (lastUpdate && isSameDay(yesterday, lastUpdate)) {
+            // --- Streak Continued ---
+            // Their last update was yesterday, so increment the streak
+            user.streak += 1;
+        } else {
+            // --- New or Broken Streak ---
+            // They either missed a day or this is their first post ever.
+            // Start a new streak of 1 (for today's post).
+            user.streak = 1; 
         }
-        if (flag) {
-            user.streak = user.streak + 1;
-        }
-    } else {
-        user.streak = user.streak + 1;
+        
+        // Mark today as the last time the streak was updated
+        user.lastStreakUpdate = today;
     }
 
     user.stories.push(...uploadedStoriesIds);
