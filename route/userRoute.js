@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const {getUser, updateUser, uploadProfileImage, sendForgotPasswordEmail, verifyForgotPasswordOtp, changePassword, uploadBannerImage, getAnotherUser, addPortfolio, registerDeviceToken, deletePortfolio, getBulkUsers, getSelfFollowers, getSelfFollowing, getUserFollowers, getUserFollowing, getConnections, getRecommendedUsers, getUserPortfolio, getAnotherUserPortfolio} = require("../controller/UserController");
-const {createStory, getFollowingStories, getCurrentStory, deleteStory} = require("../controller/StoryController");
+const {createStory, getFollowingStories, getCurrentStory, deleteStory, markStoryAsViewed, markStoriesAsViewed} = require("../controller/StoryController");
 const {auth}  = require("../middleware/authMiddleware");
 const { checkStreak } = require('../middleware/checkStreak');
 const { followUser, unFollowUser } = require("../controller/FollowController");
@@ -32,6 +32,9 @@ router.get("/story/self", auth, getCurrentStory);
 router.post("/story/comment", auth, commentOnStory);
 router.get("/story/:storyId/comments", getCommentsByStoryId);
 router.put("/storyId/:storyId/commnentId/:commentId/saveComment", auth, saveCommentslikeByStoryId);
+// View tracking routes
+router.post("/story/:storyId/view", auth, markStoryAsViewed);
+router.post("/story/batch-view", auth, markStoriesAsViewed);
 router.post("/getBulkUser", auth, getBulkUsers);
 // router.get("/followers", auth, getFollowers);
 
