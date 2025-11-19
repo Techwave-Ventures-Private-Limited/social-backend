@@ -109,17 +109,13 @@ const postSchema = new mongoose.Schema({
     default: null,
   },
   // Poll specific fields (for future use)
-  pollOptions: [
-    {
+  pollOptions: [{
       option: String,
-      votes: [
-        {
+      votes: [{
           type: mongoose.Schema.Types.ObjectId,
           ref: "User",
-        },
-      ],
-    },
-  ],
+      }],
+  }],
   // Resource specific fields (for future use)
   resourceUrl: {
     type: String,
