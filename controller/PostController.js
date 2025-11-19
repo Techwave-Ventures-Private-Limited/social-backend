@@ -304,6 +304,68 @@ exports.commentPost = async (req, res) => {
     }
 }
 
+exports.deleteComment = async (req, res) => {
+    try {
+        const { commentId } = req.params;
+        const userId = req.userId; // From 'auth' middleware
+
+        // 1. Find the comment
+        const comment = await Comment.findById(commentId);
+
+        if (!comment) {
+            return res.status(404).json({
+                success: false,
+                message: "Comment not found"
+            });
+        }
+
+        // 2. Find the parent post to check its author
+        const post = await Post.findById(comment.postId);
+
+        if (!post) {
+            return res.status(404).json({
+                success: false,
+                message: "Parent post not found"
+            });
+        }
+
+        // 3. Authorization Check:
+        // Allow deletion if the user is the comment's author OR the post's author
+        const isCommentAuthor = comment.userId.toString() === userId;
+        const isPostAuthor = post.userId.toString() === userId;
+
+        if (!isCommentAuthor && !isPostAuthor) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized: You cannot delete this comment"
+            });
+        }
+
+        // 4. Remove the comment reference from the post's 'comments' array
+        // We use $pull to remove the specific commentId from the array
+        await Post.findByIdAndUpdate(comment.postId, {
+            $pull: { comments: commentId }
+        });
+
+        // 5. Delete the comment itself
+        await Comment.findByIdAndDelete(commentId);
+
+        // (Optional) You might want to delete related notifications here
+        // await Notification.deleteMany({ /* criteria for the comment */ });
+
+        return res.status(200).json({
+            success: true,
+            message: "Comment deleted successfully"
+        });
+
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};
+
 exports.savePost = async (req, res) => {
     try {
 
