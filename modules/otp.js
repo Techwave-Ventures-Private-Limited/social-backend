@@ -14,7 +14,7 @@ const otpSchema  = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ["Verification", "Password"],
+        enum: ["Verification", "Password", "Experience"],
         default: "Verification"
     },
     createdAt:{
@@ -41,7 +41,7 @@ async function sendVerificationEmail(email, otp) {
 }
 
 otpSchema.pre("save", async function (next) {
-	if (this.isNew && this.type === "Verification") {
+	if (this.isNew && (this.type === "Verification" || this.type === "Experience")) {
 		await sendVerificationEmail(this.email, this.otp);
 	}
 	next();

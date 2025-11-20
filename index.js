@@ -61,6 +61,7 @@ const commentRouter = require("./route/commentRoute");
 const communityRouter = require("./route/communityRoute");
 const scrapperRouter = require("./route/ScrapperRoute");
 const opportunityRouter = require("./route/opportunityRoutes");
+const experienceRouter = require("./route/expVerifyRoute");
 
 
 // --- Models (needed for socket logic) ---
@@ -132,6 +133,7 @@ app.use("/comment", commentRouter);
 app.use("/community", communityRouter);
 app.use("/scrapper", scrapperRouter);
 app.use("/opportunity", opportunityRouter);
+app.use("/experience", experienceRouter);
 
 // --- Health Check and Root Routes ---
 app.use("/hailing",(req,res)=>{
