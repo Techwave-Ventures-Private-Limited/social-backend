@@ -1,6 +1,7 @@
 const User = require("../modules/user");
 const Showcase = require("../modules/showcase");
 const Comment = require("../modules/showcaseComment");
+const Opportunity = require("../modules/opportunity");
 const { uploadMultipleImagesToCloudinary, uploadImageToCloudinary } = require("../utils/imageUploader");
 const { createNotification } = require('../utils/notificationUtils');
 
@@ -34,7 +35,19 @@ exports.createShowcase = async(req,res) => {
             bannerImageUrl = uploadedBannerImage.secure_url;
         }
 
-        const {category, projectTitle, tagline, description, problem, solution, revenueModel, demoVideoLink, tags, projectLinks} = req.body;
+        const {category, projectTitle, tagline, description, problem, solution, revenueModel, demoVideoLink, tags, projectLinks, opportunities: opportunitiesString} = req.body;
+
+        console.log(req.body);
+        
+        let opportunities = [];
+        if (opportunitiesString) {
+            try {
+                opportunities = JSON.parse(opportunitiesString);
+            } catch (parseError) {
+                console.warn("Could not parse opportunities JSON string:", parseError);
+                // Fail gracefully, will just create 0 opportunities
+            }
+        }
 
         const createdShowcase = await Showcase.create({
             userId,
@@ -53,10 +66,33 @@ exports.createShowcase = async(req,res) => {
             projectLinks
         });
 
+        // 3. --- NEW LOGIC ---
+        //    Now, create the opportunities and link them
+        let createdOpportunities = [];
+        if (opportunities && Array.isArray(opportunities) && opportunities.length > 0) {
+            
+            const opportunityDocs = opportunities.map(op => ({
+                ...op, // (title, description, category, skills)
+                showcaseId: createdShowcase._id,
+                postedBy: userId
+            }));
+
+            createdOpportunities = await Opportunity.insertMany(opportunityDocs);
+            
+            const opportunityIds = createdOpportunities.map(op => op._id);
+            createdShowcase.opportunities = opportunityIds;
+            await createdShowcase.save();
+        }
+
+
+
         return res.status(200).json({
             success: true,
             message: "Showcase created successfully",
-            body: createdShowcase
+            body: {
+                showcase: createdShowcase,
+                opportunities: createdOpportunities
+            }
         })
 
     } catch(err) {
@@ -70,7 +106,11 @@ exports.createShowcase = async(req,res) => {
 exports.getShowcases = async(req,res) => {
     try {
 
-        const showcases = await Showcase.find();
+        const showcases = await Showcase.find()
+            .populate('opportunities')
+            .lean();
+        
+        console.log(showcases);
         
         return res.status(200).json({
             success: true,

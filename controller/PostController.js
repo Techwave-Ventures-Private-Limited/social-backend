@@ -12,7 +12,7 @@ const Like = require("../modules/like");
 exports.createPost = async (req, res) => {
     try {
 
-        let { discription, postType, originalPostId, videoLink, pollOptions  = null} = req.body || "";
+        let { discription, postType, originalPostId, videoLink, pollOptions} = req.body || "";
         const { isReposted } = req.body || false;
         const userId = req.userId;
         // console.log("User request to upload a post", req.body)
@@ -303,6 +303,122 @@ exports.commentPost = async (req, res) => {
         })
     }
 }
+
+exports.votePoll = async (req, res) => {
+    try {
+        const { postId } = req.params;
+        const { optionId, userId } = req.body;
+
+        if (!optionId || !userId) {
+            return res.status(400).json({ message: "optionId and userId are required" });
+        }
+
+        // Fetch post
+        const post = await Post.findById(postId);
+        if (!post) {
+            return res.status(404).json({ message: "Post not found" });
+        }
+
+        // Ensure post has pollOptions
+        if (!post.pollOptions || post.pollOptions.length === 0) {
+            return res.status(400).json({ message: "This post does not contain a poll" });
+        }
+
+        // Find selected option (fixed version using .find)
+        const selectedOption = post.pollOptions.find(
+            (opt) => opt._id.toString() === optionId
+        );
+
+        if (!selectedOption) {
+            return res.status(404).json({ message: "Option not found" });
+        }
+
+        // Check if user already voted somewhere else
+        post.pollOptions.forEach((opt) => {
+            const index = opt.votes.indexOf(userId);
+            if (index !== -1) opt.votes.splice(index, 1); // remove previous vote
+        });
+
+        // Add vote to selected option
+        selectedOption.votes.push(userId);
+
+        await post.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Vote submitted successfully",
+            pollOptions: post.pollOptions
+        });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
+
+
+
+exports.deleteComment = async (req, res) => {
+    try {
+        const { commentId } = req.params;
+        const userId = req.userId; // From 'auth' middleware
+
+        // 1. Find the comment
+        const comment = await Comment.findById(commentId);
+
+        if (!comment) {
+            return res.status(404).json({
+                success: false,
+                message: "Comment not found"
+            });
+        }
+
+        // 2. Find the parent post to check its author
+        const post = await Post.findById(comment.postId);
+
+        if (!post) {
+            return res.status(404).json({
+                success: false,
+                message: "Parent post not found"
+            });
+        }
+
+        // 3. Authorization Check:
+        // Allow deletion if the user is the comment's author OR the post's author
+        const isCommentAuthor = comment.userId.toString() === userId;
+        const isPostAuthor = post.userId.toString() === userId;
+
+        if (!isCommentAuthor && !isPostAuthor) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized: You cannot delete this comment"
+            });
+        }
+
+        // 4. Remove the comment reference from the post's 'comments' array
+        // We use $pull to remove the specific commentId from the array
+        await Post.findByIdAndUpdate(comment.postId, {
+            $pull: { comments: commentId }
+        });
+
+        // 5. Delete the comment itself
+        await Comment.findByIdAndDelete(commentId);
+
+        // (Optional) You might want to delete related notifications here
+        // await Notification.deleteMany({ /* criteria for the comment */ });
+
+        return res.status(200).json({
+            success: true,
+            message: "Comment deleted successfully"
+        });
+
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};
 
 exports.savePost = async (req, res) => {
     try {

@@ -100,6 +100,10 @@ const StorySchema = new mongoose.Schema({
     viewedAt: {
       type: Date,
       default: Date.now
+    },
+    watchDuration: {
+      type: Number,
+      default: 0
     }
   }],
 
