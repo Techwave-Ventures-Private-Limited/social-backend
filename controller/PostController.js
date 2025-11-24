@@ -727,6 +727,17 @@ exports.formatPost = async (post, currentUser = null) => {
         communityName = post.communityId?.name;
     }
 
+    // Poll aggregation: compute total votes from pollOptions if present
+    let pollOptions = undefined;
+    let totalVotes = 0;
+    if (Array.isArray(post.pollOptions) && post.pollOptions.length > 0) {
+        pollOptions = post.pollOptions;
+        totalVotes = post.pollOptions.reduce((sum, opt) => {
+            const votesArr = Array.isArray(opt.votes) ? opt.votes : [];
+            return sum + votesArr.length;
+        }, 0);
+    }
+    
     return {
         id: post._id,
         author: {
@@ -767,7 +778,10 @@ exports.formatPost = async (post, currentUser = null) => {
         isReposted: post.isReposted,
         type: post.type,
         communityName,
-        companyDetails: post.userId.companyDetails
+        companyDetails: post.userId.companyDetails,
+        // Poll fields for feed consumers
+        pollOptions,
+        totalVotes,
     };
 };
 
@@ -806,6 +820,17 @@ const formatPost = async (post, currentUser = null) => {
         communityId = post.communityId._id;
     }
 
+    // Poll aggregation: compute total votes from pollOptions if present
+    let pollOptions = undefined;
+    let totalVotes = 0;
+    if (Array.isArray(post.pollOptions) && post.pollOptions.length > 0) {
+        pollOptions = post.pollOptions;
+        totalVotes = post.pollOptions.reduce((sum, opt) => {
+            const votesArr = Array.isArray(opt.votes) ? opt.votes : [];
+            return sum + votesArr.length;
+        }, 0);
+    }
+    
     return {
         id: post._id,
         author: {
@@ -846,7 +871,10 @@ const formatPost = async (post, currentUser = null) => {
         isReposted: post.isReposted,
         type: post.type,
         communityName,
-        communityId
+        communityId,
+        // Poll fields for feed consumers
+        pollOptions,
+        totalVotes,
     };
 };
 
@@ -1048,6 +1076,17 @@ exports.getHomeFeedWithCommunities = async (req, res) => {
             const isBookmarked = false; // Community posts bookmarking can be implemented later
             const isLiked = post.likes.some(like => like._id?.toString() === userId || like.toString() === userId);
 
+            // Poll aggregation for community posts
+            let pollOptions = undefined;
+            let totalVotes = 0;
+            if (Array.isArray(post.pollOptions) && post.pollOptions.length > 0) {
+                pollOptions = post.pollOptions;
+                totalVotes = post.pollOptions.reduce((sum, opt) => {
+                    const votesArr = Array.isArray(opt.votes) ? opt.votes : [];
+                    return sum + votesArr.length;
+                }, 0);
+            }
+
             return {
                 id: post._id,
                 author: {
@@ -1088,7 +1127,10 @@ exports.getHomeFeedWithCommunities = async (req, res) => {
                 isReposted: false,
                 postSource: 'community',
                 community: post.communityId,
-                postType: post.type
+                postType: post.type,
+                // Poll info for community posts in home feed
+                pollOptions,
+                totalVotes,
             };
         }).filter(Boolean);
 
