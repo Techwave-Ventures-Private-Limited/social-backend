@@ -18,9 +18,9 @@ router.post("/create", auth, createJob);
 router.get("/all", getAllJobs);
 
 // @route  GET /:userId/job
-router.get("/:userId", auth, jobsByUserId);
+router.get("/user/:userId", auth, jobsByUserId);
 
 // @route   GET /job/:id
-router.get("/:id", auth, getJobById);
+router.get("/details/:id", auth, getJobById);
 
 module.exports = router;
