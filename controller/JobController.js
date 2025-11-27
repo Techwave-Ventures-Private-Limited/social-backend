@@ -201,3 +201,25 @@ exports.getJobById = async (req, res) => {
         });
     }
 };
+
+
+// Get Jobs by User ID
+exports.jobsByUserId = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const jobs = await Job.find({ postedBy: userId })
+            .populate("company", "name logo domain isVerified")
+            .sort({ createdAt: -1 });   
+        return res.status(200).json({
+            success: true,
+            count: jobs.length,
+            data: jobs
+        });
+    }   catch (error) {         
+        console.log(error);
+        return res.status(500).json({
+            success: false,
+            message: "Error fetching user's jobs"
+        });
+    }
+};
