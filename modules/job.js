@@ -29,13 +29,13 @@ const jobSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ["Full-time", "Part-time", "Contract", "Internship", "Freelance"],
+        enum: ["Full-time", "Part-time", "Contract", "Temporary", "Volunteer", "Internship", "Freelance", "Other"],
         required: true
     },
     // NEW: Seniority Level (Crucial for filtering)
     experienceLevel: {
         type: String,
-        enum: ["Intern", "Entry Level", "Mid-Senior", "Senior", "Associate", "Director", "Executive"],
+        enum: ["Fresher", "Entry Level (1-2 years)", "Mid Level (3-5 years)", "Senior level (5+ years)"],
         required: true
     },
     salaryRange: {
