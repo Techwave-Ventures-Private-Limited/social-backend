@@ -23,6 +23,19 @@ exports.createJob = async (req, res) => {
             externalApplyLink
         } = req.body;
 
+        // Normalise salaryRange so we always have a clean object
+        const normalisedSalaryRange = salaryRange ? {
+            min: typeof salaryRange.min === 'number' ? salaryRange.min : Number(salaryRange.min) || undefined,
+            max: typeof salaryRange.max === 'number' ? salaryRange.max : Number(salaryRange.max) || undefined,
+            currency: salaryRange.currency || "INR",
+            isDisclosed: typeof salaryRange.isDisclosed === 'boolean'
+                ? salaryRange.isDisclosed
+                : salaryRange.isDisclosed !== undefined
+                    ? Boolean(salaryRange.isDisclosed)
+                    : true,
+            period: salaryRange.period === 'Monthly' ? 'Monthly' : 'Yearly',
+        } : undefined;
+
         // 1. Validation
         if (!title || !description || !experienceId || !locations || locations.length === 0) {
             return res.status(400).json({
@@ -50,7 +63,7 @@ exports.createJob = async (req, res) => {
             openings,
             type,
             experienceLevel,
-            salaryRange,
+            salaryRange: normalisedSalaryRange,
             skills,
             requirements,
             company: experience.companyId, // Auto-linked

@@ -42,7 +42,13 @@ const jobSchema = new mongoose.Schema({
         min: { type: Number },
         max: { type: Number },
         currency: { type: String, default: "INR" },
-        isDisclosed: { type: Boolean, default: true } // Option to hide salary
+        isDisclosed: { type: Boolean, default: true }, // Option to hide salary
+        // NEW: whether the salary is yearly CTC or monthly
+        period: {
+            type: String,
+            enum: ["Yearly", "Monthly"],
+            default: "Yearly"
+        }
     },
     // NEW: Skills tags for search (e.g., ["React", "Node.js", "AWS"])
     skills: [{
