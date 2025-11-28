@@ -149,3 +149,48 @@ exports.verifyWorkOtp = async (req, res) => {
     });
   }
 };
+
+
+// -----------------------------------------
+// GET ALL COMPANIES (With Search)
+// -----------------------------------------
+exports.getAllCompanies = async (req, res) => {
+  try {
+    // Get search term from query params (e.g., /companies?search=goog)
+    const { search } = req.query;
+
+    // Build the query object
+    let query = { isVerified: true }; // Default: Only show verified companies?
+
+    // If search exists, modify query to match Name OR Domain
+    if (search) {
+      query = {
+        ...query,
+        $or: [
+          { name: { $regex: search, $options: "i" } },   // Case-insensitive name match
+          { domain: { $regex: search, $options: "i" } } // Case-insensitive domain match
+        ]
+      };
+    }
+
+    // Fetch from DB
+    // .select() limits fields to keep the response light and fast
+    // .sort() orders them alphabetically
+    const companies = await Company.find(query)
+      .select("name domain logo isVerified") 
+      .sort({ name: 1 }); 
+
+    return res.status(200).json({
+      success: true,
+      count: companies.length,
+      data: companies,
+    });
+
+  } catch (error) {
+    console.error("Error fetching companies:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching companies",
+    });
+  }
+};
