@@ -115,39 +115,56 @@ exports.applyForJob = async (req, res) => {
 // 2. RECRUITER: Update Application Status (Traceability)
 exports.updateApplicationStatus = async (req, res) => {
     try {
-        const recruiterId = req.userid;
+        // NOTE: Ensure your auth middleware sets req.userId (camelCase)
+        const recruiterId = req.userId; 
         const { applicationId, status, note } = req.body;
 
-        // A. Validate Status Enum
-        const validStatuses = ["Applied", "Reviewing", "Shortlisted", "Interview", "Assessment", "Offer", "Rejected", "Withdrawn"];
-        if (!validStatuses.includes(status)) {
-            return res.status(400).json({ success: false, message: "Invalid status value" });
-        }
-
-        // B. Find and Update (Pushing to History)
-        const application = await Application.findByIdAndUpdate(
-            applicationId,
-            {
-                status: status, // Update the "Current" status for filtering
-                $push: {        // Add event to timeline
-                    statusHistory: {
-                        status: status,
-                        note: note || `Status updated to ${status}`,
-                        updatedBy: recruiterId,
-                        changedAt: Date.now()
-                    }
-                }
-            },
-            { new: true } // Return updated doc
-        )
-        .populate("applicant", "name email profileImage headline"); // Return applicant info for UI update
+        // 1. Find the Application and Populate the Job
+        // We MUST populate 'job' to access the custom hiringWorkflow
+        const application = await Application.findById(applicationId).populate('job');
 
         if (!application) {
-            return res.status(404).json({ success: false, message: "Application not found" });
+            return res.status(404).json({ 
+                success: false, 
+                message: "Application not found" 
+            });
         }
 
-        // Optional: Send Email Notification to Candidate here logic
+        // ---------------------------------------------------------
+        // 🌟 2. DYNAMIC VALIDATION (The Core Change)
+        // ---------------------------------------------------------
+        // Instead of a hardcoded array, we check the specific Job's workflow.
+        const validStages = application.job.hiringWorkflow.map(step => step.stepName);
         
+        if (!validStages.includes(status)) {
+            return res.status(400).json({ 
+                success: false, 
+                message: `Invalid status. Allowed stages for this job are: ${validStages.join(", ")}` 
+            });
+        }
+        // ---------------------------------------------------------
+
+        // 3. Update the Status
+        application.status = status;
+
+        // 4. Add to History (The Audit Trail)
+        application.statusHistory.push({
+            status: status,
+            note: note || `Status updated to ${status}`,
+            updatedBy: recruiterId,
+            changedAt: Date.now()
+        });
+
+        // 5. Save the changes
+        await application.save();
+
+        // 6. Populate Applicant details for the Frontend UI return
+        // (We do this after save so we get the fresh object)
+        await application.populate("applicant", "name email profileImage headline");
+
+        // Optional: Trigger Notification Logic Here
+        // sendNotification(application.applicant._id, `Your application status changed to ${status}`);
+
         return res.status(200).json({
             success: true,
             message: `Candidate moved to ${status}`,
@@ -156,7 +173,10 @@ exports.updateApplicationStatus = async (req, res) => {
 
     } catch (error) {
         console.error("Update Status Error:", error);
-        return res.status(500).json({ success: false, message: "Error updating status" });
+        return res.status(500).json({ 
+            success: false, 
+            message: "Error updating status" 
+        });
     }
 };
 
