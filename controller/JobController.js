@@ -7,20 +7,8 @@ exports.createJob = async (req, res) => {
     try {
         const userId = req.userId;
 
-        const { 
-            title, 
-            description, 
-            locations,
-            locationType, 
-            openings,
-            type, 
-            experienceLevel,
-            salaryRange, 
-            skills,
-            requirements,
-            experienceId, 
-            applyMethod,
-            externalApplyLink
+        const { title, description, locations,locationType, openings,type, experienceLevel, salaryRange, 
+            skills, requirements, experienceId, applyMethod, externalApplyLink, customStages 
         } = req.body;
 
         // Normalise salaryRange so we always have a clean object
@@ -54,11 +42,57 @@ exports.createJob = async (req, res) => {
             });
         }
 
-        // 3. Create the Job
+        // 🌟 3. Construct the Dynamic Hiring Workflow
+        let hiringWorkflow = [];
+
+        // Step A: The Immutable Starting Point
+        hiringWorkflow.push(
+            { stepName: "Applied", stepType: "System", order: 1, description: "Application submitted" },
+            { stepName: "Viewed", stepType: "System", order: 2, description: "Application viewed by recruiter" },
+            { stepName: "Shortlisted", stepType: "System", order: 3, description: "Candidate shortlisted" },
+        );
+
+        // Step B: The Middle (Custom or Default)
+        if (customStages && Array.isArray(customStages) && customStages.length > 0) {
+            // Option 1: User provided custom stages
+            // customStages example: [{ name: "Assessment" }, { name: "Interview 1" }]
+            
+            customStages.forEach((stage, index) => {
+                hiringWorkflow.push({
+                    stepName: stage.name, 
+                    stepType: "Custom",
+                    // Start ordering from 2 (Applied is 1)
+                    order: index + 4, 
+                    description: stage.description || ""
+                });
+            });
+
+        } else {
+            // Option 2: Default "Happy Path" if no custom stages provided
+            const defaultStages = [ "Interview" ];
+            
+            defaultStages.forEach((name, index) => {
+                hiringWorkflow.push({
+                    stepName: name,
+                    stepType: "System",
+                    order: index + 4,
+                    description: "Standard process"
+                });
+            });
+        }
+
+        // Step C: The Immutable End States (To ensure closure)
+        // We use high order numbers to ensure they are always at the end
+        hiringWorkflow.push(
+            { stepName: "Selected", stepType: "System", order: 99, description: "Candidate hired" },
+            { stepName: "Rejected", stepType: "System", order: 100, description: "Application rejected" }
+        );
+
+        // 4. Create the Job
         const newJob = await Job.create({
             title,
             description,
-            locations,       // Mongoose handles the array automatically
+            locations,
             locationType,
             openings,
             type,
@@ -66,10 +100,11 @@ exports.createJob = async (req, res) => {
             salaryRange: normalisedSalaryRange,
             skills,
             requirements,
-            company: experience.companyId, // Auto-linked
+            company: experience.companyId,
             postedBy: userId,
             applyMethod,
-            externalApplyLink: applyMethod === "External" ? externalApplyLink : undefined
+            externalApplyLink: applyMethod === "External" ? externalApplyLink : undefined,
+            hiringWorkflow: hiringWorkflow 
         });
 
         return res.status(201).json({
@@ -82,7 +117,7 @@ exports.createJob = async (req, res) => {
         console.log(error);
         return res.status(500).json({
             success: false,
-            message: error.message // This will catch the Mongoose validator error we added above
+            message: error.message 
         });
     }
 };

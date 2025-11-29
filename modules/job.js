@@ -101,6 +101,24 @@ const jobSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "JobApplication"
     }],
+    // NEW: Customizable Hiring Workflow
+    hiringWorkflow: [{
+        stepName: { 
+            type: String, 
+            required: true,
+            trim: true 
+        },
+        stepType: {
+            type: String,
+            enum: ["System", "Custom"], // System = Applied, Rejected. Custom = Technical Round, etc.
+            default: "Custom"
+        },
+        order: { 
+            type: Number, 
+            required: true 
+        },
+        description: String // e.g., "Complete the HackerRank link sent to email"
+    }],
     createdAt: {
         type: Date,
         default: Date.now
@@ -109,6 +127,20 @@ const jobSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     }
+});
+
+// Helper to initialize default stages for every new job
+jobSchema.pre('save', function(next) {
+    if (this.isNew && this.hiringWorkflow.length === 0) {
+        this.hiringWorkflow = [
+            { stepName: "Applied", stepType: "System", order: 1 },
+            { stepName: "Viewed", stepType: "System", order: 2 },
+            { stepName: "Shortlisted", stepType: "System", order: 3 },
+            { stepName: "Selected", stepType: "System", order: 99 }, // High number to keep at end
+            { stepName: "Rejected", stepType: "System", order: 100 }
+        ];
+    }
+    next();
 });
 
 // Indexing for fast search
