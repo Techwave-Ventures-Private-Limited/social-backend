@@ -649,7 +649,20 @@ exports.getAllPosts = async (req, res) => {
         const filter = req.query.filter;
         const sortOption = filter == 1 ? { createdAt: -1 } : {};
 
-        let posts = await Post.find({ subtype: { $ne: "question" } })
+        // FEATURE FLAG: Control community posts visibility in home feed
+        // Set environment variable SHOW_COMMUNITY_POSTS_IN_FEED=true to enable community posts
+        // Default: false (community posts hidden from home feed)
+        const SHOW_COMMUNITY_POSTS_IN_FEED = process.env.SHOW_COMMUNITY_POSTS_IN_FEED === 'true';
+
+        // Build query to exclude questions and optionally exclude community posts
+        const query = { subtype: { $ne: "question" } };
+
+        // If feature flag is disabled, also exclude community posts
+        if (!SHOW_COMMUNITY_POSTS_IN_FEED) {
+            query.type = { $ne: "Community" };
+        }
+
+        let posts = await Post.find(query)
             .sort(sortOption)
             .populate({
                 path: 'userId',
@@ -1311,7 +1324,3 @@ exports.getPosts = async (req, res) => {
         });
     }
 };
-
-
-
-
