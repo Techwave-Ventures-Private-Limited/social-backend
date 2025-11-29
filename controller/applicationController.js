@@ -25,6 +25,7 @@ exports.applyForJob = async (req, res) => {
 
         // B. Check if Job exists and is Accepting Applications
         const job = await Job.findById(jobId);
+        
         if (!job || !job.isActive) {
             return res.status(404).json({ 
                 success: false, 
@@ -32,8 +33,17 @@ exports.applyForJob = async (req, res) => {
             });
         }
 
+        // 🌟 NEW CHECK: Handle External Applications
+        // If the job is "External", we shouldn't be accepting data here.
+        if (job.applyMethod === 'External') {
+            return res.status(400).json({
+                success: false,
+                message: "This job requires applying via an external website.",
+                externalLink: job.externalApplyLink
+            });
+        }
+
         // C. Check for Duplicate Application
-        // (The compound index in Schema also prevents this, but a friendly error is better)
         const existingApplication = await Application.findOne({ job: jobId, applicant: userId });
         if (existingApplication) {
             return res.status(400).json({ 
@@ -42,28 +52,40 @@ exports.applyForJob = async (req, res) => {
             });
         }
 
+        // 🌟 DETERMINE STARTING STATUS
+        // Find the step with order: 1 from the job's workflow. 
+        // Fallback to "Applied" just in case something is wrong with the data.
+        const initialStep = job.hiringWorkflow.find(step => step.order === 1);
+        const startStatus = initialStep ? initialStep.stepName : "Applied";
+
         // D. Create the Application
         const newApplication = await Application.create({
             job: jobId,
             applicant: userId,
-            company: job.company, // Denormalize company ID for faster "My Applications" queries
+            company: job.company, // Denormalize company ID for faster lookups
             resume,
             coverLetter,
             portfolioLink,
             screeningAnswers, // Array of { question, answer }
-            status: "Applied",
+            
+            // 🌟 Use the Dynamic Status
+            status: startStatus,
+
             // E. Initialize Traceability
             statusHistory: [{
-                status: "Applied",
-                note: "Application submitted successfully",
+                status: startStatus,
+                note: "Application submitted via ConnektX",
                 updatedBy: userId,
                 changedAt: Date.now()
             }]
         });
 
         // F. Link Application to Job & User
+        // Using $push is correct here
         await Job.findByIdAndUpdate(jobId, { $push: { applications: newApplication._id } });
         await User.findByIdAndUpdate(userId, { $push: { applicationsSent: newApplication._id } });
+
+        // TODO: Trigger Notification to Recruiter (Email/Socket) here
 
         return res.status(201).json({
             success: true,
@@ -73,11 +95,19 @@ exports.applyForJob = async (req, res) => {
 
     } catch (error) {
         console.error("Apply Error:", error);
+        
         // Handle Duplicate Key Error (E11000) just in case race condition happened
         if (error.code === 11000) {
-            return res.status(400).json({ success: false, message: "You have already applied for this job." });
+            return res.status(400).json({ 
+                success: false, 
+                message: "You have already applied for this job." 
+            });
         }
-        return res.status(500).json({ success: false, message: "Error submitting application" });
+        
+        return res.status(500).json({ 
+            success: false, 
+            message: "Error submitting application" 
+        });
     }
 };
 
