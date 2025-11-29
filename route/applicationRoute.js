@@ -22,10 +22,10 @@ router.get("/my-applications", getMyApplications);
 // POST /application/status
 router.post("/status", updateApplicationStatus);
 
-// GET /application/:jobId
-router.get("/:jobId", getJobApplications);
+// GET /application/job/:jobId
+router.get("/job/:jobId", getJobApplications);
 
 // GET /application/detail/:id
-router.get("/:id", getApplicationById);
+router.get("/detail/:id", getApplicationById);
 
 module.exports = router;

@@ -249,8 +249,8 @@ exports.getApplicationById = async (req, res) => {
         const application = await Application.findById(id)
             .populate({
                 path: "job",
-                select: "title description locations company",
-                populate: { path: "company", select: "name logo" }
+                select: "title description locations company hiringWorkflow",
+                populate: { path: "company", select: "name logo domain" }
             })
             .populate("applicant", "name email profileImage headline")
             .populate("statusHistory.updatedBy", "name"); // Show who made the update
