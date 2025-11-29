@@ -1042,7 +1042,7 @@ exports.getHomeFeedWithCommunities = async (req, res) => {
         // FEATURE FLAG: Control community posts visibility in home feed
         // Set environment variable SHOW_COMMUNITY_POSTS_IN_FEED=true to enable community posts
         // Default: false (community posts hidden from home feed)
-        const SHOW_COMMUNITY_POSTS_IN_FEED = process.env.SHOW_COMMUNITY_POSTS_IN_FEED === 'false';
+        const SHOW_COMMUNITY_POSTS_IN_FEED = process.env.SHOW_COMMUNITY_POSTS_IN_FEED === 'true';
 
         // Get community posts that should appear in home feed
         let communityPosts = [];
