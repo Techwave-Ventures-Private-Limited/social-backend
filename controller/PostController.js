@@ -1039,9 +1039,14 @@ exports.getHomeFeedWithCommunities = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
+        // FEATURE FLAG: Control community posts visibility in home feed
+        // Set environment variable SHOW_COMMUNITY_POSTS_IN_FEED=true to enable community posts
+        // Default: false (community posts hidden from home feed)
+        const SHOW_COMMUNITY_POSTS_IN_FEED = process.env.SHOW_COMMUNITY_POSTS_IN_FEED === 'false';
+
         // Get community posts that should appear in home feed
         let communityPosts = [];
-        if (publicCommunityIds.length > 0) {
+        if (SHOW_COMMUNITY_POSTS_IN_FEED && publicCommunityIds.length > 0) {
             communityPosts = await CommunityPost.find({
                 communityId: { $in: publicCommunityIds },
                 type: { $ne: 'question' }, // Q&A should not appear in home feed
