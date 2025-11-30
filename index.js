@@ -104,12 +104,23 @@ app.use(
     })
 )
 
-app.use(
-	fileUpload({
-		useTempFiles: true,
-		tempFileDir: "/tmp/",
-	})
-);
+// Define the fileUpload middleware but don't use it globally yet
+const fileUploadMiddleware = fileUpload({
+    useTempFiles: true,
+    tempFileDir: "/tmp/",
+});
+
+// Create a conditional middleware wrapper
+app.use((req, res, next) => {
+    // If the URL starts with '/application', SKIP express-fileupload
+    // This allows Multer (in your applicationRoute) to handle the stream
+    if (req.originalUrl.startsWith('/application')) {
+        return next();
+    }
+    
+    // For all other routes (posts, user profile, etc.), use express-fileupload
+    return fileUploadMiddleware(req, res, next);
+});
 
 
 // --- MIDDLEWARE TO ATTACH SOCKET.IO TO REQUESTS ---

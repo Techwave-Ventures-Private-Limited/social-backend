@@ -1,7 +1,7 @@
 const Application = require("../modules/JobApplication");
 const Job = require("../modules/job");
 const User = require("../modules/user");
-
+const { uploadResumeToS3 } = require("../utils/s3Upload"); // Import the helper
 
 // 1. CANDIDATE: Apply for a Job
 exports.applyForJob = async (req, res) => {
@@ -9,17 +9,32 @@ exports.applyForJob = async (req, res) => {
         const userId = req.userId;
         const { 
             jobId, 
-            resume, 
             coverLetter, 
             portfolioLink, 
             screeningAnswers 
         } = req.body;
 
+        // 2. Handle Resume Upload (The new Logic)
+        let resumeUrl = req.body.resume; // Fallback if they send a link manually
+
+        if (req.file) {
+            try {
+                // Upload the buffer to S3
+                resumeUrl = await uploadResumeToS3(req.file, userId);
+            } catch (uploadError) {
+                console.error("S3 Upload Error:", uploadError);
+                return res.status(500).json({
+                    success: false,
+                    message: "Failed to upload resume. Please try again."
+                });
+            }
+        }
+
         // A. Basic Validation
-        if (!jobId || !resume) {
+        if (!jobId || !resumeUrl) {
             return res.status(400).json({ 
                 success: false, 
-                message: "Job ID and Resume are required" 
+                message: "Job ID and Resume (PDF or Link) are required" 
             });
         }
 
@@ -34,7 +49,6 @@ exports.applyForJob = async (req, res) => {
         }
 
         // 🌟 NEW CHECK: Handle External Applications
-        // If the job is "External", we shouldn't be accepting data here.
         if (job.applyMethod === 'External') {
             return res.status(400).json({
                 success: false,
@@ -53,25 +67,29 @@ exports.applyForJob = async (req, res) => {
         }
 
         // 🌟 DETERMINE STARTING STATUS
-        // Find the step with order: 1 from the job's workflow. 
-        // Fallback to "Applied" just in case something is wrong with the data.
-        const initialStep = job.hiringWorkflow.find(step => step.order === 1);
+        const initialStep = job.hiringWorkflow?.find(step => step.order === 1);
         const startStatus = initialStep ? initialStep.stepName : "Applied";
+
+        // Handle Screening Answers parsing if sent as string via FormData
+        let parsedScreeningAnswers = screeningAnswers;
+        if (typeof screeningAnswers === 'string') {
+            try {
+                parsedScreeningAnswers = JSON.parse(screeningAnswers);
+            } catch (e) {
+                parsedScreeningAnswers = [];
+            }
+        }
 
         // D. Create the Application
         const newApplication = await Application.create({
             job: jobId,
             applicant: userId,
-            company: job.company, // Denormalize company ID for faster lookups
-            resume,
+            company: job.company, 
+            resume: resumeUrl, // This is now the AWS S3 Link
             coverLetter,
             portfolioLink,
-            screeningAnswers, // Array of { question, answer }
-            
-            // 🌟 Use the Dynamic Status
+            screeningAnswers: parsedScreeningAnswers,
             status: startStatus,
-
-            // E. Initialize Traceability
             statusHistory: [{
                 status: startStatus,
                 note: "Application submitted via ConnektX",
@@ -80,12 +98,9 @@ exports.applyForJob = async (req, res) => {
             }]
         });
 
-        // F. Link Application to Job & User
-        // Using $push is correct here
+        // E. Link Application to Job & User
         await Job.findByIdAndUpdate(jobId, { $push: { applications: newApplication._id } });
         await User.findByIdAndUpdate(userId, { $push: { applicationsSent: newApplication._id } });
-
-        // TODO: Trigger Notification to Recruiter (Email/Socket) here
 
         return res.status(201).json({
             success: true,
@@ -96,7 +111,6 @@ exports.applyForJob = async (req, res) => {
     } catch (error) {
         console.error("Apply Error:", error);
         
-        // Handle Duplicate Key Error (E11000) just in case race condition happened
         if (error.code === 11000) {
             return res.status(400).json({ 
                 success: false, 
