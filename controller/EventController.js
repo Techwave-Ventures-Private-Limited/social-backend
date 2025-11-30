@@ -74,6 +74,37 @@ exports.createEvent = async(req,res) => {
         }
         eventObject.banner = bannerUrl;
 
+// Fix tags: convert string -> array
+if (eventObject.tags) {
+    if (typeof eventObject.tags === "string") {
+        try {
+            // If passed as JSON string
+            eventObject.tags = JSON.parse(eventObject.tags);
+        } catch (err) {
+            // Fallback: comma separated
+            eventObject.tags = eventObject.tags.split(",").map(t => t.trim());
+        }
+    }
+}
+
+// Ensure it's always array
+if (!Array.isArray(eventObject.tags)) {
+    eventObject.tags = [];
+}
+//Fix Speaker 
+if (eventObject.speakers) {
+    if (typeof eventObject.speakers === "string") {
+        try {
+            eventObject.speakers = JSON.parse(eventObject.speakers);
+        } catch (err) {
+            eventObject.speakers = eventObject.speakers.split(",").map(s => s.trim());
+        }
+    }
+}
+if (!Array.isArray(eventObject.speakers)) {
+    eventObject.speakers = [];
+}
+
 
         // Handle ticketTypes (was ticketPlan)
         if (typeof eventObject.ticketTypes === 'string') {
