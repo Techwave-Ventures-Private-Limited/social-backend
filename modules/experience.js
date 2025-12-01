@@ -20,6 +20,20 @@ const experienceSchema = new mongoose.Schema({
     current: {
         type: Boolean
     },
+    companyId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Company",
+        default: null
+    },
+    workEmail: {
+        type: String,
+        trim: true,
+        lowercase: true
+    },
+    isVerified: {
+        type: Boolean,
+        default: false
+    },
     createAt:{
         type:Date,
         default:Date.now()

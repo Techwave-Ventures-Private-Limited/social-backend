@@ -12,7 +12,7 @@ const Like = require("../modules/like");
 exports.createPost = async (req, res) => {
     try {
 
-        let { discription, postType, originalPostId, videoLink, pollOptions} = req.body || "";
+        let { discription, postType, originalPostId, videoLink, pollOptions } = req.body || "";
         const { isReposted } = req.body || false;
         const userId = req.userId;
         // console.log("User request to upload a post", req.body)
@@ -29,7 +29,7 @@ exports.createPost = async (req, res) => {
 
         if (files) {
             files = Array.isArray(files) ? files : [files];
-            for (const file of files) {    
+            for (const file of files) {
                 const isVideo = file.mimetype.startsWith("video");
                 if (isVideo) {
                     const uploadedVideo = await uploadVideoToCloudinary(file, process.env.FOLDER_NAME || "post", "auto");
@@ -54,9 +54,9 @@ exports.createPost = async (req, res) => {
             })
         }
 
-        if (pollOptions !== null)
+        if (pollOptions)
             pollOptions = JSON.parse(pollOptions);
-        
+
         const createdPost = await Post.create({
             discription,
             media: mediaUrls,
@@ -106,7 +106,7 @@ exports.getPost = async (req, res) => {
         // Compute isLiked for the current user (consistent with feed responses)
         let isLiked = false;
         if (req.userId) {
-            const like = await Like.find({userId : req.userId});
+            const like = await Like.find({ userId: req.userId });
             if (like.length > 0) {
                 isLiked = true;
             }
@@ -235,7 +235,7 @@ exports.unlikePost = async (req, res) => {
         // --- YOUR RECONCILIATION LOGIC ---
         // 3. Check if the count has gone negative (due to a past sync error)
         if (updatedPost.likes < 0) {
-            
+
             // Recalculate the true count from the 'likes' collection
             const actualLikeCount = await Like.countDocuments({ postId: postId });
 
@@ -461,18 +461,18 @@ exports.savePost = async (req, res) => {
     }
 }
 
-exports.getSavedPost = async(req,res) => {
-    try{
+exports.getSavedPost = async (req, res) => {
+    try {
 
         const userId = req.userId;
 
         const user = await User.findById(userId).populate('savedPost');
         return res.json({
-            success:true,
+            success: true,
             body: user.savedPost
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
@@ -540,7 +540,7 @@ exports.getCommentsForPost = async (req, res) => {
 
 exports.getCommentsByUser = async (req, res) => {
     try {
-        const userId  = req.body.userId || req.userId;
+        const userId = req.body.userId || req.userId;
 
         if (!userId) {
             return res.status(400).json({
@@ -648,8 +648,21 @@ exports.getAllPosts = async (req, res) => {
     try {
         const filter = req.query.filter;
         const sortOption = filter == 1 ? { createdAt: -1 } : {};
-        
-        let posts = await Post.find({ subtype: { $ne: "question" } })
+
+        // FEATURE FLAG: Control community posts visibility in home feed
+        // Set environment variable SHOW_COMMUNITY_POSTS_IN_FEED=true to enable community posts
+        // Default: false (community posts hidden from home feed)
+        const SHOW_COMMUNITY_POSTS_IN_FEED = process.env.SHOW_COMMUNITY_POSTS_IN_FEED === 'true';
+
+        // Build query to exclude questions and optionally exclude community posts
+        const query = { subtype: { $ne: "question" } };
+
+        // If feature flag is disabled, also exclude community posts
+        if (!SHOW_COMMUNITY_POSTS_IN_FEED) {
+            query.type = { $ne: "Community" };
+        }
+
+        let posts = await Post.find(query)
             .sort(sortOption)
             .populate({
                 path: 'userId',
@@ -658,7 +671,7 @@ exports.getAllPosts = async (req, res) => {
                     { path: 'about', model: 'About' },
                     { path: 'education', model: 'Education' },
                     { path: 'experience', model: 'Experience' },
-                    { path: 'companyDetails', model: 'CompanyDetails'},
+                    { path: 'companyDetails', model: 'CompanyDetails' },
                 ]
             })
             .populate('comments')
@@ -709,7 +722,7 @@ exports.formatPost = async (post, currentUser = null) => {
     const isFollowing = currentUser?.followers?.some(f => f.toString() === author._id.toString()) || false;
     const isBookmarked = currentUser?.savedPost?.some(id => id.toString() === post._id.toString()) || false;
     //const isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
-    const like = await Like.find({userId : currentUser._id, postId : post._id });
+    const like = await Like.find({ userId: currentUser._id, postId: post._id });
     let isLiked = false;
     if (like.length > 0) {
         isLiked = true;
@@ -725,6 +738,17 @@ exports.formatPost = async (post, currentUser = null) => {
     let communityName = "";
     if (post.type === "Community") {
         communityName = post.communityId?.name;
+    }
+
+    // Poll aggregation: compute total votes from pollOptions if present
+    let pollOptions = undefined;
+    let totalVotes = 0;
+    if (Array.isArray(post.pollOptions) && post.pollOptions.length > 0) {
+        pollOptions = post.pollOptions;
+        totalVotes = post.pollOptions.reduce((sum, opt) => {
+            const votesArr = Array.isArray(opt.votes) ? opt.votes : [];
+            return sum + votesArr.length;
+        }, 0);
     }
 
     return {
@@ -767,7 +791,10 @@ exports.formatPost = async (post, currentUser = null) => {
         isReposted: post.isReposted,
         type: post.type,
         communityName,
-        companyDetails: post.userId.companyDetails
+        companyDetails: post.userId.companyDetails,
+        // Poll fields for feed consumers
+        pollOptions,
+        totalVotes,
     };
 };
 
@@ -786,7 +813,7 @@ const formatPost = async (post, currentUser = null) => {
     const isFollowing = currentUser?.followers?.some(f => f.toString() === author._id.toString()) || false;
     const isBookmarked = currentUser?.savedPost?.some(id => id.toString() === post._id.toString()) || false;
     //const isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
-    const like = await Like.find({userId : currentUser._id, postId : post._id });
+    const like = await Like.find({ userId: currentUser._id, postId: post._id });
     let isLiked = false;
     if (like.length > 0) {
         isLiked = true;
@@ -804,6 +831,17 @@ const formatPost = async (post, currentUser = null) => {
     if (post.type === "Community") {
         communityName = post.communityId?.name;
         communityId = post.communityId._id;
+    }
+
+    // Poll aggregation: compute total votes from pollOptions if present
+    let pollOptions = undefined;
+    let totalVotes = 0;
+    if (Array.isArray(post.pollOptions) && post.pollOptions.length > 0) {
+        pollOptions = post.pollOptions;
+        totalVotes = post.pollOptions.reduce((sum, opt) => {
+            const votesArr = Array.isArray(opt.votes) ? opt.votes : [];
+            return sum + votesArr.length;
+        }, 0);
     }
 
     return {
@@ -837,7 +875,7 @@ const formatPost = async (post, currentUser = null) => {
         content: post.discription,
         images: post.media || [],
         createdAt: post.createdAt,
-        likes : post.likes,
+        likes: post.likes,
         comments: post.comments?.length || 0,
         isLiked,
         isBookmarked,
@@ -846,12 +884,15 @@ const formatPost = async (post, currentUser = null) => {
         isReposted: post.isReposted,
         type: post.type,
         communityName,
-        communityId
+        communityId,
+        // Poll fields for feed consumers
+        pollOptions,
+        totalVotes,
     };
 };
 
 
-exports.deletePost = async(req,res) => {
+exports.deletePost = async (req, res) => {
     try {
 
         const userId = req.userId;
@@ -885,7 +926,7 @@ exports.deletePost = async(req,res) => {
             message: "Post deleted successfully"
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
@@ -1011,23 +1052,28 @@ exports.getHomeFeedWithCommunities = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
+        // FEATURE FLAG: Control community posts visibility in home feed
+        // Set environment variable SHOW_COMMUNITY_POSTS_IN_FEED=true to enable community posts
+        // Default: false (community posts hidden from home feed)
+        const SHOW_COMMUNITY_POSTS_IN_FEED = process.env.SHOW_COMMUNITY_POSTS_IN_FEED === 'true';
+
         // Get community posts that should appear in home feed
         let communityPosts = [];
-        if (publicCommunityIds.length > 0) {
+        if (SHOW_COMMUNITY_POSTS_IN_FEED && publicCommunityIds.length > 0) {
             communityPosts = await CommunityPost.find({
                 communityId: { $in: publicCommunityIds },
                 type: { $ne: 'question' }, // Q&A should not appear in home feed
                 isDeleted: { $ne: true }
             })
-            .populate('authorId', 'name profileImage')
-            .populate('communityId', 'name logo isPrivate')
-            .populate('likes', 'name')
-            .populate({
-                path: 'comments',
-                populate: { path: 'authorId', select: 'name profileImage' }
-            })
-            .sort({ createdAt: -1 })
-            .lean();
+                .populate('authorId', 'name profileImage')
+                .populate('communityId', 'name logo isPrivate')
+                .populate('likes', 'name')
+                .populate({
+                    path: 'comments',
+                    populate: { path: 'authorId', select: 'name profileImage' }
+                })
+                .sort({ createdAt: -1 })
+                .lean();
         }
 
         // Format regular posts
@@ -1047,6 +1093,17 @@ exports.getHomeFeedWithCommunities = async (req, res) => {
 
             const isBookmarked = false; // Community posts bookmarking can be implemented later
             const isLiked = post.likes.some(like => like._id?.toString() === userId || like.toString() === userId);
+
+            // Poll aggregation for community posts
+            let pollOptions = undefined;
+            let totalVotes = 0;
+            if (Array.isArray(post.pollOptions) && post.pollOptions.length > 0) {
+                pollOptions = post.pollOptions;
+                totalVotes = post.pollOptions.reduce((sum, opt) => {
+                    const votesArr = Array.isArray(opt.votes) ? opt.votes : [];
+                    return sum + votesArr.length;
+                }, 0);
+            }
 
             return {
                 id: post._id,
@@ -1088,7 +1145,10 @@ exports.getHomeFeedWithCommunities = async (req, res) => {
                 isReposted: false,
                 postSource: 'community',
                 community: post.communityId,
-                postType: post.type
+                postType: post.type,
+                // Poll info for community posts in home feed
+                pollOptions,
+                totalVotes,
             };
         }).filter(Boolean);
 
@@ -1118,153 +1178,149 @@ exports.getHomeFeedWithCommunities = async (req, res) => {
 
 // DO NOT CHANGE THIS WITHOUT PERMISSION
 exports.getPosts = async (req, res) => {
-  try {
-    const userId = req.userId;
-    const limit = parseInt(req.query.limit) || 20;
-    const offset = parseInt(req.query.offset) || 0;
+    try {
+        const userId = req.userId;
+        const limit = parseInt(req.query.limit) || 20;
+        const offset = parseInt(req.query.offset) || 0;
 
-    const user = await User.findById(userId);
+        const user = await User.findById(userId);
 
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    const following = user.following || [];
-    const followers = user.followers || [];
-    const people = [...new Set([...following, ...followers].map(id => id.toString()))];
-
-    const joinedCommunities = user.communities || [];
-
-    /** const likedPosts = (user.likedPost || [])
-      .filter(id => mongoose.Types.ObjectId.isValid(id))
-      .map(id => new mongoose.Types.ObjectId(id)); */
-
-    const likedPosts = [];
-
-    /** ---------------- MAIN PIPELINE ---------------- */
-    let combinedPosts = await Post.aggregate([
-      { 
-        $match: { 
-          _id: { $nin: likedPosts },
-          type: "Post",
-          ...(people.length > 0 ? { userId: { $in: people } } : {})
-        } 
-      },
-      {
-        $unionWith: {
-          coll: "posts",
-          pipeline: [
-            { 
-              $match: { 
-                _id: { $nin: likedPosts },
-                type: "Community",
-                ...(joinedCommunities.length > 0 ? { communityId: { $in: joinedCommunities } } : { communityId: null })
-              } 
-            },
-            {
-              $lookup: {
-                from: "communities",
-                localField: "communityId",
-                foreignField: "_id",
-                as: "communityId"
-              }
-            },
-            { $unwind: { path: "$communityId", preserveNullAndEmptyArrays: true } },
-            {
-              $project: {
-                commentsCount: { $size: { $ifNull: ["$comments", []] } },
-                likes: 1,
-                title: 1,
-                content: 1,
-                userId: 1,
-                originalPostId: 1,
-                createdAt: 1,
-                "communityId._id": 1,
-                "communityId.name": 1,
-                "communityId.logo": 1,
-                "communityId.isPrivate": 1
-              }
-            }
-          ]
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "User not found",
+            });
         }
-      },
-      { $addFields: { commentsCount: { $size: { $ifNull: ["$comments", []] } } } },
-      { $sort: { likes: -1, commentsCount: -1, createdAt: -1 } },
-      { $skip: offset },
-      { $limit: limit }
-    ]);
 
-    /** ---------------- BACKFILL WITH TRENDING ---------------- */
-    if (combinedPosts.length < limit) {
-      const remaining = limit - combinedPosts.length;
+        const following = user.following || [];
+        const followers = user.followers || [];
+        const people = [...new Set([...following, ...followers].map(id => id.toString()))];
 
-      const trendingPosts = await Post.aggregate([
-        {
-          $match: {
-            _id: { $nin: likedPosts },
-            type: "post"
-          }
-        },
-        { $addFields: { commentsCount: { $size: { $ifNull: ["$comments", []] } } } },
-        { $sort: { likes: -1, commentsCount: -1, createdAt: -1 } },
-        { $limit: remaining }
-      ]);
+        const joinedCommunities = user.communities || [];
 
-      combinedPosts = [...combinedPosts, ...trendingPosts];
+        /** const likedPosts = (user.likedPost || [])
+          .filter(id => mongoose.Types.ObjectId.isValid(id))
+          .map(id => new mongoose.Types.ObjectId(id)); */
+
+        const likedPosts = [];
+
+        /** ---------------- MAIN PIPELINE ---------------- */
+        let combinedPosts = await Post.aggregate([
+            {
+                $match: {
+                    _id: { $nin: likedPosts },
+                    type: "Post",
+                    ...(people.length > 0 ? { userId: { $in: people } } : {})
+                }
+            },
+            {
+                $unionWith: {
+                    coll: "posts",
+                    pipeline: [
+                        {
+                            $match: {
+                                _id: { $nin: likedPosts },
+                                type: "Community",
+                                ...(joinedCommunities.length > 0 ? { communityId: { $in: joinedCommunities } } : { communityId: null })
+                            }
+                        },
+                        {
+                            $lookup: {
+                                from: "communities",
+                                localField: "communityId",
+                                foreignField: "_id",
+                                as: "communityId"
+                            }
+                        },
+                        { $unwind: { path: "$communityId", preserveNullAndEmptyArrays: true } },
+                        {
+                            $project: {
+                                commentsCount: { $size: { $ifNull: ["$comments", []] } },
+                                likes: 1,
+                                title: 1,
+                                content: 1,
+                                userId: 1,
+                                originalPostId: 1,
+                                createdAt: 1,
+                                "communityId._id": 1,
+                                "communityId.name": 1,
+                                "communityId.logo": 1,
+                                "communityId.isPrivate": 1
+                            }
+                        }
+                    ]
+                }
+            },
+            { $addFields: { commentsCount: { $size: { $ifNull: ["$comments", []] } } } },
+            { $sort: { likes: -1, commentsCount: -1, createdAt: -1 } },
+            { $skip: offset },
+            { $limit: limit }
+        ]);
+
+        /** ---------------- BACKFILL WITH TRENDING ---------------- */
+        if (combinedPosts.length < limit) {
+            const remaining = limit - combinedPosts.length;
+
+            const trendingPosts = await Post.aggregate([
+                {
+                    $match: {
+                        _id: { $nin: likedPosts },
+                        type: "post"
+                    }
+                },
+                { $addFields: { commentsCount: { $size: { $ifNull: ["$comments", []] } } } },
+                { $sort: { likes: -1, commentsCount: -1, createdAt: -1 } },
+                { $limit: remaining }
+            ]);
+
+            combinedPosts = [...combinedPosts, ...trendingPosts];
+        }
+
+        /** ---------------- POPULATE ---------------- */
+        combinedPosts = await Post.populate(combinedPosts, [
+            {
+                path: "userId",
+                model: "User",
+                populate: [
+                    { path: "about", model: "About" },
+                    { path: "education", model: "Education" },
+                    { path: "experience", model: "Experience" },
+                    { path: 'companyDetails', model: 'CompanyDetails' },
+                ],
+            },
+            { path: "comments" },
+            {
+                path: "originalPostId",
+                populate: {
+                    path: "userId",
+                    model: "User",
+                    populate: [
+                        { path: "about", model: "About" },
+                        { path: "education", model: "Education" },
+                        { path: "experience", model: "Experience" },
+                    ],
+                },
+            },
+            {
+                path: "communityId",
+                model: "Community",
+                select: "name logo isPrivate _id"
+            }
+        ]);
+
+        /** ---------------- FORMAT ---------------- */
+        const formattedPosts = await Promise.all(
+            combinedPosts.map(post => formatPost(post, user))
+        );
+
+        return res.status(200).json({
+            success: true,
+            body: formattedPosts,
+        });
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message,
+        });
     }
-
-    /** ---------------- POPULATE ---------------- */
-    combinedPosts = await Post.populate(combinedPosts, [
-      {
-        path: "userId",
-        model: "User",
-        populate: [
-          { path: "about", model: "About" },
-          { path: "education", model: "Education" },
-          { path: "experience", model: "Experience" },
-          { path: 'companyDetails', model: 'CompanyDetails'},
-        ],
-      },
-      { path: "comments" },
-      {
-        path: "originalPostId",
-        populate: {
-          path: "userId",
-          model: "User",
-          populate: [
-            { path: "about", model: "About" },
-            { path: "education", model: "Education" },
-            { path: "experience", model: "Experience" },
-          ],
-        },
-      },
-      {
-        path: "communityId",
-        model: "Community",
-        select: "name logo isPrivate _id"
-      }
-    ]);
-
-    /** ---------------- FORMAT ---------------- */
-    const formattedPosts = await Promise.all(
-      combinedPosts.map(post => formatPost(post, user))
-    );
-
-    return res.status(200).json({
-      success: true,
-      body: formattedPosts,
-    });
-  } catch (err) {
-    return res.status(500).json({
-      success: false,
-      message: err.message,
-    });
-  }
 };
-
-
-
-

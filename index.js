@@ -61,6 +61,9 @@ const commentRouter = require("./route/commentRoute");
 const communityRouter = require("./route/communityRoute");
 const scrapperRouter = require("./route/ScrapperRoute");
 const opportunityRouter = require("./route/opportunityRoutes");
+const experienceRouter = require("./route/expVerifyRoute");
+const jobRouter = require("./route/jobRoute");
+const applicationRouter = require("./route/applicationRoute");
 
 
 // --- Models (needed for socket logic) ---
@@ -101,12 +104,23 @@ app.use(
     })
 )
 
-app.use(
-	fileUpload({
-		useTempFiles: true,
-		tempFileDir: "/tmp/",
-	})
-);
+// Define the fileUpload middleware but don't use it globally yet
+const fileUploadMiddleware = fileUpload({
+    useTempFiles: true,
+    tempFileDir: "/tmp/",
+});
+
+// Create a conditional middleware wrapper
+app.use((req, res, next) => {
+    // If the URL starts with '/application', SKIP express-fileupload
+    // This allows Multer (in your applicationRoute) to handle the stream
+    if (req.originalUrl.startsWith('/application')) {
+        return next();
+    }
+    
+    // For all other routes (posts, user profile, etc.), use express-fileupload
+    return fileUploadMiddleware(req, res, next);
+});
 
 
 // --- MIDDLEWARE TO ATTACH SOCKET.IO TO REQUESTS ---
@@ -132,6 +146,9 @@ app.use("/comment", commentRouter);
 app.use("/community", communityRouter);
 app.use("/scrapper", scrapperRouter);
 app.use("/opportunity", opportunityRouter);
+app.use("/experience", experienceRouter);
+app.use("/job", jobRouter);
+app.use("/application", applicationRouter);
 
 // --- Health Check and Root Routes ---
 app.use("/hailing",(req,res)=>{
