@@ -1,6 +1,7 @@
 const User = require("../modules/user");
 const { createNotification } = require('../utils/notificationUtils');
 const { createFollowship } = require("../services/followService");
+const Connection = require("../modules/connection");
 
 exports.followUser = async(req,res) => {
     try{
@@ -54,11 +55,29 @@ exports.unFollowUser = async(req,res) => {
             })
         }
 
-        user.following.pull(userToFollow._id);
-        await user.save();
+        //user.following.pull(userToFollow._id);
+        //await user.save();
 
-        userToFollow.followers.pull(user._id);
-        await userToFollow.save();
+        //userToFollow.followers.pull(user._id);
+        //await userToFollow.save();
+
+        const isPresent = await Connection.findOne({follower : user, following: userToFollow});
+        if (!isPresent) {
+            return res.status(200).json({
+                success: true,
+                message: "Already Unfollowed"
+            })
+        }
+
+        await Connection.findByIdAndDelete(isPresent._id);
+
+        user.followingCount = user.followingCount - 1;
+        userToFollow.followerCount = userToFollow.followerCount - 1;
+
+        await Promise.all([
+            user.save(),
+            userToFollow.save()
+        ]);
 
         return res.status(200).json({
             success:true,

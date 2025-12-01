@@ -153,6 +153,14 @@ const userSchema = new mongoose.Schema({
     companyDetails : {
         type: mongoose.Schema.Types.ObjectId,
         ref: "CompanyDetails"
+    },
+    followingCount: {
+        type: Number,
+        default: 0
+    },
+    followerCount: {
+        type: Number,
+        default: 0
     }
 })
 
