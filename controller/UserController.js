@@ -45,7 +45,7 @@ exports.getUser = async(req,res) => {
             })
         }
 
-        user = await addUserData(user);
+        user = await this.addUserData(user);
 
         return res.status(200).json({
             success:true,
@@ -176,7 +176,7 @@ exports.getAnotherUser = async(req,res) => {
             user.isFollowing = true;
         }
 
-        user = await addUserData(user);
+        user = await this.addUserData(user);
 
         return res.status(200).json({
             success:true,
@@ -714,7 +714,7 @@ exports.getBulkUsers = async (req, res) => {
     let usersList = [];
 
     users.forEach(async(user) => {
-        user = await addUserData(user);
+        user = await this.addUserData(user);
         usersList.push(user);
     })
 
@@ -947,7 +947,7 @@ exports.getConnections = async (req, res) => {
 
 // private function to append followers and following details
 // can be resued to add other fields into user object in future
-async function addUserData(user) {
+exports.addUserData = async(user) => {
     if (!user) {
         return ;
     }

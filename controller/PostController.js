@@ -8,6 +8,7 @@ const { uploadMultipleImagesToCloudinary, uploadVideoToCloudinary, uploadImageTo
 const mongoose = require("mongoose");
 const CompanyDetails = require("../modules/companyDetails");
 const Like = require("../modules/like");
+const {addUserData} = require("../controller/UserController");
 
 exports.createPost = async (req, res) => {
     try {
@@ -1183,7 +1184,7 @@ exports.getPosts = async (req, res) => {
         const limit = parseInt(req.query.limit) || 20;
         const offset = parseInt(req.query.offset) || 0;
 
-        const user = await User.findById(userId);
+        let user = await User.findById(userId);
 
         if (!user) {
             return res.status(400).json({
@@ -1192,9 +1193,13 @@ exports.getPosts = async (req, res) => {
             });
         }
 
+        user = await addUserData(user._id); 
+
         const following = user.following || [];
         const followers = user.followers || [];
-        const people = [...new Set([...following, ...followers].map(id => id.toString()))];
+       
+        let people = [...new Set([...following].map(connection => connection.following._id.toString()))];
+        people = [...new Set([...followers].map(connection => connection.follower._id.toString()))];
 
         const joinedCommunities = user.communities || [];
 
@@ -1260,19 +1265,18 @@ exports.getPosts = async (req, res) => {
         /** ---------------- BACKFILL WITH TRENDING ---------------- */
         if (combinedPosts.length < limit) {
             const remaining = limit - combinedPosts.length;
-
+            
             const trendingPosts = await Post.aggregate([
                 {
                     $match: {
                         _id: { $nin: likedPosts },
-                        type: "post"
+                        type: "Post"
                     }
                 },
                 { $addFields: { commentsCount: { $size: { $ifNull: ["$comments", []] } } } },
                 { $sort: { likes: -1, commentsCount: -1, createdAt: -1 } },
                 { $limit: remaining }
             ]);
-
             combinedPosts = [...combinedPosts, ...trendingPosts];
         }
 
