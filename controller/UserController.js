@@ -218,6 +218,66 @@ exports.getRecommendedUsers = async (req, res) => {
 };
 
 
+exports.getSeedProfiles = async (req, res) => {
+//   console.log("[getSeedProfiles] Starting...");
+
+  try {
+    const rawIds = process.env.COFOUNDER_IDS;
+
+    if (!rawIds) {
+    //   console.warn("[getSeedProfiles] COFOUNDER_IDS env variable is missing!");
+      return res.status(200).json({
+        success: true,
+        message: "No seed IDs configured",
+        users: [] 
+      });
+    }
+
+    // 1. Parse and Explicitly Cast to ObjectId
+    const seedUserIds = rawIds.split(',').map(id => {
+      const trimmed = id.trim();
+      if (mongoose.Types.ObjectId.isValid(trimmed)) {
+        return new mongoose.Types.ObjectId(trimmed); 
+      }
+      return null;
+    }).filter(Boolean);
+
+    // console.log(`[getSeedProfiles] Querying for IDs:`, seedUserIds);
+
+    if (seedUserIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No valid seed IDs found",
+        users: []
+      });
+    }
+
+    // 2. Fetch users
+    const seedUsers = await User.find({ _id: { $in: seedUserIds } })
+      .select('_id name profileImage headline') 
+      .lean()
+      .maxTimeMS(5000); 
+
+    // console.log(`[getSeedProfiles] Success. Retrieved ${seedUsers.length} users.`);
+    
+    return res.status(200).json({
+      success: true,
+      message: "Seed profiles fetched successfully",
+      users: seedUsers, 
+    });
+
+  } catch (error) {
+    console.error("[getSeedProfiles] CRITICAL ERROR:", error);
+    
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch seed profiles",
+      error: error.message
+    });
+  }
+};
+
+
 exports.updateUser = async(req,res) => {
     try{
         const userId = req.userId;
