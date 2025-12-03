@@ -107,7 +107,7 @@ exports.getPost = async (req, res) => {
         // Compute isLiked for the current user (consistent with feed responses)
         let isLiked = false;
         if (req.userId) {
-            const like = await Like.find({ userId: req.userId });
+            const like = await Like.find({ userId: req.userId, postId: postId });
             if (like.length > 0) {
                 isLiked = true;
             }

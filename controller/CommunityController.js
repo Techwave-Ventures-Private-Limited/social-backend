@@ -14,6 +14,7 @@ const {
     emitRoleChange
 } = require('../utils/communitySocketHelper');
 const { uploadVideoToCloudinary, uploadImageToCloudinary } = require("../utils/imageUploader");
+const Like = require("../modules/like");
 
 // ================================
 // COMMUNITY CRUD OPERATIONS
@@ -1031,7 +1032,7 @@ exports.getCommunityPosts = async (req, res) => {
 
         const posts = await CommunityPost.find(query)
             .populate('authorId', 'name profileImage')
-            .populate('likes', 'name')
+            // .populate('likes', 'name') // likes is a number now
             .populate({
                 path: 'comments',
                 populate: { path: 'userId', select: 'name profileImage' },
@@ -1042,6 +1043,16 @@ exports.getCommunityPosts = async (req, res) => {
             .limit(parseInt(limit))
             .lean();
 
+        // Fetch all likes for these posts by this user
+        let likedPostIds = new Set();
+        if (userId) {
+            const postIds = posts.map(p => p._id);
+            const likes = await Like.find({
+                userId: userId,
+                postId: { $in: postIds }
+            });
+            likedPostIds = new Set(likes.map(l => l.postId.toString()));
+        }
 
         return res.status(200).json({
             success: true,
@@ -1050,14 +1061,13 @@ exports.getCommunityPosts = async (req, res) => {
                     id => id.toString() === post._id.toString()
                 ) || false;
 
-                const isLiked = currentUser?.likedPost?.some(
-                    id => id.toString() === post._id.toString()
-                ) || false;
+                const isLiked = likedPostIds.has(post._id.toString());
 
                 return {
-                    ...post.toObject?.() || post, // ensure plain object
+                    ...post, // lean() returns plain object
                     isLiked,
                     isBookmarked,
+                    likesCount: post.likes || 0 // Ensure likesCount is available
                 };
             }),
             pagination: {
@@ -1078,6 +1088,7 @@ exports.getCommunityPosts = async (req, res) => {
 
 
 
+// Like/Unlike community post
 // Like/Unlike community post
 exports.likeCommunityPost = async (req, res) => {
     try {
@@ -1110,26 +1121,40 @@ exports.likeCommunityPost = async (req, res) => {
             });
         }
 
-        const hasLiked = post.likes.includes(userId);
+        // Check if the like already exists
+        const existingLike = await Like.findOne({ userId, postId });
+        let isLiked = false;
 
-        if (hasLiked) {
-            post.likes = post.likes.filter(id => id.toString() !== userId);
+        if (existingLike) {
+            // Unlike
+            await Like.findByIdAndDelete(existingLike._id);
+            post.likes = Math.max(0, post.likes - 1);
+            isLiked = false;
         } else {
-            post.likes.push(userId);
+            // Like
+            await Like.create({ userId, postId });
+            post.likes += 1;
+            isLiked = true;
         }
 
         await post.save();
 
-        if (!user.likedPost.some(id => id.toString() === post._id.toString())) {
-            user.likedPost.push(post._id);
+        // Update user.likedPost array (legacy support)
+        if (isLiked) {
+            if (!user.likedPost.some(id => id.toString() === post._id.toString())) {
+                user.likedPost.push(post._id);
+                await user.save();
+            }
+        } else {
+            user.likedPost = user.likedPost.filter(id => id.toString() !== post._id.toString());
             await user.save();
         }
 
         return res.status(200).json({
             success: true,
-            message: hasLiked ? "Post unliked" : "Post liked",
-            isLiked: !hasLiked,
-            likesCount: post.likes.length
+            message: isLiked ? "Post liked" : "Post unliked",
+            isLiked: isLiked,
+            likesCount: post.likes
         });
 
     } catch (error) {
