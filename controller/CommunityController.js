@@ -1322,7 +1322,7 @@ exports.getAllJoinRequests = async (req, res) => {
         if (!community) {
             return res.status(404).json({ success: false, message: "Community not found" });
         }
-        if (!isOwnerOrAdmin(community, userId)) {
+        if (!isOwnerAdminOrModerator(community, userId)) {
             return res.status(403).json({ success: false, message: "Permission denied" });
         }
         const joinRequests = await JoinRequest.find({ communityId, status: 'pending' });
@@ -1342,7 +1342,7 @@ exports.bulkHandleJoinRequests = async (req, res) => {
         if (!community) {
             return res.status(404).json({ success: false, message: "Community not found" });
         }
-        if (!isOwnerOrAdmin(community, userId)) {
+        if (!isOwnerAdminOrModerator(community, userId)) {
             return res.status(403).json({ success: false, message: "Permission denied" });
         }
         let results = { approved: [], rejected: [], errors: [] };
