@@ -1451,20 +1451,16 @@ exports.removeRole = async (req, res) => {
         }
 
         // Only owner and admins can remove roles
-        if (community.owner.toString() !== userId && !community.admins.includes(userId)) {
+        if (!isOwnerOrAdmin(community, userId)) {
             return res.status(403).json({ success: false, message: "Permission denied" });
         }
 
-        // Use $pull to remove the memberId from both admins and moderators arrays
-        await Community.updateOne(
-            { _id: id },
-            {
-                $pull: {
-                    admins: memberId,
-                    moderators: memberId,
-                },
-            }
-        );
+        // Remove from existing role arrays
+        community.admins = community.admins.filter(id => id.toString() !== memberId);
+        community.moderators = community.moderators.filter(id => id.toString() !== memberId);
+
+        community.lastActivity = new Date();
+        await community.save();
 
         return res.status(200).json({ success: true, message: "User role removed successfully. The user is now a member." });
 
@@ -1653,8 +1649,8 @@ exports.updateCoverImage = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Community not found' });
         }
 
-        // Permission check (remains the same)
-        if (!(community.owner.toString() === userId || community.admins.includes(userId))) {
+        // Permission check
+        if (!isOwnerOrAdmin(community, userId)) {
             return res.status(403).json({ success: false, message: 'Permission denied.' });
         }
 
@@ -1696,7 +1692,7 @@ exports.updateLogo = async (req, res) => {
         }
 
         // Permission check
-        if (!(community.owner.toString() === userId || community.admins.includes(userId))) {
+        if (!isOwnerOrAdmin(community, userId)) {
             return res.status(403).json({ success: false, message: 'Permission denied.' });
         }
 
