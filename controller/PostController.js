@@ -8,7 +8,7 @@ const { uploadMultipleImagesToCloudinary, uploadVideoToCloudinary, uploadImageTo
 const mongoose = require("mongoose");
 const CompanyDetails = require("../modules/companyDetails");
 const Like = require("../modules/like");
-const {addUserData} = require("../controller/UserController");
+const { addUserData } = require("../controller/UserController");
 
 exports.createPost = async (req, res) => {
     try {
@@ -551,19 +551,39 @@ exports.getCommentsByUser = async (req, res) => {
         }
 
         const comments = await Comment.find({ userId: userId })
-            .populate("postId", "title")
+            .populate({
+                path: "postId",
+                populate: {
+                    path: "userId",
+                    model: "User",
+                    select: "name profileImage"
+                }
+            })
             .populate("userId", "name profileImage");
 
         const formatComment = async (comment) => {
             await comment.populate("replies");
             await comment.populate("userId");
             const user = comment.userId;
+
+            // Format post object if it exists
+            let postData = null;
+            if (comment.postId) {
+                const postAuthor = comment.postId.userId;
+                postData = {
+                    _id: comment.postId._id,
+                    content: comment.postId.discription || "",
+                    author: {
+                        _id: postAuthor?._id || postAuthor,
+                        name: postAuthor?.name || "Unknown User",
+                        profilePicture: postAuthor?.profileImage || null
+                    }
+                };
+            }
+
             return {
                 id: comment._id,
-                post: comment.postId ? {
-                    id: comment.postId._id,
-                    title: comment.postId.title
-                } : null,
+                post: postData,
                 author: {
                     id: user?._id,
                     name: user?.name,
@@ -1193,11 +1213,11 @@ exports.getPosts = async (req, res) => {
             });
         }
 
-        user = await addUserData(user._id); 
+        user = await addUserData(user._id);
 
         const following = user.following || [];
         const followers = user.followers || [];
-       
+
         let people = [...new Set([...following].map(connection => connection.following._id.toString()))];
         people = [...new Set([...followers].map(connection => connection.follower._id.toString()))];
 
@@ -1265,7 +1285,7 @@ exports.getPosts = async (req, res) => {
         /** ---------------- BACKFILL WITH TRENDING ---------------- */
         if (combinedPosts.length < limit) {
             const remaining = limit - combinedPosts.length;
-            
+
             const trendingPosts = await Post.aggregate([
                 {
                     $match: {
