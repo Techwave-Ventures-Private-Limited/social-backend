@@ -8,12 +8,12 @@ const { uploadMultipleImagesToCloudinary, uploadVideoToCloudinary, uploadImageTo
 const mongoose = require("mongoose");
 const CompanyDetails = require("../modules/companyDetails");
 const Like = require("../modules/like");
-const {addUserData} = require("../controller/UserController");
+const { addUserData } = require("../controller/UserController");
 
 exports.createPost = async (req, res) => {
     try {
 
-        let { discription, postType, originalPostId, videoLink, pollOptions } = req.body || "";
+        let { discription, postType, originalPostId, videoLink, pollOptions, resourceUrl, resourceType } = req.body || "";
         const { isReposted } = req.body || false;
         const userId = req.userId;
         // console.log("User request to upload a post", req.body)
@@ -66,7 +66,9 @@ exports.createPost = async (req, res) => {
             user,
             originalPostId,
             isReposted,
-            pollOptions
+            pollOptions,
+            resourceUrl,
+            resourceType
         });
         user.posts.push(createdPost._id);
         await user.save();
@@ -107,7 +109,7 @@ exports.getPost = async (req, res) => {
         // Compute isLiked for the current user (consistent with feed responses)
         let isLiked = false;
         if (req.userId) {
-            const like = await Like.find({ userId: req.userId });
+            const like = await Like.find({ userId: req.userId, postId: postId });
             if (like.length > 0) {
                 isLiked = true;
             }
@@ -551,19 +553,39 @@ exports.getCommentsByUser = async (req, res) => {
         }
 
         const comments = await Comment.find({ userId: userId })
-            .populate("postId", "title")
+            .populate({
+                path: "postId",
+                populate: {
+                    path: "userId",
+                    model: "User",
+                    select: "name profileImage"
+                }
+            })
             .populate("userId", "name profileImage");
 
         const formatComment = async (comment) => {
             await comment.populate("replies");
             await comment.populate("userId");
             const user = comment.userId;
+
+            // Format post object if it exists
+            let postData = null;
+            if (comment.postId) {
+                const postAuthor = comment.postId.userId;
+                postData = {
+                    _id: comment.postId._id,
+                    content: comment.postId.discription || "",
+                    author: {
+                        _id: postAuthor?._id || postAuthor,
+                        name: postAuthor?.name || "Unknown User",
+                        profilePicture: postAuthor?.profileImage || null
+                    }
+                };
+            }
+
             return {
                 id: comment._id,
-                post: comment.postId ? {
-                    id: comment.postId._id,
-                    title: comment.postId.title
-                } : null,
+                post: postData,
                 author: {
                     id: user?._id,
                     name: user?.name,
@@ -795,7 +817,10 @@ exports.formatPost = async (post, currentUser = null) => {
         companyDetails: post.userId.companyDetails,
         // Poll fields for feed consumers
         pollOptions,
+        pollOptions,
         totalVotes,
+        resourceUrl: post.resourceUrl,
+        resourceType: post.resourceType,
     };
 };
 
@@ -888,7 +913,10 @@ const formatPost = async (post, currentUser = null) => {
         communityId,
         // Poll fields for feed consumers
         pollOptions,
+        pollOptions,
         totalVotes,
+        resourceUrl: post.resourceUrl,
+        resourceType: post.resourceType,
     };
 };
 
@@ -1193,11 +1221,11 @@ exports.getPosts = async (req, res) => {
             });
         }
 
-        user = await addUserData(user._id); 
+        user = await addUserData(user._id);
 
         const following = user.following || [];
         const followers = user.followers || [];
-       
+
         let people = [...new Set([...following].map(connection => connection.following._id.toString()))];
         people = [...new Set([...followers].map(connection => connection.follower._id.toString()))];
 
@@ -1265,7 +1293,7 @@ exports.getPosts = async (req, res) => {
         /** ---------------- BACKFILL WITH TRENDING ---------------- */
         if (combinedPosts.length < limit) {
             const remaining = limit - combinedPosts.length;
-            
+
             const trendingPosts = await Post.aggregate([
                 {
                     $match: {

@@ -12,6 +12,7 @@ const { createAdapter } = require("@socket.io/redis-adapter");
 const jwt = require('jsonwebtoken'); // You'll need this for auth
 const { initializeCommunitySocket } = require('./utils/communitySocketHelper');
 const nodemailer = require('nodemailer');
+const fs = require('fs');
 
 // --- Import Redis Connection ---
 const { redisClient, subClient } = require("./config/redis");
@@ -64,6 +65,7 @@ const opportunityRouter = require("./route/opportunityRoutes");
 const experienceRouter = require("./route/expVerifyRoute");
 const jobRouter = require("./route/jobRoute");
 const applicationRouter = require("./route/applicationRoute");
+const shareRouter = require("./route/shareRoute");
 
 
 // --- Models (needed for socket logic) ---
@@ -149,6 +151,7 @@ app.use("/opportunity", opportunityRouter);
 app.use("/experience", experienceRouter);
 app.use("/job", jobRouter);
 app.use("/application", applicationRouter);
+app.use("/share", shareRouter);
 
 // --- Health Check and Root Routes ---
 app.use("/hailing",(req,res)=>{
@@ -161,6 +164,20 @@ app.use("/hailing",(req,res)=>{
 app.get("/",(req, res)=>{
     return res.send(`<h1>Working..</h1>`)
 })
+
+app.get('/.well-known/assetlinks.json', (req, res) => {
+    const filePath = path.join(__dirname, '.well-known', 'assetlinks.json');
+    
+    // Check if the file exists before trying to read it
+    if (fs.existsSync(filePath)) {
+        res.sendFile(filePath, { headers: { 
+            // Crucial: Set the content type explicitly
+            'Content-Type': 'application/json' 
+        }});
+    } else {
+        res.status(404).send('Not Found');
+    }
+});
 
 // Middleware for authenticating socket connections
 io.use(async (socket, next) => {

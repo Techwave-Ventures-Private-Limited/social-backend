@@ -5,7 +5,7 @@ const Opportunity = require("../modules/opportunity");
 const { uploadMultipleImagesToCloudinary, uploadImageToCloudinary } = require("../utils/imageUploader");
 const { createNotification } = require('../utils/notificationUtils');
 
-exports.createShowcase = async(req,res) => {
+exports.createShowcase = async (req, res) => {
     try {
 
         const userId = req.userId;
@@ -35,10 +35,10 @@ exports.createShowcase = async(req,res) => {
             bannerImageUrl = uploadedBannerImage.secure_url;
         }
 
-        const {category, projectTitle, tagline, description, problem, solution, revenueModel, demoVideoLink, tags, projectLinks, opportunities: opportunitiesString} = req.body;
+        const { category, projectTitle, tagline, description, problem, solution, revenueModel, demoVideoLink, tags, projectLinks, opportunities: opportunitiesString } = req.body;
 
         console.log(req.body);
-        
+
         let opportunities = [];
         if (opportunitiesString) {
             try {
@@ -70,7 +70,7 @@ exports.createShowcase = async(req,res) => {
         //    Now, create the opportunities and link them
         let createdOpportunities = [];
         if (opportunities && Array.isArray(opportunities) && opportunities.length > 0) {
-            
+
             const opportunityDocs = opportunities.map(op => ({
                 ...op, // (title, description, category, skills)
                 showcaseId: createdShowcase._id,
@@ -78,7 +78,7 @@ exports.createShowcase = async(req,res) => {
             }));
 
             createdOpportunities = await Opportunity.insertMany(opportunityDocs);
-            
+
             const opportunityIds = createdOpportunities.map(op => op._id);
             createdShowcase.opportunities = opportunityIds;
             await createdShowcase.save();
@@ -95,7 +95,7 @@ exports.createShowcase = async(req,res) => {
             }
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
@@ -103,22 +103,28 @@ exports.createShowcase = async(req,res) => {
     }
 }
 
-exports.getShowcases = async(req,res) => {
+exports.getShowcases = async (req, res) => {
     try {
 
         const showcases = await Showcase.find()
             .populate('opportunities')
             .lean();
-        
+
+        // Transform upvotesUsers -> upvoters for frontend compatibility
+        const transformed = showcases.map(s => ({
+            ...s,
+            upvoters: s.upvotesUsers || []  // Ensure upvoters array is sent
+        }));
+
         console.log(showcases);
-        
+
         return res.status(200).json({
             success: true,
             message: "Showcase found",
-            body: showcases
+            body: transformed
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
@@ -126,19 +132,25 @@ exports.getShowcases = async(req,res) => {
     }
 }
 
-exports.getUserShowcase = async(req,res) => {
+exports.getUserShowcase = async (req, res) => {
     try {
         const userId = req.userId;
 
-        const showcases = await Showcase.find({userId : userId});
-        
+        const showcases = await Showcase.find({ userId: userId }).lean();
+
+        // Transform upvotesUsers -> upvoters for frontend compatibility
+        const transformed = showcases.map(s => ({
+            ...s,
+            upvoters: s.upvotesUsers || []
+        }));
+
         return res.status(200).json({
             success: true,
             message: "Showcase found",
-            body: showcases
+            body: transformed
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
@@ -146,10 +158,10 @@ exports.getUserShowcase = async(req,res) => {
     }
 }
 
-exports.deleteShowcase = async(req,res) => {
+exports.deleteShowcase = async (req, res) => {
     try {
 
-        const {showcaseId} = req.params;
+        const { showcaseId } = req.params;
 
         if (!showcaseId) {
             return res.status(400).json({
@@ -165,7 +177,7 @@ exports.deleteShowcase = async(req,res) => {
             message: "Showcase deleted"
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
@@ -173,7 +185,7 @@ exports.deleteShowcase = async(req,res) => {
     }
 }
 
-exports.upvote = async(req,res) => {
+exports.upvote = async (req, res) => {
     try {
         const showcaseId = req.params.showcaseId;
 
@@ -197,7 +209,7 @@ exports.upvote = async(req,res) => {
             message: "Upvote successfull"
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
@@ -205,7 +217,7 @@ exports.upvote = async(req,res) => {
     }
 }
 
-exports.downvote = async(req,res) => {
+exports.downvote = async (req, res) => {
     try {
         const showcaseId = req.params.showcaseId;
 
@@ -229,7 +241,7 @@ exports.downvote = async(req,res) => {
             message: "Downvote successfull"
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message

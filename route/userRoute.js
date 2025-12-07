@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const {getUser, updateUser, uploadProfileImage, sendForgotPasswordEmail, verifyForgotPasswordOtp, changePassword, uploadBannerImage, getAnotherUser, addPortfolio, registerDeviceToken, deletePortfolio, getBulkUsers, getSelfFollowers, getSelfFollowing, getUserFollowers, getUserFollowing, getConnections, getRecommendedUsers, getUserPortfolio, getAnotherUserPortfolio} = require("../controller/UserController");
+const {getUser, updateUser, uploadProfileImage, sendForgotPasswordEmail, verifyForgotPasswordOtp, changePassword, uploadBannerImage, getAnotherUser, addPortfolio, registerDeviceToken, deletePortfolio, getBulkUsers, getSelfFollowers, getSelfFollowing, getUserFollowers, getUserFollowing, getConnections, getRecommendedUsers, getSeedProfiles, getUserPortfolio, getAnotherUserPortfolio} = require("../controller/UserController");
 const {createStory, getFollowingStories, getCurrentStory, deleteStory, markStoryAsViewed, markStoriesAsViewed} = require("../controller/StoryController");
 const {auth}  = require("../middleware/authMiddleware");
 const { checkStreak } = require('../middleware/checkStreak');
@@ -55,6 +55,7 @@ router.get('/connections', auth, getConnections);
 
 // NEW RECOMMENDATION ROUTE
 router.get("/recommendations", auth, getRecommendedUsers);
+router.get("/seed-profiles", auth, getSeedProfiles);
 
 router.get("/:userId", auth, getAnotherUser);
 
