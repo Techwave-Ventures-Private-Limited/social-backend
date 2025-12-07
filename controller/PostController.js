@@ -13,7 +13,7 @@ const { addUserData } = require("../controller/UserController");
 exports.createPost = async (req, res) => {
     try {
 
-        let { discription, postType, originalPostId, videoLink, pollOptions } = req.body || "";
+        let { discription, postType, originalPostId, videoLink, pollOptions, resourceUrl, resourceType } = req.body || "";
         const { isReposted } = req.body || false;
         const userId = req.userId;
         // console.log("User request to upload a post", req.body)
@@ -66,7 +66,9 @@ exports.createPost = async (req, res) => {
             user,
             originalPostId,
             isReposted,
-            pollOptions
+            pollOptions,
+            resourceUrl,
+            resourceType
         });
         user.posts.push(createdPost._id);
         await user.save();
@@ -815,7 +817,10 @@ exports.formatPost = async (post, currentUser = null) => {
         companyDetails: post.userId.companyDetails,
         // Poll fields for feed consumers
         pollOptions,
+        pollOptions,
         totalVotes,
+        resourceUrl: post.resourceUrl,
+        resourceType: post.resourceType,
     };
 };
 
@@ -908,7 +913,10 @@ const formatPost = async (post, currentUser = null) => {
         communityId,
         // Poll fields for feed consumers
         pollOptions,
+        pollOptions,
         totalVotes,
+        resourceUrl: post.resourceUrl,
+        resourceType: post.resourceType,
     };
 };
 
