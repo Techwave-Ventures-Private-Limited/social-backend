@@ -37,7 +37,7 @@ exports.getRecommendations = async (userId) => {
   exclusionSet.add(userId.toString());
 
   // --- Step 2: Find all 2nd-degree "follows-of-follows" ---
-  const firstDegreeIds = currentUser.following;
+  let firstDegreeIds = currentUser.following;
 
   // If the user isn't following anyone, use the default seed list
   if (!firstDegreeIds || firstDegreeIds.length === 0) {

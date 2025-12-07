@@ -1,4 +1,5 @@
 const User = require('../modules/user'); // Adjust path as needed
+const Connection = require("../modules/connection");
 const { createNotification } = require('../utils/notificationUtils');
 
 /**
@@ -32,17 +33,28 @@ exports.createFollowship = async (userId, userToFollowId) => {
     }
 
     // 4. Check if already following (prevents duplicate entries)
-    if (user.following.includes(userToFollow._id)) {
+    /*if (user.following.includes(userToFollow._id)) {
         console.warn(`[FollowService] User ${userId} is already following ${userToFollowId}.`);
+        return;
+    }*/
+
+    const isAlreadyPresent = await Connection.findOne({follower : userId, following: userToFollowId});
+    console.log(isAlreadyPresent);
+    if (isAlreadyPresent) {
+        console.log("Already followed");
         return;
     }
 
     // 5. Perform the follow logic (this is from your function)
-    user.following.push(userToFollow._id);
-    userToFollow.followers.push(user._id);
+    // user.following.push(userToFollow._id);
+    // userToFollow.followers.push(user._id);
+    
+    user.followingCount = user.followingCount + 1;
+    userToFollow.followerCount = user.followerCount + 1;
 
     // 6. Save both users in parallel
     await Promise.all([
+        Connection.create({follower : userId, following: userToFollowId}),
         user.save(),
         userToFollow.save()
     ]);

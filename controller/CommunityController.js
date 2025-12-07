@@ -14,6 +14,7 @@ const {
     emitRoleChange
 } = require('../utils/communitySocketHelper');
 const { uploadVideoToCloudinary, uploadImageToCloudinary } = require("../utils/imageUploader");
+const Like = require("../modules/like");
 
 // ================================
 // COMMUNITY CRUD OPERATIONS
@@ -31,9 +32,9 @@ exports.createCommunity = async (req, res) => {
             requiresApproval,
             settings,
             category
-        } = req.body;        
+        } = req.body;
 
-    let logo = req.files && req.files.logo;
+        let logo = req.files && req.files.logo;
         let coverImage = req.files && req.files.coverImage;
 
         const userId = req.userId;
@@ -50,7 +51,7 @@ exports.createCommunity = async (req, res) => {
         }
 
         // Check if community name already exists
-        const existingCommunity = await Community.findOne({ 
+        const existingCommunity = await Community.findOne({
             name: { $regex: new RegExp(`^${name}$`, 'i') }
         });
 
@@ -381,7 +382,7 @@ exports.deleteCommunity = async (req, res) => {
 
         // Delete all related posts and comments
         await CommunityPost.deleteMany({ communityId: id });
-        await CommunityComment.deleteMany({ 
+        await CommunityComment.deleteMany({
             postId: { $in: community.posts }
         });
         await JoinRequest.deleteMany({ communityId: id });
@@ -613,7 +614,7 @@ exports.joinCommunity = async (req, res) => {
         if (community.requiresApproval) {
             // Create join request
             const user = await User.findById(userId).select('name profileImage');
-            
+
             const joinRequest = new JoinRequest({
                 userId,
                 userName: user.name,
@@ -623,7 +624,7 @@ exports.joinCommunity = async (req, res) => {
             });
 
             await joinRequest.save();
-            
+
             community.joinRequests.push(joinRequest._id);
             await community.save();
 
@@ -722,9 +723,9 @@ exports.getUserCommunities = async (req, res) => {
             members: userId,
             isDeleted: { $ne: true }
         })
-        .populate('owner', 'name profileImage')
-        .sort({ lastActivity: -1 })
-        .lean();
+            .populate('owner', 'name profileImage')
+            .sort({ lastActivity: -1 })
+            .lean();
 
         // Add user role for each community
         const communitiesWithRoles = communities.map(community => ({
@@ -800,7 +801,7 @@ exports.createCommunityPost = async (req, res) => {
 
         if (files) {
             files = Array.isArray(files) ? files : [files];
-            for (const file of files) {    
+            for (const file of files) {
                 const isVideo = file.mimetype.startsWith("video");
                 if (isVideo) {
                     const uploadedVideo = await uploadVideoToCloudinary(file, process.env.FOLDER_NAME || "post", "auto");
@@ -825,10 +826,10 @@ exports.createCommunityPost = async (req, res) => {
             discription: discription.trim(),
             media: mediaUrls,
             subtype: type,
-            type:"Community",
+            type: "Community",
             resourceUrl,
             resourceType,
-            postType:"public",
+            postType: "public",
             userId: userId,
             pollOptions
         });
@@ -917,11 +918,11 @@ exports.getPostsForHomeFeed = async (req, res) => {
             user: { $in: followingIds },
             postType: 'public'
         })
-        .populate('user', 'name profileImage')
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(parseInt(limit))
-        .lean();
+            .populate('user', 'name profileImage')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit))
+            .lean();
 
         // Combine and sort all posts by creation date
         const allPosts = [
@@ -969,7 +970,7 @@ exports.getCommunityPosts = async (req, res) => {
 
         const userId = req.userId;
         const currentUser = await User.findById(userId);
- 
+
         if (!currentUser) {
             return res.status(400).json({
                 success: false,
@@ -1031,7 +1032,7 @@ exports.getCommunityPosts = async (req, res) => {
 
         const posts = await CommunityPost.find(query)
             .populate('authorId', 'name profileImage')
-            .populate('likes', 'name')
+            // .populate('likes', 'name') // likes is a number now
             .populate({
                 path: 'comments',
                 populate: { path: 'userId', select: 'name profileImage' },
@@ -1042,29 +1043,38 @@ exports.getCommunityPosts = async (req, res) => {
             .limit(parseInt(limit))
             .lean();
 
+        // Fetch all likes for these posts by this user
+        let likedPostIds = new Set();
+        if (userId) {
+            const postIds = posts.map(p => p._id);
+            const likes = await Like.find({
+                userId: userId,
+                postId: { $in: postIds }
+            });
+            likedPostIds = new Set(likes.map(l => l.postId.toString()));
+        }
 
         return res.status(200).json({
             success: true,
             posts: posts.map(post => {
                 const isBookmarked = currentUser?.savedPost?.some(
-                id => id.toString() === post._id.toString()
+                    id => id.toString() === post._id.toString()
                 ) || false;
 
-                const isLiked = currentUser?.likedPost?.some(
-                id => id.toString() === post._id.toString()
-                ) || false;
+                const isLiked = likedPostIds.has(post._id.toString());
 
                 return {
-                ...post.toObject?.() || post, // ensure plain object
-                isLiked,
-                isBookmarked,
+                    ...post, // lean() returns plain object
+                    isLiked,
+                    isBookmarked,
+                    likesCount: post.likes || 0 // Ensure likesCount is available
                 };
             }),
             pagination: {
                 currentPage: parseInt(page),
                 hasNextPage: posts.length === parseInt(limit),
             },
-            });
+        });
 
     } catch (error) {
         console.error("Error fetching community posts:", error);
@@ -1078,6 +1088,7 @@ exports.getCommunityPosts = async (req, res) => {
 
 
 
+// Like/Unlike community post
 // Like/Unlike community post
 exports.likeCommunityPost = async (req, res) => {
     try {
@@ -1110,26 +1121,40 @@ exports.likeCommunityPost = async (req, res) => {
             });
         }
 
-        const hasLiked = post.likes.includes(userId);
+        // Check if the like already exists
+        const existingLike = await Like.findOne({ userId, postId });
+        let isLiked = false;
 
-        if (hasLiked) {
-            post.likes = post.likes.filter(id => id.toString() !== userId);
+        if (existingLike) {
+            // Unlike
+            await Like.findByIdAndDelete(existingLike._id);
+            post.likes = Math.max(0, post.likes - 1);
+            isLiked = false;
         } else {
-            post.likes.push(userId);
+            // Like
+            await Like.create({ userId, postId });
+            post.likes += 1;
+            isLiked = true;
         }
 
         await post.save();
 
-        if (!user.likedPost.some(id => id.toString() === post._id.toString())) {
-            user.likedPost.push(post._id);
+        // Update user.likedPost array (legacy support)
+        if (isLiked) {
+            if (!user.likedPost.some(id => id.toString() === post._id.toString())) {
+                user.likedPost.push(post._id);
+                await user.save();
+            }
+        } else {
+            user.likedPost = user.likedPost.filter(id => id.toString() !== post._id.toString());
             await user.save();
         }
 
         return res.status(200).json({
             success: true,
-            message: hasLiked ? "Post unliked" : "Post liked",
-            isLiked: !hasLiked,
-            likesCount: post.likes.length
+            message: isLiked ? "Post liked" : "Post unliked",
+            isLiked: isLiked,
+            likesCount: post.likes
         });
 
     } catch (error) {
@@ -1178,12 +1203,12 @@ exports.addCommentToCommunityPost = async (req, res) => {
 
         // Add comment to post
         post.comments.push(newComment._id);
-        
+
         // If this is a question post, mark as answered
         if (post.type === 'question') {
             post.isAnswered = true;
         }
-        
+
         await post.save();
 
         // Update community last activity
@@ -1322,7 +1347,7 @@ exports.getAllJoinRequests = async (req, res) => {
         if (!community) {
             return res.status(404).json({ success: false, message: "Community not found" });
         }
-        if (!isOwnerOrAdmin(community, userId)) {
+        if (!isOwnerAdminOrModerator(community, userId)) {
             return res.status(403).json({ success: false, message: "Permission denied" });
         }
         const joinRequests = await JoinRequest.find({ communityId, status: 'pending' });
@@ -1342,7 +1367,7 @@ exports.bulkHandleJoinRequests = async (req, res) => {
         if (!community) {
             return res.status(404).json({ success: false, message: "Community not found" });
         }
-        if (!isOwnerOrAdmin(community, userId)) {
+        if (!isOwnerAdminOrModerator(community, userId)) {
             return res.status(403).json({ success: false, message: "Permission denied" });
         }
         let results = { approved: [], rejected: [], errors: [] };
@@ -1451,20 +1476,16 @@ exports.removeRole = async (req, res) => {
         }
 
         // Only owner and admins can remove roles
-        if (community.owner.toString() !== userId && !community.admins.includes(userId)) {
+        if (!isOwnerOrAdmin(community, userId)) {
             return res.status(403).json({ success: false, message: "Permission denied" });
         }
 
-        // Use $pull to remove the memberId from both admins and moderators arrays
-        await Community.updateOne(
-            { _id: id },
-            {
-                $pull: {
-                    admins: memberId,
-                    moderators: memberId,
-                },
-            }
-        );
+        // Remove from existing role arrays
+        community.admins = community.admins.filter(id => id.toString() !== memberId);
+        community.moderators = community.moderators.filter(id => id.toString() !== memberId);
+
+        community.lastActivity = new Date();
+        await community.save();
 
         return res.status(200).json({ success: true, message: "User role removed successfully. The user is now a member." });
 
@@ -1597,10 +1618,10 @@ exports.deleteCommunityPost = async (req, res) => {
         }
 
         const community = await Community.findById(post.communityId);
-        
+
         // Check if user can delete (owner of post or community moderator)
-        const canDelete = post.authorId.toString() === userId || 
-                         isOwnerAdminOrModerator(community, userId);
+        const canDelete = post.authorId.toString() === userId ||
+            isOwnerAdminOrModerator(community, userId);
 
         if (!canDelete) {
             return res.status(403).json({
@@ -1644,7 +1665,7 @@ exports.updateCoverImage = async (req, res) => {
         if (!req.files || Object.keys(req.files).length === 0 || !req.files.coverImage) {
             return res.status(400).json({ success: false, message: 'No cover image file uploaded' });
         }
-        
+
         // 2. Access the file directly from req.files
         const coverImageFile = req.files.coverImage;
 
@@ -1653,8 +1674,8 @@ exports.updateCoverImage = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Community not found' });
         }
 
-        // Permission check (remains the same)
-        if (!(community.owner.toString() === userId || community.admins.includes(userId))) {
+        // Permission check
+        if (!isOwnerOrAdmin(community, userId)) {
             return res.status(403).json({ success: false, message: 'Permission denied.' });
         }
 
@@ -1666,10 +1687,10 @@ exports.updateCoverImage = async (req, res) => {
         community.lastActivity = new Date();
         await community.save();
 
-        return res.status(200).json({ 
-            success: true, 
-            message: 'Cover image updated successfully', 
-            coverImage: community.coverImage 
+        return res.status(200).json({
+            success: true,
+            message: 'Cover image updated successfully',
+            coverImage: community.coverImage
         });
 
     } catch (error) {
@@ -1696,7 +1717,7 @@ exports.updateLogo = async (req, res) => {
         }
 
         // Permission check
-        if (!(community.owner.toString() === userId || community.admins.includes(userId))) {
+        if (!isOwnerOrAdmin(community, userId)) {
             return res.status(403).json({ success: false, message: 'Permission denied.' });
         }
 
@@ -1708,10 +1729,10 @@ exports.updateLogo = async (req, res) => {
         community.lastActivity = new Date();
         await community.save();
 
-        return res.status(200).json({ 
-            success: true, 
-            message: 'Logo updated successfully', 
-            logo: community.logo 
+        return res.status(200).json({
+            success: true,
+            message: 'Logo updated successfully',
+            logo: community.logo
         });
 
     } catch (error) {
@@ -1733,36 +1754,42 @@ function getUserRoleInCommunity(community, userId) {
 }
 
 function isOwnerOrAdmin(community, userId) {
-    return community.owner.toString() === userId || 
-           community.admins.some(admin => admin.toString() === userId);
+    return community.owner.toString() === userId ||
+        community.admins.some(admin => admin.toString() === userId);
 }
 
 function isOwnerAdminOrModerator(community, userId) {
-    return community.owner.toString() === userId || 
-           community.admins.some(admin => admin.toString() === userId) ||
-           community.moderators.some(mod => mod.toString() === userId);
+    return community.owner.toString() === userId ||
+        community.admins.some(admin => admin.toString() === userId) ||
+        community.moderators.some(mod => mod.toString() === userId);
 }
 
-exports.getCommunityMembers = async(req,res) => {
+exports.getCommunityMembers = async (req, res) => {
     try {
 
         const userId = req.userId;
         const communityId = req.params.id;
 
         const community = await Community.findById(communityId).populate("members");
-        const user = await User.findById(userId);
 
-        if (!user.communities.includes(communityId)) {
-            return res.status(400).json({
+        if (!community) {
+            return res.status(404).json({
                 success: false,
-                message: "You do not have permission to access this community since you are not a member."
+                message: "Community not found"
             })
         }
 
-        if (!community) {
-            return res.status(400).json({
+        // Check if user is a member (handling populated members array)
+        const isMember = community.members.some(member => member._id.toString() === userId);
+
+        // Also check if user is owner or admin (just in case they are not in members list for some reason)
+        const isOwner = community.owner.toString() === userId;
+        const isAdmin = community.admins && community.admins.some(admin => admin.toString() === userId);
+
+        if (!isMember && !isOwner && !isAdmin) {
+            return res.status(403).json({
                 success: false,
-                message: "Community not found"
+                message: "You do not have permission to access this community since you are not a member."
             })
         }
 
@@ -1771,7 +1798,7 @@ exports.getCommunityMembers = async(req,res) => {
             members: community.members
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message

@@ -2,6 +2,7 @@ const User = require("../modules/user");
 const Education = require("../modules/education");
 const Experience = require("../modules/experience");
 const About = require("../modules/about");
+const Connection = require("../modules/connection");
 const mongoose = require("mongoose");
 const { uploadImageToCloudinary } = require("../utils/imageUploader");
 const mailSender = require("../utils/mailSender");
@@ -24,7 +25,7 @@ exports.getUser = async(req,res) => {
             })
         } 
 
-        const user = await User.findById(userId)
+        let user = await User.findById(userId)
             .populate({
                 path: 'about',
                 populate: [
@@ -43,6 +44,8 @@ exports.getUser = async(req,res) => {
                 message:"User not found"
             })
         }
+
+        user = await this.addUserData(user);
 
         return res.status(200).json({
             success:true,
@@ -148,7 +151,7 @@ exports.getAnotherUser = async(req,res) => {
             })
         } 
 
-        const user = await User.findById(userId)
+        let user = await User.findById(userId)
             .populate({
                 path: 'about',
                 populate: [
@@ -172,6 +175,8 @@ exports.getAnotherUser = async(req,res) => {
         if (currUser.following.includes(user._id)) {
             user.isFollowing = true;
         }
+
+        user = await this.addUserData(user);
 
         return res.status(200).json({
             success:true,
@@ -208,6 +213,66 @@ exports.getRecommendedUsers = async (req, res) => {
       success: false,
       message: "Failed to fetch recommendations",
       error: error.message,
+    });
+  }
+};
+
+
+exports.getSeedProfiles = async (req, res) => {
+//   console.log("[getSeedProfiles] Starting...");
+
+  try {
+    const rawIds = process.env.COFOUNDER_IDS;
+
+    if (!rawIds) {
+    //   console.warn("[getSeedProfiles] COFOUNDER_IDS env variable is missing!");
+      return res.status(200).json({
+        success: true,
+        message: "No seed IDs configured",
+        users: [] 
+      });
+    }
+
+    // 1. Parse and Explicitly Cast to ObjectId
+    const seedUserIds = rawIds.split(',').map(id => {
+      const trimmed = id.trim();
+      if (mongoose.Types.ObjectId.isValid(trimmed)) {
+        return new mongoose.Types.ObjectId(trimmed); 
+      }
+      return null;
+    }).filter(Boolean);
+
+    // console.log(`[getSeedProfiles] Querying for IDs:`, seedUserIds);
+
+    if (seedUserIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No valid seed IDs found",
+        users: []
+      });
+    }
+
+    // 2. Fetch users
+    const seedUsers = await User.find({ _id: { $in: seedUserIds } })
+      .select('_id name profileImage headline') 
+      .lean()
+      .maxTimeMS(5000); 
+
+    // console.log(`[getSeedProfiles] Success. Retrieved ${seedUsers.length} users.`);
+    
+    return res.status(200).json({
+      success: true,
+      message: "Seed profiles fetched successfully",
+      users: seedUsers, 
+    });
+
+  } catch (error) {
+    console.error("[getSeedProfiles] CRITICAL ERROR:", error);
+    
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch seed profiles",
+      error: error.message
     });
   }
 };
@@ -706,9 +771,16 @@ exports.getBulkUsers = async (req, res) => {
     const users = await User.find({ _id: { $in: ids } })
       .populate('companyDetails');
 
+    let usersList = [];
+
+    users.forEach(async(user) => {
+        user = await this.addUserData(user);
+        usersList.push(user);
+    })
+
     return res.status(200).json({
       success: true,
-      body: users,
+      body: usersList,
     });
   } catch (error) {
     return res.status(500).json({
@@ -832,10 +904,15 @@ exports.getUserFollowers = async (req, res) => {
         const { userId } = req.params;
 
         // Find all users who are following the specified userId
-        const followers = await User.find({ following: userId })
+        /*const followers = await User.find({ following: userId })
             .select('_id name profileImage bio headline')
             .populate('companyDetails')
-            .lean();
+            .lean();*/
+
+        const followers = await Connection.find({following : userId})
+            .select("follower")
+            .populate({path : "follower" , select : "_id name profileImage bio headline"}).lean();
+
 
         return res.status(200).json({
             success: true,
@@ -859,22 +936,15 @@ exports.getUserFollowing = async (req, res) => {
     try {
         const { userId } = req.params;
 
-        const user = await User.findById(userId)
-            .populate({
-                path: 'following',
-                select: '_id name profileImage bio headline',
-                populate: { path: 'companyDetails', model: 'CompanyDetails' }
-            })
-            .lean();
-
-        if (!user) {
-            return res.status(404).json({ success: false, message: "User not found" });
-        }
+        const followings = await Connection.find({follower : userId})
+            .select("following")
+            .populate({path : "following", select : "_id name profileImage bio headline", 
+                populate : {path : "companyDetails",  model : 'CompanyDetails'}}).lean();
 
         return res.status(200).json({
             success: true,
             message: `Following list for user ${userId} fetched successfully`,
-            body: user.following || [],
+            body: followings || [],
         });
 
     } catch (err) {
@@ -896,22 +966,13 @@ exports.getConnections = async (req, res) => {
             return res.status(401).json({ success: false, message: 'Authentication error: User ID not found.' });
         }
 
-        const user = await User.findById(userId)
-            .populate({
-                path: 'followers',
-                select: 'name profileImage headline',
-                populate: { path: 'companyDetails', model: 'CompanyDetails' }
-            })
-            .populate({
-                path: 'following',
-                select: 'name profileImage headline',
-                populate: { path: 'companyDetails', model: 'CompanyDetails' }
-            });
-
-        if (!user) {
-            console.error(`[CONNECTIONS] User with ID ${userId} not found in database.`);
-            return res.status(404).json({ success: false, message: 'User not found' });
-        }
+        const followers = await Connection.find({following : userId})
+            .select("follower")
+            .populate({path : "follower" , select : "_id name profileImage bio headline"}).lean();
+        const followings = await Connection.find({follower : userId})
+            .select("following")
+            .populate({path : "following", select : "_id name profileImage bio headline", 
+                populate : {path : "companyDetails",  model : 'CompanyDetails'}}).lean();
 
         // --- Critical Debugging Logs ---
         // console.log(`[CONNECTIONS] Found user: ${user.name}`);
@@ -923,13 +984,13 @@ exports.getConnections = async (req, res) => {
         const connectionsMap = new Map();
         
         // Add followers to the map
-        user.followers.forEach(follower => {
-            connectionsMap.set(follower._id.toString(), follower);
+        followers.forEach(follower => {
+            connectionsMap.set(follower.follower._id.toString(), follower);
         });
         
         // Add following to the map (will overwrite duplicates, which is fine)
-        user.following.forEach(followedUser => {
-            connectionsMap.set(followedUser._id.toString(), followedUser);
+        followings.forEach(followedUser => {
+            connectionsMap.set(followedUser.following._id.toString(), followedUser);
         });
 
         // Convert the map values back to an array for the response
@@ -943,3 +1004,26 @@ exports.getConnections = async (req, res) => {
         res.status(500).json({ success: false, message: 'Server error while fetching connections.', error: error.message });
     }
 };
+
+// private function to append followers and following details
+// can be resued to add other fields into user object in future
+exports.addUserData = async(user) => {
+    if (!user) {
+        return ;
+    }
+
+    const userId = user._id;
+
+    const followers = await Connection.find({following : userId})
+            .select("follower")
+            .populate({path : "follower" , select : "_id name profileImage bio headline"}).lean();
+    const followings = await Connection.find({follower : userId})
+            .select("following")
+            .populate({path : "following", select : "_id name profileImage bio headline", 
+                populate : {path : "companyDetails",  model : 'CompanyDetails'}}).lean();
+
+    user.followers = followers;
+    user.following = followings;
+
+    return user;
+}
