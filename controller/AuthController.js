@@ -200,7 +200,7 @@ exports.login = async(req,res) =>{
             })
         }
 
-        const user =  await User.findOne({email});
+        const user =  await User.findOne({email}).populate("companyDetails");
         if (!user){
             return res.status(402).json({
                 success:false,
