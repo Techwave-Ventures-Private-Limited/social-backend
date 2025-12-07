@@ -1,0 +1,11 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.rork.connektx",
+      "sha256_cert_fingerprints":
+        ["AB:BB:94:52:90:7E:3E:4A:E2:5F:FD:02:83:7D:EA:BA:86:A1:3A:F7:6D:0F:16:75:82:5A:BB:4A:45:3E:4E:AD"]
+    }
+  }
+]

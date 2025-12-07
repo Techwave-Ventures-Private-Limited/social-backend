@@ -12,6 +12,7 @@ const { createAdapter } = require("@socket.io/redis-adapter");
 const jwt = require('jsonwebtoken'); // You'll need this for auth
 const { initializeCommunitySocket } = require('./utils/communitySocketHelper');
 const nodemailer = require('nodemailer');
+const fs = require('fs');
 
 // --- Import Redis Connection ---
 const { redisClient, subClient } = require("./config/redis");
@@ -163,6 +164,20 @@ app.use("/hailing",(req,res)=>{
 app.get("/",(req, res)=>{
     return res.send(`<h1>Working..</h1>`)
 })
+
+app.get('/.well-known/assetlinks.json', (req, res) => {
+    const filePath = path.join(__dirname, '.well-known', 'assetlinks.json');
+    
+    // Check if the file exists before trying to read it
+    if (fs.existsSync(filePath)) {
+        res.sendFile(filePath, { headers: { 
+            // Crucial: Set the content type explicitly
+            'Content-Type': 'application/json' 
+        }});
+    } else {
+        res.status(404).send('Not Found');
+    }
+});
 
 // Middleware for authenticating socket connections
 io.use(async (socket, next) => {
