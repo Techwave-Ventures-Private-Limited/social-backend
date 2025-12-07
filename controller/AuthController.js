@@ -143,7 +143,7 @@ exports.signup = async (req, res) => {
     const newUserId = savedUser._id;
 
     if (COFOUNDER_IDS.length > 0) {
-      console.log(`[Signup] Scheduling ${COFOUNDER_IDS.length} individual follow jobs for new user ${newUserId}.`);
+      // console.log(`[Signup] Scheduling ${COFOUNDER_IDS.length} individual follow jobs for new user ${newUserId}.`);
       
       // Loop through each co-founder and schedule a separate job
       COFOUNDER_IDS.forEach(async (cofounderId, index) => {
@@ -164,7 +164,7 @@ exports.signup = async (req, res) => {
               removeOnFail: true
           });
           
-          console.log(`[Signup] Job scheduled: ${cofounderId} will follow ${newUserId} in ${delay / 60000} minutes.`);
+          // console.log(`[Signup] Job scheduled: ${cofounderId} will follow ${newUserId} in ${delay / 60000} minutes.`);
 
         } catch (queueError) {
           console.error(`[Signup] FAILED to schedule job for ${cofounderId} to follow ${newUserId}:`, queueError.message);

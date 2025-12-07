@@ -219,7 +219,7 @@ exports.getRecommendedUsers = async (req, res) => {
 
 
 exports.getSeedProfiles = async (req, res) => {
-//   console.log("[getSeedProfiles] Starting...");
+  // console.log("[getSeedProfiles] Starting...");
 
   try {
     const rawIds = process.env.COFOUNDER_IDS;

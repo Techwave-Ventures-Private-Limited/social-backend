@@ -183,9 +183,9 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
 io.use(async (socket, next) => {
     try {
 
-        console.log("Socket handshake auth:", socket.handshake.auth); // ADD THIS
+        // console.log("Socket handshake auth:", socket.handshake.auth); // ADD THIS
         const token = socket.handshake.auth.token;
-        console.log("Extracted JWT Token:", token); // ADD THIS
+        // console.log("Extracted JWT Token:", token); // ADD THIS
 
         if (!token) {
             return next(new Error('Authentication error: Token is required.'));
@@ -201,7 +201,7 @@ io.use(async (socket, next) => {
 });
 
 io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.userId} with socket ID: ${socket.id}`);
+    // console.log(`User connected: ${socket.userId} with socket ID: ${socket.id}`);
     socket.join(socket.userId);
     
     // Join community rooms for real-time updates
@@ -211,7 +211,7 @@ io.on('connection', (socket) => {
             if (Array.isArray(communityIds)) {
                 communityIds.forEach(communityId => {
                     socket.join(`community_${communityId}`);
-                    console.log(`User ${socket.userId} joined community room: community_${communityId}`);
+                    // console.log(`User ${socket.userId} joined community room: community_${communityId}`);
                 });
             }
         } catch (err) {
@@ -224,7 +224,7 @@ io.on('connection', (socket) => {
         try {
             const { communityId } = data;
             socket.leave(`community_${communityId}`);
-            console.log(`User ${socket.userId} left community room: community_${communityId}`);
+            // console.log(`User ${socket.userId} left community room: community_${communityId}`);
         } catch (err) {
             console.error('Error leaving community room:', err);
         }
@@ -281,7 +281,7 @@ io.on('connection', (socket) => {
 
     // Handle user disconnection
     socket.on('disconnect', () => {
-        console.log(`User disconnected: ${socket.userId}`);
+        // console.log(`User disconnected: ${socket.userId}`);
     });
 });
 

@@ -37,7 +37,7 @@ exports.createShowcase = async (req, res) => {
 
         const { category, projectTitle, tagline, description, problem, solution, revenueModel, demoVideoLink, tags, projectLinks, opportunities: opportunitiesString } = req.body;
 
-        console.log(req.body);
+        // console.log(req.body);
 
         let opportunities = [];
         if (opportunitiesString) {
@@ -116,7 +116,7 @@ exports.getShowcases = async (req, res) => {
             upvoters: s.upvotesUsers || []  // Ensure upvoters array is sent
         }));
 
-        console.log(showcases);
+        // console.log(showcases);
 
         return res.status(200).json({
             success: true,

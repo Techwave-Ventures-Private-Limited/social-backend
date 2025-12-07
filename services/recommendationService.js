@@ -41,7 +41,7 @@ exports.getRecommendations = async (userId) => {
 
   // If the user isn't following anyone, use the default seed list
   if (!firstDegreeIds || firstDegreeIds.length === 0) {
-    console.log(`[Recommender] User ${userId} has no follows. Using default seed list.`);
+    // console.log(`[Recommender] User ${userId} has no follows. Using default seed list.`);
     firstDegreeIds = DEFAULT_SEED_USER_IDS;
   }
 

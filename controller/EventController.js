@@ -11,12 +11,6 @@ exports.createEvent = async(req,res) => {
         const eventObject = req.body;
         const userId = req.userId;
 
-        console.log("--- Raw req.body received ---");
-        console.log(req.body);
-        console.log("Type of tags:", typeof req.body.tags);
-        console.log("Type of speakers:", typeof req.body.speakers);
-        console.log("-----------------------------");
-
         const { communityId } = eventObject;
 
         if (communityId) {
