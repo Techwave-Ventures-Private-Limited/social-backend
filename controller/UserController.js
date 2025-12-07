@@ -841,10 +841,10 @@ exports.getSelfFollowers = async (req, res) => {
     try {
         const userId = req.userId;
 
-        // Find all users who are following the current user
-        const followers = await User.find({ following: userId })
-            .select('_id name profileImage bio headline')
-            .populate('companyDetails')
+        // Find all Connection documents where the current user (userId) is the one being FOLLOWED.
+        const followers = await Connection.find({ following: userId })
+            .select("follower") // Only select the 'follower' field (the user who follows)
+            .populate({ path: "follower", select: "_id name profileImage headline" })
             .lean();
 
         return res.status(200).json({
@@ -857,7 +857,7 @@ exports.getSelfFollowers = async (req, res) => {
         console.error("Error in getSelfFollowers controller:", err.message);
         return res.status(500).json({
             success: false,
-            message: "Failed to fetch followers.",
+            message: "Failed to fetch self followers.",
         });
     }
 };
@@ -869,29 +869,23 @@ exports.getSelfFollowing = async (req, res) => {
     try {
         const userId = req.userId;
 
-        const user = await User.findById(userId)
-            .populate({
-                path: 'following',
-                select: '_id name profileImage bio headline',
-                populate: { path: 'companyDetails', model: 'CompanyDetails' }
-            })
+        // Find all Connection documents where the current user (userId) is the FOLLOWER.
+        const followings = await Connection.find({ follower: userId })
+            .select("following")
+            .populate({ path: "following", select: "_id name profileImage headline"})
             .lean();
-
-        if (!user) {
-            return res.status(404).json({ success: false, message: "User not found" });
-        }
 
         return res.status(200).json({
             success: true,
             message: "Following list fetched successfully",
-            body: user.following || [],
+            body: followings || [],
         });
 
     } catch (err) {
         console.error("Error in getSelfFollowing controller:", err.message);
         return res.status(500).json({
             success: false,
-            message: "Failed to fetch following list.",
+            message: "Failed to fetch self following list.",
         });
     }
 };
@@ -911,7 +905,8 @@ exports.getUserFollowers = async (req, res) => {
 
         const followers = await Connection.find({following : userId})
             .select("follower")
-            .populate({path : "follower" , select : "_id name profileImage bio headline"}).lean();
+            .populate({path : "follower" , select : "_id name profileImage headline"})
+            .lean();
 
 
         return res.status(200).json({
@@ -938,8 +933,8 @@ exports.getUserFollowing = async (req, res) => {
 
         const followings = await Connection.find({follower : userId})
             .select("following")
-            .populate({path : "following", select : "_id name profileImage bio headline", 
-                populate : {path : "companyDetails",  model : 'CompanyDetails'}}).lean();
+            .populate({path : "following", select : "_id name profileImage headline"})
+            .lean();
 
         return res.status(200).json({
             success: true,
