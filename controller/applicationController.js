@@ -7,11 +7,11 @@ const { uploadResumeToS3 } = require("../utils/s3Upload"); // Import the helper
 exports.applyForJob = async (req, res) => {
     try {
         const userId = req.userId;
-        const { 
-            jobId, 
-            coverLetter, 
-            portfolioLink, 
-            screeningAnswers 
+        const {
+            jobId,
+            coverLetter,
+            portfolioLink,
+            screeningAnswers
         } = req.body;
 
         // 2. Handle Resume Upload (The new Logic)
@@ -32,19 +32,19 @@ exports.applyForJob = async (req, res) => {
 
         // A. Basic Validation
         if (!jobId || !resumeUrl) {
-            return res.status(400).json({ 
-                success: false, 
-                message: "Job ID and Resume (PDF or Link) are required" 
+            return res.status(400).json({
+                success: false,
+                message: "Job ID and Resume (PDF or Link) are required"
             });
         }
 
         // B. Check if Job exists and is Accepting Applications
         const job = await Job.findById(jobId);
-        
+
         if (!job || !job.isActive) {
-            return res.status(404).json({ 
-                success: false, 
-                message: "Job not found or no longer accepting applications." 
+            return res.status(404).json({
+                success: false,
+                message: "Job not found or no longer accepting applications."
             });
         }
 
@@ -60,9 +60,9 @@ exports.applyForJob = async (req, res) => {
         // C. Check for Duplicate Application
         const existingApplication = await Application.findOne({ job: jobId, applicant: userId });
         if (existingApplication) {
-            return res.status(400).json({ 
-                success: false, 
-                message: "You have already applied for this job." 
+            return res.status(400).json({
+                success: false,
+                message: "You have already applied for this job."
             });
         }
 
@@ -84,7 +84,7 @@ exports.applyForJob = async (req, res) => {
         const newApplication = await Application.create({
             job: jobId,
             applicant: userId,
-            company: job.company, 
+            company: job.company,
             resume: resumeUrl, // This is now the AWS S3 Link
             coverLetter,
             portfolioLink,
@@ -110,17 +110,17 @@ exports.applyForJob = async (req, res) => {
 
     } catch (error) {
         console.error("Apply Error:", error);
-        
+
         if (error.code === 11000) {
-            return res.status(400).json({ 
-                success: false, 
-                message: "You have already applied for this job." 
+            return res.status(400).json({
+                success: false,
+                message: "You have already applied for this job."
             });
         }
-        
-        return res.status(500).json({ 
-            success: false, 
-            message: "Error submitting application" 
+
+        return res.status(500).json({
+            success: false,
+            message: "Error submitting application"
         });
     }
 };
@@ -130,7 +130,7 @@ exports.applyForJob = async (req, res) => {
 exports.updateApplicationStatus = async (req, res) => {
     try {
         // NOTE: Ensure your auth middleware sets req.userId (camelCase)
-        const recruiterId = req.userId; 
+        const recruiterId = req.userId;
         const { applicationId, status, note } = req.body;
 
         // 1. Find the Application and Populate the Job
@@ -138,9 +138,9 @@ exports.updateApplicationStatus = async (req, res) => {
         const application = await Application.findById(applicationId).populate('job');
 
         if (!application) {
-            return res.status(404).json({ 
-                success: false, 
-                message: "Application not found" 
+            return res.status(404).json({
+                success: false,
+                message: "Application not found"
             });
         }
 
@@ -149,11 +149,11 @@ exports.updateApplicationStatus = async (req, res) => {
         // ---------------------------------------------------------
         // Instead of a hardcoded array, we check the specific Job's workflow.
         const validStages = application.job.hiringWorkflow.map(step => step.stepName);
-        
+
         if (!validStages.includes(status)) {
-            return res.status(400).json({ 
-                success: false, 
-                message: `Invalid status. Allowed stages for this job are: ${validStages.join(", ")}` 
+            return res.status(400).json({
+                success: false,
+                message: `Invalid status. Allowed stages for this job are: ${validStages.join(", ")}`
             });
         }
         // ---------------------------------------------------------
@@ -187,9 +187,9 @@ exports.updateApplicationStatus = async (req, res) => {
 
     } catch (error) {
         console.error("Update Status Error:", error);
-        return res.status(500).json({ 
-            success: false, 
-            message: "Error updating status" 
+        return res.status(500).json({
+            success: false,
+            message: "Error updating status"
         });
     }
 };
@@ -199,7 +199,7 @@ exports.updateApplicationStatus = async (req, res) => {
 exports.getMyApplications = async (req, res) => {
     try {
         const userId = req.userid;
-        
+
         const applications = await Application.find({ applicant: userId })
             .populate({
                 path: "job",
@@ -240,7 +240,14 @@ exports.getJobApplications = async (req, res) => {
         // if (job.postedBy.toString() !== req.userid) return res.status(403)...
 
         const applications = await Application.find(filter)
-            .populate("applicant", "name email headline profileImage resume portfolioLink")
+            .populate({
+                path: "applicant",
+                select: "name email headline profileImage resume portfolioLink experience education",
+                populate: [
+                    { path: "experience", select: "role name startDate endDate current desc" },
+                    { path: "education", select: "school degree fos startDate endDate" }
+                ]
+            })
             .sort({ createdAt: -1 });
 
         return res.status(200).json({

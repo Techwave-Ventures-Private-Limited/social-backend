@@ -19,7 +19,7 @@ const uploadResumeToS3 = async (file, userId) => {
         Key: fileName,
         Body: file.buffer,
         ContentType: file.mimetype,
-        // ACL: 'public-read' // Uncomment if you want the file to be publicly accessible (Not recommended for resumes)
+        ACL: 'public-read' // Make file publicly accessible
     };
 
     await s3Client.send(new PutObjectCommand(uploadParams));
