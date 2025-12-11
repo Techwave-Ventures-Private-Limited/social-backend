@@ -148,7 +148,12 @@ exports.updateApplicationStatus = async (req, res) => {
         // 🌟 2. DYNAMIC VALIDATION (The Core Change)
         // ---------------------------------------------------------
         // Instead of a hardcoded array, we check the specific Job's workflow.
-        const validStages = application.job.hiringWorkflow.map(step => step.stepName);
+        let validStages = application.job.hiringWorkflow.map(step => step.stepName);
+
+        // Fallback for legacy jobs with no workflow defined
+        if (validStages.length === 0) {
+            validStages = ["Applied", "Viewed", "Shortlisted", "Selected", "Rejected"];
+        }
 
         if (!validStages.includes(status)) {
             return res.status(400).json({
