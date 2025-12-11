@@ -203,12 +203,12 @@ exports.updateApplicationStatus = async (req, res) => {
 // 3. CANDIDATE: Get My Applications
 exports.getMyApplications = async (req, res) => {
     try {
-        const userId = req.userid;
+        const userId = req.userId;
 
         const applications = await Application.find({ applicant: userId })
             .populate({
                 path: "job",
-                select: "title location locationType salaryRange experienceLevel",
+                select: "title location locationType salaryRange experienceLevel company",
                 populate: {
                     path: "company",
                     select: "name logo domain isVerified"
