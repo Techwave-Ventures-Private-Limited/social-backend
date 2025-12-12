@@ -7,8 +7,8 @@ exports.createJob = async (req, res) => {
     try {
         const userId = req.userId;
 
-        const { title, description, locations,locationType, openings,type, experienceLevel, salaryRange, 
-            skills, requirements, experienceId, applyMethod, externalApplyLink, customStages 
+        const { title, description, locations, locationType, openings, type, experienceLevel, salaryRange,
+            skills, requirements, experienceId, applyMethod, externalApplyLink, customStages
         } = req.body;
 
         // Normalise salaryRange so we always have a clean object
@@ -56,21 +56,21 @@ exports.createJob = async (req, res) => {
         if (customStages && Array.isArray(customStages) && customStages.length > 0) {
             // Option 1: User provided custom stages
             // customStages example: [{ name: "Assessment" }, { name: "Interview 1" }]
-            
+
             customStages.forEach((stage, index) => {
                 hiringWorkflow.push({
-                    stepName: stage.name, 
+                    stepName: stage.name,
                     stepType: "Custom",
                     // Start ordering from 2 (Applied is 1)
-                    order: index + 4, 
+                    order: index + 4,
                     description: stage.description || ""
                 });
             });
 
         } else {
             // Option 2: Default "Happy Path" if no custom stages provided
-            const defaultStages = [ "Interview" ];
-            
+            const defaultStages = ["Interview"];
+
             defaultStages.forEach((name, index) => {
                 hiringWorkflow.push({
                     stepName: name,
@@ -104,7 +104,7 @@ exports.createJob = async (req, res) => {
             postedBy: userId,
             applyMethod,
             externalApplyLink: applyMethod === "External" ? externalApplyLink : undefined,
-            hiringWorkflow: hiringWorkflow 
+            hiringWorkflow: hiringWorkflow
         });
 
         return res.status(201).json({
@@ -117,7 +117,7 @@ exports.createJob = async (req, res) => {
         console.log(error);
         return res.status(500).json({
             success: false,
-            message: error.message 
+            message: error.message
         });
     }
 };
@@ -126,20 +126,20 @@ exports.createJob = async (req, res) => {
 exports.getAllJobs = async (req, res) => {
     try {
         // 1. Destructure Query Parameters
-        const { 
-            keyword, 
-            location, 
-            locationType, 
+        const {
+            keyword,
+            location,
+            locationType,
             level,      // Experience Level (Intern, Senior, etc.)
             type,       // Job Type (Full-time, Contract)
-            salaryMin, 
-            page = 1, 
-            limit = 10 
+            salaryMin,
+            page = 1,
+            limit = 10
         } = req.query;
 
         // 2. Build the Query Object
         // Default: Only show active jobs that haven't expired
-        const query = { 
+        const query = {
             isActive: true,
             expiresAt: { $gt: new Date() } // Ensure job hasn't expired
         };
@@ -163,7 +163,7 @@ exports.getAllJobs = async (req, res) => {
         if (locationType) {
             query.locationType = locationType; // "Remote", "On-site", "Hybrid"
         }
-        
+
         if (level) {
             query.experienceLevel = level; // "Senior", "Entry Level"
         }
@@ -220,7 +220,7 @@ exports.getJobById = async (req, res) => {
             .populate("postedBy", "name headline profileImage email") // Recruiter info
             .populate({
                 path: "applications", // Optional: Only if you want to show how many applied
-                select: "_id" 
+                select: "_id applicant"
             });
 
         if (!job) {
@@ -257,13 +257,13 @@ exports.jobsByUserId = async (req, res) => {
         const { userId } = req.params;
         const jobs = await Job.find({ postedBy: userId })
             .populate("company", "name logo domain isVerified")
-            .sort({ createdAt: -1 });   
+            .sort({ createdAt: -1 });
         return res.status(200).json({
             success: true,
             count: jobs.length,
             data: jobs
         });
-    }   catch (error) {         
+    } catch (error) {
         console.log(error);
         return res.status(500).json({
             success: false,
