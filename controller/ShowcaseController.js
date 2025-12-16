@@ -105,10 +105,26 @@ exports.createShowcase = async (req, res) => {
 
 exports.getShowcases = async (req, res) => {
     try {
+        const Application = require("../modules/application");
 
         const showcases = await Showcase.find()
             .populate('opportunities')
             .lean();
+
+        // For each showcase, populate applicants for each opportunity
+        for (let showcase of showcases) {
+            if (showcase.opportunities && showcase.opportunities.length > 0) {
+                for (let opportunity of showcase.opportunities) {
+                    // Fetch applicants for this opportunity
+                    const applications = await Application.find({
+                        opportunityId: opportunity._id
+                    }).select('applicantId').lean();
+
+                    // Add applicants array to the opportunity
+                    opportunity.applicants = applications.map(app => app.applicantId.toString());
+                }
+            }
+        }
 
         // Transform upvotesUsers -> upvoters for frontend compatibility
         const transformed = showcases.map(s => ({
