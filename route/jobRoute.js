@@ -6,7 +6,8 @@ const {
     getAllJobs,
     getJobById,
     jobsByUserId,
-    closeJob
+    closeJob,
+    updateJob
 } = require("../controller/JobController");
 
 const { auth } = require("../middleware/authMiddleware");
@@ -14,6 +15,9 @@ const job = require("../modules/job");
 
 // @route   POST /job/create
 router.post("/create", auth, createJob);
+
+// @route   PUT /job/update/:id
+router.put("/update/:id", auth, updateJob);
 
 // @route   GET /job/all
 router.get("/all", getAllJobs);
