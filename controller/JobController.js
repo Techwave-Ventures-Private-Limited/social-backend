@@ -271,3 +271,44 @@ exports.jobsByUserId = async (req, res) => {
         });
     }
 };
+
+// Close Job
+exports.closeJob = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.userId;
+
+        const job = await Job.findById(id);
+
+        if (!job) {
+            return res.status(404).json({
+                success: false,
+                message: "Job not found"
+            });
+        }
+
+        // Check if the user is the owner
+        if (String(job.postedBy) !== String(userId)) {
+            return res.status(403).json({
+                success: false,
+                message: "You are not authorized to close this job"
+            });
+        }
+
+        job.isActive = false;
+        await job.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Job closed successfully",
+            data: job
+        });
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            success: false,
+            message: "Error closing job"
+        });
+    }
+};
