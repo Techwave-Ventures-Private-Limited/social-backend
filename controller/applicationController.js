@@ -208,7 +208,7 @@ exports.getMyApplications = async (req, res) => {
         const applications = await Application.find({ applicant: userId })
             .populate({
                 path: "job",
-                select: "title location locationType salaryRange experienceLevel company",
+                select: "title locations locationType salaryRange experienceLevel company isActive",
                 populate: {
                     path: "company",
                     select: "name logo domain isVerified"
@@ -275,7 +275,7 @@ exports.getApplicationById = async (req, res) => {
         const application = await Application.findById(id)
             .populate({
                 path: "job",
-                select: "title description locations company hiringWorkflow",
+                select: "title description locations company hiringWorkflow isActive",
                 populate: { path: "company", select: "name logo domain" }
             })
             .populate("applicant", "name email profileImage headline")
