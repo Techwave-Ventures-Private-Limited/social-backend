@@ -46,6 +46,7 @@ async function startBotsByType(botType) {
 async function startAllBots() {
     await startBotsByType("POST");
     await startBotsByType("COMMENT");
+    await startBotsByType("LIKE");
 }
 
 module.exports = { startAllBots };

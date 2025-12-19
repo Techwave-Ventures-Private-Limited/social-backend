@@ -29,6 +29,9 @@ function buildBotGraph() {
         } else if (state.bot.bt === "COMMENT") {
             //console.log("Commenting");
             return { bot: state.bot, action: "COMMENT" };
+        } else if (state.bot.bt === "LIKE") {
+            console.log("likig post");
+            return { bot: state.bot, action: "LIKE" };
         }
 
         return { action: "SKIP" };
@@ -102,6 +105,35 @@ function buildBotGraph() {
                 if (!res.ok) {
                     const errorBody = await res.text();
                     console.log("Comment error:", errorBody);
+                }
+            }
+        } else if (state.action === "LIKE") {
+            const posts = await Post.aggregate([
+                {
+                    $match: {
+                        category: state.bot.category,
+                        createdBy: { $ne: state.bot._id }
+                    }
+                },
+                { $sample: { size: 5 } }
+            ]);
+
+            for (const post of posts) {
+                const res = await fetch(`${process.env.BASE_URL}/post/like`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bot ${state.bot.bk}`
+                    },
+                    body: JSON.stringify({
+                        postId: post._id,
+                        userId: state.bot._id
+                    })
+                });
+
+                if (!res.ok) {
+                    const errorBody = await res.text();
+                    //console.log("Like error:", errorBody);
                 }
             }
         }

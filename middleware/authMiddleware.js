@@ -22,6 +22,7 @@ exports.auth = async (req, res, next) => {
             }
 
             req.userId = botUser._id;
+            req.ib = true;
             return next();
         }
 
@@ -41,6 +42,7 @@ exports.auth = async (req, res, next) => {
         try {
             const decode = jwt.verify(token, process.env.JWT_SECRET);
             req.userId = decode.id;
+            req.ib = false;
         } catch (err) {
             return res.status(401).json({
                 success: false,

@@ -165,6 +165,7 @@ exports.likePost = async (req, res) => {
 
         const postId = req.body.postId;
         const userId = req.userId;
+        const ib = req.ib || false;
 
         // 1. Check if the like already exists to avoid duplicates
         const existingLike = await Like.findOne({ userId, postId });
@@ -192,8 +193,9 @@ exports.likePost = async (req, res) => {
             return res.status(404).json({ success: false, message: "Post not found" });
         }
 
-        await createNotification(updatedPost.userId, userId, 'like', postId);
-
+        if (!ib) {
+            await createNotification(updatedPost.userId, userId, 'like', postId);
+        }
         // console.log("Post liked:", newLike);
 
         return res.status(200).json({
