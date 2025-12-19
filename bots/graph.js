@@ -30,7 +30,7 @@ function buildBotGraph() {
             //console.log("Commenting");
             return { bot: state.bot, action: "COMMENT" };
         } else if (state.bot.bt === "LIKE") {
-            console.log("likig post");
+            //console.log("likig post");
             return { bot: state.bot, action: "LIKE" };
         }
 
