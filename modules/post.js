@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const CATEGORY = require("../constants/CategoryEnum");
 
 const postSchema = new mongoose.Schema({
   type: {
@@ -110,11 +111,11 @@ const postSchema = new mongoose.Schema({
   },
   // Poll specific fields (for future use)
   pollOptions: [{
-      option: String,
-      votes: [{
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-      }],
+    option: String,
+    votes: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    }],
   }],
   // Resource specific fields (for future use)
   resourceUrl: {
@@ -126,6 +127,11 @@ const postSchema = new mongoose.Schema({
     enum: ["pdf", "link", "video", "document"],
     default: null,
   },
+  category: {
+    type: String,
+    enum: Object.values(CATEGORY),
+    default: "Technology & IT"
+  }
 });
 
 module.exports = mongoose.model("Post", postSchema);

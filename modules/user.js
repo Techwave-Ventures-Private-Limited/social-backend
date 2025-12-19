@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const CATEGORY = require("../constants/CategoryEnum");
 
 const userSchema = new mongoose.Schema({
 
@@ -174,22 +175,7 @@ const userSchema = new mongoose.Schema({
     },
     category: {
         type: String,
-        enum: ["Business & Entrepreneurship",
-            "Technology & IT",
-            "Design & Creative",
-            "Sales, Marketing & Growth",
-            "Product, Strategy & Operations",
-            "Finance, Legal & HR",
-            "Law & Compliance",
-            "Industry & Trade",
-            "Retail & Services",
-            "Education & Training",
-            "Healthcare & Wellness",
-            "Media, Content & Creators",
-            "Real Estate & Infrastructure",
-            "Freelance & Independent",
-            "Students & Early Career",
-            "Government / Public Sector"],
+        enum:Object.values(CATEGORY),
         default: "Technology & IT"
     }
 })

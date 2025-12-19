@@ -68,7 +68,8 @@ exports.createPost = async (req, res) => {
             isReposted,
             pollOptions,
             resourceUrl,
-            resourceType
+            resourceType,
+            category : user.category
         });
         user.posts.push(createdPost._id);
         await user.save();
