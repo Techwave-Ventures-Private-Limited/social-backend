@@ -69,7 +69,7 @@ exports.createPost = async (req, res) => {
             pollOptions,
             resourceUrl,
             resourceType,
-            category : user.category
+            category: user.category
         });
         user.posts.push(createdPost._id);
         await user.save();
@@ -1228,9 +1228,12 @@ exports.getPosts = async (req, res) => {
 
         const following = user.following || [];
         const followers = user.followers || [];
-
-        let people = [...new Set([...following].map(connection => connection.following._id.toString()))];
-        people = [...new Set([...followers].map(connection => connection.follower._id.toString()))];
+        const people = [
+            ...new Set([
+                ...following.map(c => c.following._id.toString()),
+                ...followers.map(c => c.follower._id.toString())
+            ])
+        ];
 
         const joinedCommunities = user.communities || [];
 

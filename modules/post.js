@@ -134,4 +134,13 @@ const postSchema = new mongoose.Schema({
   }
 });
 
+postSchema.index({ createdAt: -1 });
+postSchema.index({ isDeleted: 1, createdAt: -1 });
+postSchema.index({ category: 1, isDeleted: 1, createdAt: -1 });
+postSchema.index({ authorId: 1, isDeleted: 1, createdAt: -1 });
+postSchema.index({ communityId: 1, isDeleted: 1, createdAt: -1 });
+postSchema.index({ type: 1, category: 1, isDeleted: 1, createdAt: -1 });
+postSchema.index({ originalPostId: 1 });
+postSchema.index({ isPinned: 1, pinnedAt: -1 });
+
 module.exports = mongoose.model("Post", postSchema);
