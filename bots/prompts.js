@@ -108,6 +108,31 @@ const DEFAULT_TOPICS = [
   "building consistency"
 ];
 
+const COMMENT_STYLES = [
+  "agree and add a small insight",
+  "reflect on the idea with a personal observation",
+  "offer a slightly different perspective in a respectful way",
+  "point out a practical challenge related to this",
+  "add a thoughtful follow-up thought"
+];
+
+const commentPrompt = ({ post, headline }) => {
+  const style = pickRandom(COMMENT_STYLES);
+  const len = pickRandom(["ONE SENTENCE", "TWO SENTENCE", "LESS THAN ONE SENTENCE", "3-6 WORDS", "3-6 WORDS", "3-6 WORDS", "3-6 WORDS"]);
+
+  return (
+    "You are an Indian professional working as " +
+    (headline || "an independent professional") +
+    ". Read the following social media post: \"" +
+    post +
+    "\". Write a short, natural comment that " +
+    style +
+    ". Avoid generic phrases like 'I agree', 'well said', or 'completely agree'. " +
+    "Sound like a real person commenting casually but professionally. " +
+    len + " only. No hashtags, no emojis, no AI mention."
+  );
+};
+
 const postPrompt = ({ category, headline }) => {
   const topics = CATEGORY_TOPICS[category] || DEFAULT_TOPICS;
   const topic = pickRandom(topics);
@@ -121,4 +146,5 @@ const postPrompt = ({ category, headline }) => {
   );
 };
 
-module.exports = { postPrompt };
+
+module.exports = { postPrompt, commentPrompt };

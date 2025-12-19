@@ -15,7 +15,7 @@ const nodemailer = require('nodemailer');
 const fs = require('fs');
 // --- Import Redis Connection ---
 const { redisClient, subClient } = require("./config/redis");
-const { startPostBots } = require("./bots");
+const { startAllBots } = require("./bots");
 
 // --- App Setup ---
 const app = express();
@@ -290,7 +290,7 @@ io.on('connection', (socket) => {
 // --- Server Listening ---
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running at ${PORT}`);
-    startPostBots();
+    startAllBots();
     // Non-blocking SMTP connectivity check
     (async function verifySmtpTransport() {
         try {
