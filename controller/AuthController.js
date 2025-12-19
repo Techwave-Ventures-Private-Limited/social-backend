@@ -64,7 +64,7 @@ exports.sendEmailVerificationOTP = async(req,res) => {
 
 exports.signup = async (req, res) => {
   try {
-    let { name, email, password, confirmPassword, otp, type } = req.body;
+    let { name, email, password, confirmPassword, otp, type, category } = req.body;
 
     if (!email.includes("sbagul") && !otp) {
       return res.status(400).json({
@@ -124,7 +124,8 @@ exports.signup = async (req, res) => {
       email,
       password: hashedPassword,
       profileImage,
-      type
+      type,
+      category
     });
 
     const token = jwt.sign({

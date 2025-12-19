@@ -2,96 +2,96 @@ const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema({
 
-    name:{
-        type:String,
-        required:true
+    name: {
+        type: String,
+        required: true
     },
-    email:{
-        type:String,
-        required:true,
+    email: {
+        type: String,
+        required: true,
     },
-    otp:{
-        type:String,
+    otp: {
+        type: String,
     },
-    emailVerityToken:{
-        type:String,
+    emailVerityToken: {
+        type: String,
     },
-    isVerified:{
-        type:Boolean,
-        default:false,
+    isVerified: {
+        type: Boolean,
+        default: false,
     },
-    token:{
-        type:String,
-        default:""
+    token: {
+        type: String,
+        default: ""
     },
-    password:{
-        type:String,
-        required:true
+    password: {
+        type: String,
+        required: true
     },
-    bio:{
-        type:String,
+    bio: {
+        type: String,
         default: ""
     },
     headline: {
         type: String,
         default: ""
     },
-    address:{
-        type:String,
-        default : ""
+    address: {
+        type: String,
+        default: ""
     },
-    posts:[{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"Post",
-        default: []
-    }],
-    event:[{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"Event",
-        default: []
-    }],
-    savedPost:[{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"Post",
-        default: []
-    }],
-    likedPost:[{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"Post",
-        default:[]
-    }],
-    followers:[{
+    posts: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref:"User",
+        ref: "Post",
         default: []
     }],
-    following:[{
+    event: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref:"User",
+        ref: "Event",
+        default: []
+    }],
+    savedPost: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Post",
+        default: []
+    }],
+    likedPost: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Post",
+        default: []
+    }],
+    followers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: []
+    }],
+    following: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
         default: [] //show their stories
     }],
     applicationsSent: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: "Application"
     }],
-    about:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"About"
+    about: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "About"
     },
-    profileImage:{
-        type:String,
+    profileImage: {
+        type: String,
         default: null
     },
     bannerImage: {
         type: String,
     },
-    createdAt:{
-        type:Date,
-        default:Date.now
+    createdAt: {
+        type: Date,
+        default: Date.now
     },
     updatedAt: {
-        type:Date,
-        default:Date.now
+        type: Date,
+        default: Date.now
     },
     education: [{
         type: mongoose.Schema.Types.ObjectId,
@@ -120,7 +120,7 @@ const userSchema = new mongoose.Schema({
     }],
     streak: {
         type: Number,
-        default:0 
+        default: 0
     },
     lastStreakUpdate: {
         type: Date,
@@ -150,7 +150,7 @@ const userSchema = new mongoose.Schema({
     website: {
         type: String,
     },
-    companyDetails : {
+    companyDetails: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "CompanyDetails"
     },
@@ -161,8 +161,38 @@ const userSchema = new mongoose.Schema({
     followerCount: {
         type: Number,
         default: 0
+    },
+    ib: {
+        type: Boolean,
+        deafult: false
+    },
+    bt: {
+        type: String,
+    },
+    bk: {
+        type: String
+    },
+    category: {
+        type: String,
+        enum: ["Business & Entrepreneurship",
+            "Technology & IT",
+            "Design & Creative",
+            "Sales, Marketing & Growth",
+            "Product, Strategy & Operations",
+            "Finance, Legal & HR",
+            "Law & Compliance",
+            "Industry & Trade",
+            "Retail & Services",
+            "Education & Training",
+            "Healthcare & Wellness",
+            "Media, Content & Creators",
+            "Real Estate & Infrastructure",
+            "Freelance & Independent",
+            "Students & Early Career",
+            "Government / Public Sector"],
+        default: "Technology & IT"
     }
 })
 
-module.exports = mongoose.model("User",userSchema);
+module.exports = mongoose.model("User", userSchema);
 

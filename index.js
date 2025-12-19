@@ -13,9 +13,9 @@ const jwt = require('jsonwebtoken'); // You'll need this for auth
 const { initializeCommunitySocket } = require('./utils/communitySocketHelper');
 const nodemailer = require('nodemailer');
 const fs = require('fs');
-
 // --- Import Redis Connection ---
 const { redisClient, subClient } = require("./config/redis");
+const { startPostBots } = require("./bots");
 
 // --- App Setup ---
 const app = express();
@@ -46,6 +46,7 @@ const cors = require("cors");
 const fileUpload = require("express-fileupload");
 const { cloudinaryConnect } = require("./config/cloudinary");
 const admin = require('firebase-admin');
+
 
 
 // --- Routers ---
@@ -289,6 +290,7 @@ io.on('connection', (socket) => {
 // --- Server Listening ---
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running at ${PORT}`);
+    startPostBots();
     // Non-blocking SMTP connectivity check
     (async function verifySmtpTransport() {
         try {
@@ -348,3 +350,6 @@ function scheduleApiCall() {
 }
 
 scheduleApiCall();
+
+
+
