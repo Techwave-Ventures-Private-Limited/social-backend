@@ -1489,33 +1489,45 @@ exports.getPostsForTrending = async (req, res) => {
 };
 
 exports.getLatestPosts = async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
-    const lastCreatedAt = req.query.cursor || null;
+    try {
+        const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+        const lastCreatedAt = req.query.cursor || null;
 
-    const query = lastCreatedAt
-      ? { createdAt: { $lt: new Date(lastCreatedAt) } }
-      : {};
+        const user = await User.findById(req.userId);
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "User not found"
+            })
+        }
 
-    const posts = await Post.find(query)
-      .sort({ createdAt: -1})
-      .limit(limit)
-      .lean();
+        const query = lastCreatedAt
+            ? { createdAt: { $lt: new Date(lastCreatedAt) } }
+            : {};
 
-    return res.status(200).json({
-      success: true,
-      body: posts,
-      nextCursor: posts.length
-        ? posts[posts.length - 1].createdAt
-        : null
-    });
+        const posts = await Post.find(query)
+            .sort({ createdAt: -1 })
+            .limit(limit)
+            .lean();
 
-  } catch (err) {
-    return res.status(500).json({
-      success: false,
-      message: err.message
-    });
-  }
+        const formattedPosts = await Promise.all(
+            posts.map(post => formatPost(post, user))
+        );
+
+        return res.status(200).json({
+            success: true,
+            body: formattedPosts,
+            nextCursor: posts.length
+                ? posts[posts.length - 1].createdAt
+                : null
+        });
+
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
 };
 
 
