@@ -2,9 +2,15 @@ const User = require("../modules/user");
 const { runBot } = require("./runner");
 
 const BATCH_SIZE = 5;
-const BATCH_DELAY_MS =  3 * 60 * 60 * 1000; // 3 hours
+const BATCH_DELAY_MS = 3 * 60 * 60 * 1000; // 3 hours
+const ENABLE_BOTS = process.env.ENABLE_BOTS === "true";
+
 
 async function startBotsByType(botType) {
+    if (!ENABLE_BOTS) {
+        console.log("Bots are disabled");
+        return;
+    }
     const bots = await User.find({
         ib: true,
         bt: botType

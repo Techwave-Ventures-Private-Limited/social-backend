@@ -824,9 +824,12 @@ exports.formatPost = async (post, currentUser = null) => {
         totalVotes,
         resourceUrl: post.resourceUrl,
         resourceType: post.resourceType,
+        category: post.category
     };
 };
 
+
+// TODO : Remove format post
 const formatPost = async (post, currentUser = null) => {
     if (!post || !post.userId) return null;
 
@@ -839,7 +842,7 @@ const formatPost = async (post, currentUser = null) => {
     const followers = Array.isArray(author.followers) ? author.followers.length : 0;
     const following = Array.isArray(author.following) ? author.following.length : 0;
 
-    const isFollowing = currentUser?.followers?.some(f => f.toString() === author._id.toString()) || false;
+    const isFollowing = currentUser?.followers?.some(f => f.toString() === author?._id?.toString()) || false;
     const isBookmarked = currentUser?.savedPost?.some(id => id.toString() === post._id.toString()) || false;
     //const isLiked = currentUser?.likedPost?.some(id => id.toString() === post._id.toString()) || false;
     const like = await Like.find({ userId: currentUser._id, postId: post._id });
@@ -859,7 +862,7 @@ const formatPost = async (post, currentUser = null) => {
     let communityId = "";
     if (post.type === "Community") {
         communityName = post.communityId?.name;
-        communityId = post.communityId._id;
+        communityId = post.communityId?._id;
     }
 
     // Poll aggregation: compute total votes from pollOptions if present
@@ -872,7 +875,7 @@ const formatPost = async (post, currentUser = null) => {
             return sum + votesArr.length;
         }, 0);
     }
-
+    //console.log(post.category);
     return {
         id: post._id,
         author: {
@@ -920,6 +923,7 @@ const formatPost = async (post, currentUser = null) => {
         totalVotes,
         resourceUrl: post.resourceUrl,
         resourceType: post.resourceType,
+        category: post.category,
     };
 };
 
@@ -1209,8 +1213,13 @@ exports.getHomeFeedWithCommunities = async (req, res) => {
 };
 
 // DO NOT CHANGE THIS WITHOUT PERMISSION
-exports.getPosts = async (req, res) => {
+// DEPRECATED
+exports.getPostsOld = async (req, res) => {
     try {
+        return res.status(400).json({
+            success: false,
+            message: "CONTROLLER IS DEPERECATED"
+        })
         const userId = req.userId;
         const limit = parseInt(req.query.limit) || 20;
         const offset = parseInt(req.query.offset) || 0;
@@ -1362,3 +1371,176 @@ exports.getPosts = async (req, res) => {
         });
     }
 };
+
+
+// DO NOT CHANGE THIS WITHOUT PERMISSION
+exports.getPostsForTrending = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const limit = parseInt(req.query.limit) || 20;
+        const cursor = req.query.cursor ? new Date(req.query.cursor) : null;
+
+        let user = await User.findById(userId);
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+
+        user = await addUserData(user._id);
+
+        const following = user.following || [];
+        //const followers = user.followers || [];
+        const joinedCommunities = user.communities || [];
+
+        const people = [
+            ...new Set([
+                ...following.map(c => c.following._id.toString())
+            ])
+        ];
+
+        const peopleSet = new Set(people);
+
+        // Removed this filter since we don't have that much posts yet
+        const likedPosts = [];
+
+        const CANDIDATE_LIMIT = 300;
+
+        const candidateQuery = {
+            _id: { $nin: likedPosts },
+            $or: [
+                { authorId: { $in: people } },
+                { communityId: { $in: joinedCommunities } }
+            ],
+            ...(cursor ? { createdAt: { $lt: cursor } } : {})
+        };
+
+        let candidates = await Post.find(candidateQuery)
+            .sort({ createdAt: -1 })
+            .limit(CANDIDATE_LIMIT)
+            .lean();
+
+        candidates.forEach(post => {
+            post._score = rankPost(post, user, peopleSet);
+        });
+
+        candidates.sort((a, b) => b._score - a._score);
+
+        let finalPosts = candidates.slice(0, limit);
+
+        // filling with trending if candidates are not engouth to reach limit
+        if (finalPosts.length < limit) {
+            const remaining = limit - finalPosts.length;
+            const fetchedIds = finalPosts.map(p => p._id);
+
+            const trending = await Post.find({
+                _id: { $nin: [...likedPosts, ...fetchedIds] },
+                isDeleted: false,
+                ...(cursor ? { createdAt: { $lt: cursor } } : {})
+            })
+                .sort({ likes: -1, commentsCount: -1, createdAt: -1 })
+                .limit(remaining)
+                .lean();
+
+            finalPosts = [...finalPosts, ...trending];
+        }
+
+        finalPosts = await Post.populate(finalPosts, [
+            {
+                path: "userId",
+                model: "User",
+                select: "name profileImage headline _id",
+            },
+            {
+                path: "communityId",
+                model: "Community",
+                select: "name logo isPrivate _id",
+            },
+            {
+                path: "originalPostId",
+                populate: {
+                    path: "authorId",
+                    model: "User",
+                    select: "name profileImage headline _id",
+                },
+            }
+        ]);
+
+        const formattedPosts = await Promise.all(
+            finalPosts.map(post => formatPost(post, user))
+        );
+
+        return res.status(200).json({
+            success: true,
+            body: formattedPosts,
+            nextCursor:
+                formattedPosts.length > 0
+                    ? formattedPosts[formattedPosts.length - 1].createdAt
+                    : null
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({
+            success: false,
+            message: err.message,
+        });
+    }
+};
+
+exports.getLatestPosts = async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+    const lastCreatedAt = req.query.cursor || null;
+
+    const query = lastCreatedAt
+      ? { createdAt: { $lt: new Date(lastCreatedAt) } }
+      : {};
+
+    const posts = await Post.find(query)
+      .sort({ createdAt: -1})
+      .limit(limit)
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      body: posts,
+      nextCursor: posts.length
+        ? posts[posts.length - 1].createdAt
+        : null
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+};
+
+
+// private function to calculat posts rank on users homescreen
+function rankPost(post, user, people) {
+    let score = 0;
+
+    // 1. Same category as user
+    if (post.category && post.category === user.category) {
+        score += 50;
+    }
+
+    // 2. People I follow / followers
+    if (post.authorId && people.has(post.authorId.toString())) {
+        score += 40;
+    }
+
+    // 3. Engagement
+    score += (post.likes || 0) * 2;
+    score += (post.commentsCount || 0) * 3;
+
+    // 4. Recency decay
+    const ageInHours =
+        (Date.now() - new Date(post.createdAt)) / 3600000;
+    score -= ageInHours * 1.5;
+
+    return score;
+}

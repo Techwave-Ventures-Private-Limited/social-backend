@@ -20,5 +20,7 @@ const connectionSchema = new mongoose.Schema({
 });
 
 connectionSchema.index({ follower: 1, following: 1 }, { unique: true });
+connectionSchema.index({ follower: 1 }, { unique: true });
+connectionSchema.index({ following: 1 }, { unique: true });
 
 module.exports = mongoose.model("Follow", connectionSchema);
