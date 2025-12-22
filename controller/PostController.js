@@ -1505,10 +1505,32 @@ exports.getLatestPosts = async (req, res) => {
             ? { createdAt: { $lt: new Date(lastCreatedAt) } }
             : {};
 
-        const posts = await Post.find(query)
+        let posts = await Post.find(query)
             .sort({ createdAt: -1 })
             .limit(limit)
             .lean();
+
+        // Populate user and community data before formatting
+        posts = await Post.populate(posts, [
+            {
+                path: "userId",
+                model: "User",
+                select: "name profileImage headline _id",
+            },
+            {
+                path: "communityId",
+                model: "Community",
+                select: "name logo isPrivate _id",
+            },
+            {
+                path: "originalPostId",
+                populate: {
+                    path: "authorId",
+                    model: "User",
+                    select: "name profileImage headline _id",
+                },
+            }
+        ]);
 
         const formattedPosts = await Promise.all(
             posts.map(post => formatPost(post, user))
