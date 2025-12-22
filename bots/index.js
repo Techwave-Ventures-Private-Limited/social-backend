@@ -11,6 +11,7 @@ async function startBotsByType(botType) {
         console.log("Bots are disabled");
         return;
     }
+    return;
     const bots = await User.find({
         ib: true,
         bt: botType
