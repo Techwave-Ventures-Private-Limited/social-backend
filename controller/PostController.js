@@ -167,7 +167,6 @@ exports.likePost = async (req, res) => {
         const userId = req.userId;
         const ib = req.ib || false;
 
-        // 1. Check if the like already exists to avoid duplicates
         const existingLike = await Like.findOne({ userId, postId });
         if (existingLike) {
             return res.status(400).json({
@@ -176,19 +175,19 @@ exports.likePost = async (req, res) => {
             });
         }
 
-        // 2. Create the like document (the source of truth)
         const newLike = await Like.create({ userId, postId });
 
-        // 3. Atomically increment the likes counter on the Post document
-        // This is the key change for scalability.
-        const updatedPost = await Post.findByIdAndUpdate(
-            postId,
-            { $inc: { likes: 1 } },
-            { new: true } // This option returns the updated document
-        );
+        const updatedPost = await Post.findByIdAndUpdate(postId, {
+            $inc: {
+                likes: 1,
+                engagementScore: 2
+            },
+            $set: {
+                lastEngagementAt: new Date()
+            }
+        }, { new: true });
 
         if (!updatedPost) {
-            // If the post was deleted in the meantime, clean up the like
             await Like.findByIdAndDelete(newLike._id);
             return res.status(404).json({ success: false, message: "Post not found" });
         }
@@ -196,7 +195,6 @@ exports.likePost = async (req, res) => {
         if (!ib) {
             await createNotification(updatedPost.userId, userId, 'like', postId);
         }
-        // console.log("Post liked:", newLike);
 
         return res.status(200).json({
             success: true,
@@ -217,7 +215,6 @@ exports.unlikePost = async (req, res) => {
         const postId = req.body.postId;
         const userId = req.userId;
 
-        // 1. Find and delete the like document
         const deletedLike = await Like.findOneAndDelete({ userId, postId });
 
         if (!deletedLike) {
@@ -227,33 +224,25 @@ exports.unlikePost = async (req, res) => {
             });
         }
 
-        // 2. Atomically decrement the likes counter
-        let updatedPost = await Post.findByIdAndUpdate(
-            postId,
-            { $inc: { likes: -1 } },
-            { new: true }
-        );
+        let updatedPost = await Post.findByIdAndUpdate(postId, {
+            $inc: {
+                likes: -1,
+                engagementScore: -2
+            }
+        }, { new: true });
 
         if (!updatedPost) {
             return res.status(404).json({ success: false, message: "Post not found" });
         }
 
-        // --- YOUR RECONCILIATION LOGIC ---
-        // 3. Check if the count has gone negative (due to a past sync error)
         if (updatedPost.likes < 0) {
-
-            // Recalculate the true count from the 'likes' collection
             const actualLikeCount = await Like.countDocuments({ postId: postId });
-
-            // Set the count to the correct number
             updatedPost = await Post.findByIdAndUpdate(
                 postId,
                 { $set: { likes: actualLikeCount } },
                 { new: true }
             );
         }
-
-        // console.log("Post unliked:", deletedLike);
 
         return res.status(200).json({
             success: true,
@@ -280,7 +269,7 @@ exports.commentPost = async (req, res) => {
             })
         }
 
-        const post = await Post.findById(postId);
+        let post = await Post.findById(postId);
         if (!post) {
             return res.status(400).json({
                 success: false,
@@ -290,8 +279,20 @@ exports.commentPost = async (req, res) => {
 
         const comment = await Comment.create({ text, postId, userId: req.userId });
 
-        post.comments.push(comment._id);
-        await post.save();
+        post = await Post.findByIdAndUpdate(
+            postId,
+            {
+                $push: { comments: comment._id },
+                $inc: {
+                    commentsCount: 1,
+                    engagementScore: 3
+                },
+                $set: {
+                    lastEngagementAt: new Date()
+                }
+            },
+            { new: false }
+        );
 
         await createNotification(post.userId, req.userId, 'comment', postId);
 
@@ -1378,115 +1379,95 @@ exports.getPostsForTrending = async (req, res) => {
     try {
         const userId = req.userId;
         const limit = parseInt(req.query.limit) || 20;
-        const cursor = req.query.cursor ? new Date(req.query.cursor) : null;
+        const cursor = req.query.cursor
+            ? Number(req.query.cursor)
+            : null;
 
         let user = await User.findById(userId);
         if (!user) {
-            return res.status(400).json({
-                success: false,
-                message: "User not found",
-            });
+            return res.status(400).json({ success: false });
         }
 
         user = await addUserData(user._id);
 
         const following = user.following || [];
-        //const followers = user.followers || [];
         const joinedCommunities = user.communities || [];
 
-        const people = [
-            ...new Set([
-                ...following.map(c => c.following._id.toString())
-            ])
-        ];
+        const peopleSet = new Set(
+            following.map(f => f.following._id.toString())
+        );
 
-        const peopleSet = new Set(people);
+        const WINDOW_SIZE = 500;
 
-        // Removed this filter since we don't have that much posts yet
-        const likedPosts = [];
-
-        const CANDIDATE_LIMIT = 300;
-
-        const candidateQuery = {
-            _id: { $nin: likedPosts },
+        const candidates = await Post.find({
+            isDeleted: false,
             $or: [
-                { authorId: { $in: people } },
+                { authorId: { $in: [...peopleSet] } },
                 { communityId: { $in: joinedCommunities } }
             ],
-            ...(cursor ? { createdAt: { $lt: cursor } } : {})
-        };
-
-        let candidates = await Post.find(candidateQuery)
-            .sort({ createdAt: -1 })
-            .limit(CANDIDATE_LIMIT)
+            ...(cursor ? { engagementScore: { $lt: cursor } } : {})
+        })
+            .sort({ engagementScore: -1, lastEngagementAt: -1 })
+            .limit(WINDOW_SIZE)
             .lean();
 
-        candidates.forEach(post => {
-            post._score = rankPost(post, user, peopleSet);
-        });
+        const now = Date.now();
 
-        candidates.sort((a, b) => b._score - a._score);
+        for (const post of candidates) {
+            let score = post.engagementScore;
 
-        let finalPosts = candidates.slice(0, limit);
+            if (post.category === user.category) {
+                score += 50;
+            }
 
-        // filling with trending if candidates are not engouth to reach limit
-        if (finalPosts.length < limit) {
-            const remaining = limit - finalPosts.length;
-            const fetchedIds = finalPosts.map(p => p._id);
+            if (peopleSet.has(post.authorId?.toString())) {
+                score += 40;
+            }
 
-            const trending = await Post.find({
-                _id: { $nin: [...likedPosts, ...fetchedIds] },
-                isDeleted: false,
-                ...(cursor ? { createdAt: { $lt: cursor } } : {})
-            })
-                .sort({ likes: -1, commentsCount: -1, createdAt: -1 })
-                .limit(remaining)
-                .lean();
+            const ageHours =
+                (now - new Date(post.lastEngagementAt)) / 3600000;
 
-            finalPosts = [...finalPosts, ...trending];
+            score -= ageHours * 1.5;
+
+            post.finalScore = score;
         }
 
-        finalPosts = await Post.populate(finalPosts, [
+        candidates.sort((a, b) => b.finalScore - a.finalScore);
+
+        const finalPosts = candidates.slice(0, limit);
+
+        const populatedPosts = await Post.populate(finalPosts, [
             {
-                path: "userId",
-                model: "User",
-                select: "name profileImage headline _id",
+                path: "authorId",
+                select: "name profileImage headline _id"
             },
             {
                 path: "communityId",
-                model: "Community",
-                select: "name logo isPrivate _id",
-            },
-            {
-                path: "originalPostId",
-                populate: {
-                    path: "authorId",
-                    model: "User",
-                    select: "name profileImage headline _id",
-                },
+                select: "name logo isPrivate _id"
             }
         ]);
 
         const formattedPosts = await Promise.all(
-            finalPosts.map(post => formatPost(post, user))
+            populatedPosts.map(post => formatPost(post, user))
         );
 
-        return res.status(200).json({
+        const nextCursor =
+            candidates.length > 0
+                ? candidates[candidates.length - 1].engagementScore
+                : null;
+
+        return res.json({
             success: true,
             body: formattedPosts,
-            nextCursor:
-                formattedPosts.length > 0
-                    ? formattedPosts[formattedPosts.length - 1].createdAt
-                    : null
+            nextCursor
         });
+
     } catch (err) {
         console.error(err);
-        return res.status(500).json({
-            success: false,
-            message: err.message,
-        });
+        return res.status(500).json({ success: false });
     }
 };
+
 
 exports.getLatestPosts = async (req, res) => {
     try {

@@ -131,6 +131,20 @@ const postSchema = new mongoose.Schema({
     type: String,
     enum: Object.values(CATEGORY),
     default: "Technology & IT"
+  },
+  engagementScore: {
+    type: Number,
+    default: 0,
+    index: true
+  },
+  lastEngagementAt: {
+    type: Date,
+    default: Date.now,
+    index: true
+  },
+  commentsCount: {
+    type: Number,
+    default : 0
   }
 });
 
@@ -142,5 +156,6 @@ postSchema.index({ communityId: 1, isDeleted: 1, createdAt: -1 });
 postSchema.index({ type: 1, category: 1, isDeleted: 1, createdAt: -1 });
 postSchema.index({ originalPostId: 1 });
 postSchema.index({ isPinned: 1, pinnedAt: -1 });
+postSchema.index({ engagementScore: -1, lastEngagementAt: -1 });
 
 module.exports = mongoose.model("Post", postSchema);
