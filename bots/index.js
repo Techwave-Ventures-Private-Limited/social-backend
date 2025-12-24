@@ -1,59 +1,63 @@
 const User = require("../modules/user");
 const { runBot } = require("./runner");
+const { acquireLock, releaseLock, COOLDOWN_MS } = require("./utility");
 
 const BATCH_SIZE = 5;
-const BATCH_DELAY_MS = 3 * 60 * 60 * 1000; // 3 hours
 const ENABLE_BOTS = process.env.ENABLE_BOTS === "true";
-
 
 async function startBotsByType(botType) {
     if (!ENABLE_BOTS) {
         console.log("Bots are disabled");
         return;
     }
-    return;
-    const bots = await User.find({
-        ib: true,
-        bt: botType
-    });
+
+    const locked = await acquireLock(botType);
+    if (!locked) {
+        console.log(`${botType} bots skipped (cooldown or running)`);
+        return;
+    }
 
     console.log(`Starting ${botType} bots`);
 
-    let index = 0;
+    try {
+        const bots = await User.find({
+            ib: true,
+            bt: botType
+        });
 
-    const runBatch = async () => {
-        const batch = bots.slice(index, index + BATCH_SIZE);
+        for (let i = 0; i < bots.length; i += BATCH_SIZE) {
+            const batch = bots.slice(i, i + BATCH_SIZE);
 
-        if (batch.length === 0) {
-            console.log(`${botType} bots completed`);
-            index = 0;
-            setTimeout(runBatch, BATCH_DELAY_MS);
-            return;
-        }
+            console.log(
+                `Running ${botType} batch ${Math.floor(i / BATCH_SIZE) + 1}`
+            );
 
-        console.log(
-            `Running ${botType} bot batch ${Math.floor(index / BATCH_SIZE) + 1}`
-        );
+            for (const bot of batch) {
+                try {
+                    await runBot(bot);
+                } catch (err) {
+                    console.error(
+                        `${botType} bot failed`,
+                        bot.name,
+                        err.message
+                    );
+                }
+            }
 
-        for (const bot of batch) {
-            try {
-                await runBot(bot);
-            } catch (err) {
-                console.error(`${botType} bot failed:`, bot.name, err.message);
+            if (i + BATCH_SIZE < bots.length) {
+                await new Promise(res => setTimeout(res, COOLDOWN_MS));
             }
         }
-
-        index += BATCH_SIZE;
-        setTimeout(runBatch, BATCH_DELAY_MS);
-    };
-
-    runBatch();
+    } finally {
+        await releaseLock(botType);
+        console.log(`${botType} bots finished`);
+    }
 }
 
 async function startAllBots() {
-    await startBotsByType("POST");
-    await startBotsByType("COMMENT");
-    await startBotsByType("LIKE");
+    startBotsByType("POST");
+    startBotsByType("COMMENT");
+    startBotsByType("LIKE");
 }
 
 module.exports = { startAllBots };
