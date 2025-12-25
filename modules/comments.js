@@ -3,18 +3,18 @@ const mongoose = require("mongoose");
 const commentSchema = new mongoose.Schema({
 
     text: {
-        type:String,
-        default:""
+        type: String,
+        default: ""
     },
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
     },
-    likes : {
-        type:Number,
-        default : 0
+    likes: {
+        type: Number,
+        default: 0
     },
-    postId : {
+    postId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Post',
         required: true
@@ -29,13 +29,13 @@ const commentSchema = new mongoose.Schema({
         ref: 'Comment',
         default: []
     }],
-    createAt:{
-        type:Date,
-        default:Date.now()
+    createAt: {
+        type: Date,
+        default: Date.now
     },
     updatedAt: {
-        type:Date,
-        default:Date.now()
+        type: Date,
+        default: Date.now
     }
 
 })

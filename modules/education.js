@@ -2,35 +2,35 @@ const mongoose = require("mongoose");
 
 const educationSchema = new mongoose.Schema({
 
-    name:{
-        type:String
+    name: {
+        type: String
     },
-    school:{
-        type:String
+    school: {
+        type: String
     },
     fos: {
-        type:String
+        type: String
     },
-     degree:{
-        type:String,
-        
+    degree: {
+        type: String,
+
     },
-    startDate:{
-        type:Date
+    startDate: {
+        type: Date
     },
-    endDate:{
-        type:Date
+    endDate: {
+        type: Date
     },
     current: {
         type: Boolean
     },
-    createAt:{
-        type:Date,
-        default:Date.now()
+    createAt: {
+        type: Date,
+        default: Date.now
     },
     updatedAt: {
-        type:Date,
-        default:Date.now()
+        type: Date,
+        default: Date.now
     }
 
 })

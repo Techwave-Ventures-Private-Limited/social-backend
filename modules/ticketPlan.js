@@ -1,33 +1,33 @@
 const mongoose = require("mongoose");
 
 const ticketPlanSchema = new mongoose.Schema({
-    
+
     name: {
-        type:String,
+        type: String,
         required: true
     },
-    price : {
+    price: {
         type: String,
         required: true
     },
     remTicket: {
-        type : Number,
+        type: Number,
         required: true
     },
     totalTicket: {
-        type : Number,
+        type: Number,
         required: true
     },
-    userId:{
+    userId: {
         type: String,
     },
-    createAt:{
-        type:Date,
-        default:Date.now()
+    createAt: {
+        type: Date,
+        default: Date.now
     },
     updatedAt: {
-        type:Date,
-        default:Date.now()
+        type: Date,
+        default: Date.now
     }
 
 })

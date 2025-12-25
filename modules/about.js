@@ -2,31 +2,31 @@ const mongoose = require("mongoose");
 
 const aboutSchema = new mongoose.Schema({
 
-    summary:{
-        type:String,
+    summary: {
+        type: String,
         default: ""
     },
     experience: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref : "Experience",
-        default : []
+        ref: "Experience",
+        default: []
     }],
     education: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: "Education",
-        default : []
+        default: []
     }],
     skills: [{
         type: String,
-        default : []
+        default: []
     }],
-    createAt:{
-        type:Date,
-        default:Date.now()
+    createAt: {
+        type: Date,
+        default: Date.now
     },
     updatedAt: {
-        type:Date,
-        default:Date.now()
+        type: Date,
+        default: Date.now
     },
     headline: {
         type: String,
