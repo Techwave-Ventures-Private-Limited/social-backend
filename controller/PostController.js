@@ -1374,87 +1374,140 @@ exports.getPostsOld = async (req, res) => {
 };
 
 
-// DO NOT CHANGE THIS WITHOUT PERMISSION
-exports.getPostsForTrending = async (req, res) => {
+// Controller to get trending posts
+exports.getTrendingPosts = async (req, res) => {
     try {
-        const userId = req.userId;
-        const limit = parseInt(req.query.limit) || 20;
+        const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+
+        const user = await User.findById(req.userId);
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
         const cursor = req.query.cursor
-            ? Number(req.query.cursor)
+            ? JSON.parse(
+                Buffer.from(req.query.cursor, "base64").toString("utf-8")
+            )
             : null;
 
-        let user = await User.findById(userId);
-        if (!user) {
-            return res.status(400).json({ success: false });
-        }
+        const now = new Date();
 
-        user = await addUserData(user._id);
 
-        const following = user.following || [];
-        const joinedCommunities = user.communities || [];
-
-        const peopleSet = new Set(
-            following.map(f => f.following._id.toString())
-        );
-
-        const WINDOW_SIZE = 500;
-
-        const candidates = await Post.find({
-            isDeleted: false,
-            $or: [
-                { authorId: { $in: [...peopleSet] } },
-                { communityId: { $in: joinedCommunities } }
-            ],
-            ...(cursor ? { engagementScore: { $lt: cursor } } : {})
-        })
-            .sort({ engagementScore: -1, lastEngagementAt: -1 })
-            .limit(WINDOW_SIZE)
-            .lean();
-
-        const now = Date.now();
-
-        for (const post of candidates) {
-            let score = post.engagementScore;
-
-            if (post.category === user.category) {
-                score += 50;
+        const cursorQuery = cursor
+            ? {
+                $or: [
+                    { risingScore: { $lt: cursor.score } },
+                    {
+                        risingScore: cursor.score,
+                        _id: { $lt: cursor.id }
+                    }
+                ]
             }
+            : {};
 
-            if (peopleSet.has(post.authorId?.toString())) {
-                score += 40;
-            }
-
-            const ageHours =
-                (now - new Date(post.lastEngagementAt)) / 3600000;
-
-            score -= ageHours * 1.5;
-
-            post.finalScore = score;
-        }
-
-        candidates.sort((a, b) => b.finalScore - a.finalScore);
-
-        const finalPosts = candidates.slice(0, limit);
-
-        const populatedPosts = await Post.populate(finalPosts, [
+        const posts = await Post.aggregate([
             {
-                path: "authorId",
-                select: "name profileImage headline _id"
+                $match: {
+                    isDeleted: false,
+                    engagementScore: { $gt: 0 },
+                    lastEngagementAt: { $exists: true }
+                }
+            },
+
+
+            {
+                $addFields: {
+                    ageHours: {
+                        $divide: [
+                            { $subtract: [now, "$lastEngagementAt"] },
+                            1000 * 60 * 60
+                        ]
+                    }
+                }
+            },
+
+
+            {
+                $addFields: {
+                    risingScore: {
+                        $divide: [
+                            "$engagementScore",
+                            {
+                                $pow: [
+                                    { $add: ["$ageHours", 2] },
+                                    0.7
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+
+
+            { $match: cursorQuery },
+
+
+            {
+                $sort: {
+                    risingScore: -1,
+                    _id: -1
+                }
+            },
+
+            { $limit: limit }
+        ]);
+
+
+        const populatedPosts = await Post.populate(posts, [
+            {
+                path: "userId",
+                model: "User",
+                populate: [
+                    { path: "about", model: "About" },
+                    { path: "education", model: "Education" },
+                    { path: "experience", model: "Experience" },
+                    { path: 'companyDetails', model: 'CompanyDetails' },
+                ],
+            },
+            { path: "comments" },
+            {
+                path: "originalPostId",
+                populate: {
+                    path: "userId",
+                    model: "User",
+                    populate: [
+                        { path: "about", model: "About" },
+                        { path: "education", model: "Education" },
+                        { path: "experience", model: "Experience" },
+                    ],
+                },
             },
             {
                 path: "communityId",
+                model: "Community",
                 select: "name logo isPrivate _id"
             }
         ]);
+
 
         const formattedPosts = await Promise.all(
             populatedPosts.map(post => formatPost(post, user))
         );
 
-        const nextCursor =
-            candidates.length > 0
-                ? candidates[candidates.length - 1].engagementScore
-                : null;
+
+        const lastPost = posts[posts.length - 1];
+
+        const nextCursor = lastPost
+            ? Buffer.from(
+                JSON.stringify({
+                    score: lastPost.risingScore,
+                    id: lastPost._id
+                })
+            ).toString("base64")
+            : null;
 
         return res.json({
             success: true,
@@ -1468,7 +1521,7 @@ exports.getPostsForTrending = async (req, res) => {
     }
 };
 
-
+// Controller to get latest posts
 exports.getLatestPosts = async (req, res) => {
     try {
         const limit = Math.min(parseInt(req.query.limit) || 20, 50);
@@ -1533,29 +1586,223 @@ exports.getLatestPosts = async (req, res) => {
     }
 };
 
+// Controller to get home page feed
+exports.getHomeFeed = async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+        const page = parseInt(req.query.offset) || 0;
+        const SKIP = page;
 
-// private function to calculat posts rank on users homescreen
-function rankPost(post, user, people) {
-    let score = 0;
+        const lastSeenAt = req.query.lastSeenAt
+            ? new Date(req.query.lastSeenAt)
+            : null;
 
-    // 1. Same category as user
-    if (post.category && post.category === user.category) {
-        score += 50;
+        const user = await User.findById(req.userId).lean();
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        const followingIds = (user.following || []).map(f => f.toString());
+        const communityIds = user.communities;
+        const userCategory = user.category;
+
+        const now = new Date();
+
+        /* ---------------- COMMON SCORING ---------------- */
+        const baseAddFields = (sourceBoost) => ([
+            {
+                $addFields: {
+                    ageHours: {
+                        $divide: [
+                            { $subtract: [now, "$createdAt"] },
+                            1000 * 60 * 60
+                        ]
+                    }
+                }
+            },
+            {
+                $addFields: {
+                    freshnessScore: {
+                        $max: [0, { $subtract: [48, "$ageHours"] }]
+                    }
+                }
+            },
+            {
+                $addFields: {
+                    engagementBoost: {
+                        $add: [
+                            { $multiply: ["$likes", 1.5] },
+                            { $multiply: ["$commentsCount", 2] }
+                        ]
+                    }
+                }
+            },
+            {
+                $addFields: {
+                    homeScore: {
+                        $add: [
+                            sourceBoost,
+                            { $multiply: ["$freshnessScore", 10] },
+                            "$engagementBoost"
+                        ]
+                    }
+                }
+            }
+        ]);
+
+        /* ---------------- SOURCE GATING ---------------- */
+        const allowFollowing = page === 0;
+        const allowCommunity = page <= 1;
+        const allowCategory = true;
+        const allowFallback = true;
+
+        const cursorFilter = lastSeenAt
+            ? { createdAt: { $lt: lastSeenAt } }
+            : {};
+
+        const results = [];
+
+        /* ---------------- 1️⃣ FOLLOWING (PAGE 0 ONLY) ---------------- */
+        if (allowFollowing && followingIds.length) {
+            const followingPosts = await Post.aggregate([
+                {
+                    $match: {
+                        isDeleted: false,
+                        userId: { $in: followingIds },
+                        createdAt: {
+                            $gte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+                            ...cursorFilter
+                        }
+                    }
+                },
+                ...baseAddFields(1000),
+                { $sort: { homeScore: -1, _id: -1 } },
+                { $limit: 100 }
+            ]);
+            results.push(...followingPosts);
+        }
+
+        /* ---------------- 2️⃣ COMMUNITY (PAGE 0–1) ---------------- */
+        if (allowCommunity && communityIds.length) {
+            const communityPosts = await Post.aggregate([
+                {
+                    $match: {
+                        isDeleted: false,
+                        communityId: { $in: communityIds },
+                        createdAt: {
+                            $gte: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+                            ...cursorFilter
+                        }
+                    }
+                },
+                ...baseAddFields(600),
+                { $sort: { homeScore: -1, _id: -1 } },
+                { $limit: 100 }
+            ]);
+            results.push(...communityPosts);
+        }
+
+        /* ---------------- 3️⃣ CATEGORY ---------------- */
+        if (allowCategory && userCategory) {
+            const categoryPosts = await Post.aggregate([
+                {
+                    $match: {
+                        isDeleted: false,
+                        category: userCategory,
+                        createdAt: {
+                            $gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
+                            ...cursorFilter
+                        }
+                    }
+                },
+                ...baseAddFields(300),
+                { $sort: { homeScore: -1, _id: -1 } },
+                { $limit: 100 }
+            ]);
+            results.push(...categoryPosts);
+        }
+
+        /* ---------------- 4️⃣ FALLBACK ---------------- */
+        if (allowFallback) {
+            const fallbackPosts = await Post.aggregate([
+                {
+                    $match: {
+                        isDeleted: false,
+                        createdAt: {
+                            $gte: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000),
+                            ...cursorFilter
+                        }
+                    }
+                },
+                ...baseAddFields(100),
+                { $sort: { homeScore: -1, _id: -1 } },
+                { $limit: 100 }
+            ]);
+            results.push(...fallbackPosts);
+        }
+
+        /* ---------------- MERGE + DEDUPE ---------------- */
+        const seen = new Set();
+        const merged = [];
+
+        for (const post of results) {
+            const id = post._id.toString();
+            if (!seen.has(id)) {
+                seen.add(id);
+                merged.push(post);
+            }
+        }
+
+        /* ---------------- PAGINATION ---------------- */
+        const paginated = merged.slice(SKIP, SKIP + limit);
+        const nextCursor = paginated.at(-1)?.createdAt || null;
+
+        /* ---------------- POPULATE ---------------- */
+        const populated = await Post.populate(paginated, [
+            {
+                path: "userId",
+                model: "User",
+                populate: [
+                    { path: "about" },
+                    { path: "education" },
+                    { path: "experience" },
+                    { path: "companyDetails" }
+                ]
+            },
+            { path: "comments" },
+            {
+                path: "originalPostId",
+                populate: {
+                    path: "userId",
+                    model: "User"
+                }
+            },
+            {
+                path: "communityId",
+                select: "name logo isPrivate"
+            }
+        ]);
+
+        const formatted = await Promise.all(
+            populated.map(post => formatPost(post, user))
+        );
+
+        return res.json({
+            success: true,
+            body: formatted,
+            nextCursor,
+            hasMore: merged.length > SKIP + limit
+        });
+
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false });
     }
+};
 
-    // 2. People I follow / followers
-    if (post.authorId && people.has(post.authorId.toString())) {
-        score += 40;
-    }
 
-    // 3. Engagement
-    score += (post.likes || 0) * 2;
-    score += (post.commentsCount || 0) * 3;
 
-    // 4. Recency decay
-    const ageInHours =
-        (Date.now() - new Date(post.createdAt)) / 3600000;
-    score -= ageInHours * 1.5;
 
-    return score;
-}

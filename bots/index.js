@@ -1,6 +1,7 @@
 const User = require("../modules/user");
 const { runBot } = require("./runner");
 const { acquireLock, releaseLock, COOLDOWN_MS } = require("./utility");
+const {connect} = require("../config/dbonfig");
 
 const BATCH_SIZE = 5;
 const ENABLE_BOTS = process.env.ENABLE_BOTS === "true";

@@ -41,7 +41,7 @@ initializeCommunitySocket(io);
 
 // --- Middleware and Config ---
 const cookieParser = require("cookie-parser");
-const database = require('./config/dbonfig');
+const {connect} = require('./config/dbonfig');
 const cors = require("cors");
 const fileUpload = require("express-fileupload");
 const { cloudinaryConnect } = require("./config/cloudinary");
@@ -78,7 +78,7 @@ const CommunityPost = require('./modules/communityPost');
 const CommunityComment = require('./modules/communityComment');
 
 // --- Database and Cloudinary Connection ---
-database.connect();
+connect();
 cloudinaryConnect();
 
 // Initialize Firebase Admin (conditional)
