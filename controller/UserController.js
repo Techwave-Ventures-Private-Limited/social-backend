@@ -12,6 +12,7 @@ const bcrypt = require("bcrypt");
 const Portfolio = require("../modules/portfolio");
 const CompanyDetails = require("../modules/companyDetails");
 const { getRecommendations } = require("../services/recommendationService");
+const {buildSearchText, generateEmbedding} = require("../services/userService");
 
 
 exports.getUser = async(req,res) => {
@@ -315,8 +316,8 @@ exports.updateUser = async(req,res) => {
 
         
         const educationIds = [];
+        let eduDoc;
         for (const edu of education) {
-            let eduDoc;
             const startDate = edu.startDate ? new Date(edu.startDate) : new Date();
             const endDate = edu.endDate && edu.endDate !== "Present" ? new Date(edu.endDate) : new Date();
             if (edu.id && mongoose.Types.ObjectId.isValid(edu.id)) {
@@ -351,8 +352,8 @@ exports.updateUser = async(req,res) => {
 
      
         const experienceIds = [];
+        let expDoc;
         for (const exp of experience) {
-            let expDoc;
             const startDate = exp.startDate ? new Date(exp.startDate) : new Date();
             const endDate = exp.endDate && exp.endDate !== "Present" ? new Date(exp.endDate) : new Date();
             if (exp.id && mongoose.Types.ObjectId.isValid(exp.id)) {
@@ -407,7 +408,11 @@ exports.updateUser = async(req,res) => {
             }
         }
 
+        user.searchText = buildSearchText(user, eduDoc, expDoc);
+        const embedding = await generateEmbedding(user.searchText);
+        user.embedding = embedding;
         await user.save();
+
 
         return res.status(200).json({
             success: true,
@@ -1022,3 +1027,5 @@ exports.addUserData = async(user) => {
 
     return user;
 }
+
+

@@ -175,8 +175,16 @@ const userSchema = new mongoose.Schema({
     },
     category: {
         type: String,
-        enum:Object.values(CATEGORY),
+        enum: Object.values(CATEGORY),
         default: "Technology & IT"
+    },
+    embedding: {
+        type: [Number],
+        default: []
+    },
+    searchText: {
+        type: String,
+        default: ""
     }
 })
 
