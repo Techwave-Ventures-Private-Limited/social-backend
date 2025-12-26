@@ -99,7 +99,14 @@ exports.getPost = async (req, res) => {
             });
         }
 
-        const post = await Post.findById(postId).populate("comments");
+        const post = await Post.findById(postId)
+            .populate({
+                path: "userId",
+                model: "User",
+                select: "name profileImage headline bio _id",
+            })
+            .populate("comments");
+
         if (!post) {
             return res.status(404).json({
                 success: false,
@@ -109,6 +116,7 @@ exports.getPost = async (req, res) => {
 
         // Compute isLiked for the current user (consistent with feed responses)
         let isLiked = false;
+        const currentUser = req.userId ? await User.findById(req.userId) : null;
         if (req.userId) {
             const like = await Like.find({ userId: req.userId, postId: postId });
             if (like.length > 0) {
@@ -116,8 +124,9 @@ exports.getPost = async (req, res) => {
             }
         }
 
-        // Return the post plus isLiked without changing the route shape
-        const body = { ...(post.toObject ? post.toObject() : post), isLiked };
+        // Use formatPost for consistent response structure
+        const formattedPost = await exports.formatPost(post, currentUser);
+        const body = { ...formattedPost, isLiked };
 
         return res.status(200).json({
             success: true,
@@ -1557,7 +1566,7 @@ exports.getLatestPosts = async (req, res) => {
             {
                 path: "userId",
                 model: "User",
-                select: "name profileImage headline _id",
+                select: "name profileImage headline bio _id",
             },
             {
                 path: "communityId",
@@ -1567,9 +1576,9 @@ exports.getLatestPosts = async (req, res) => {
             {
                 path: "originalPostId",
                 populate: {
-                    path: "authorId",
+                    path: "userId",
                     model: "User",
-                    select: "name profileImage headline _id",
+                    select: "name profileImage headline bio _id",
                 },
             }
         ]);
