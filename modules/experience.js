@@ -2,20 +2,20 @@ const mongoose = require("mongoose");
 
 const experienceSchema = new mongoose.Schema({
 
-    name:{
-        type:String,
+    name: {
+        type: String,
     },
-    role:{
+    role: {
         type: String
     },
-    startDate:{
-        type:Date
+    startDate: {
+        type: Date
     },
-    endDate:{
-        type:Date
+    endDate: {
+        type: Date
     },
-    desc:{
-        type:String
+    desc: {
+        type: String
     },
     current: {
         type: Boolean
@@ -34,13 +34,13 @@ const experienceSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
-    createAt:{
-        type:Date,
-        default:Date.now()
+    createAt: {
+        type: Date,
+        default: Date.now
     },
     updatedAt: {
-        type:Date,
-        default:Date.now()
+        type: Date,
+        default: Date.now
     }
 
 })
