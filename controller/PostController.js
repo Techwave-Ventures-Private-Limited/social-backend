@@ -1090,7 +1090,9 @@ exports.getHomeFeedWithCommunities = async (req, res) => {
         // Get regular posts from following users
         const regularPostsQuery = {
             userId: { $in: followingIds },
-            postType: 'public'
+            postType: 'public',
+            type: { $ne: 'Community' },
+            communityId: null
         };
 
         const regularPosts = await Post.find(regularPostsQuery)
@@ -1411,6 +1413,7 @@ exports.getTrendingPosts = async (req, res) => {
             : null;
 
         const now = new Date();
+        const SHOW_COMMUNITY_POSTS_IN_FEED = process.env.SHOW_COMMUNITY_POSTS_IN_FEED === 'true';
 
 
         const cursorQuery = cursor
@@ -1430,7 +1433,9 @@ exports.getTrendingPosts = async (req, res) => {
                 $match: {
                     isDeleted: false,
                     engagementScore: { $gt: 0 },
-                    lastEngagementAt: { $exists: true }
+                    lastEngagementAt: { $exists: true },
+                    lastEngagementAt: { $exists: true },
+                    ...(SHOW_COMMUNITY_POSTS_IN_FEED ? {} : { type: { $ne: "Community" }, communityId: null })
                 }
             },
 
@@ -1552,9 +1557,11 @@ exports.getLatestPosts = async (req, res) => {
             })
         }
 
-        const query = lastCreatedAt
-            ? { createdAt: { $lt: new Date(lastCreatedAt) } }
-            : {};
+        const SHOW_COMMUNITY_POSTS_IN_FEED = process.env.SHOW_COMMUNITY_POSTS_IN_FEED === 'true';
+        const query = {
+            ...(lastCreatedAt ? { createdAt: { $lt: new Date(lastCreatedAt) } } : {}),
+            ...(SHOW_COMMUNITY_POSTS_IN_FEED ? {} : { type: { $ne: "Community" }, communityId: null })
+        };
 
         let posts = await Post.find(query)
             .sort({ createdAt: -1 })
@@ -1627,6 +1634,8 @@ exports.getHomeFeed = async (req, res) => {
         const userCategory = user.category;
 
         const now = new Date();
+        const SHOW_COMMUNITY_POSTS_IN_FEED = process.env.SHOW_COMMUNITY_POSTS_IN_FEED === 'true';
+        const communityExclusion = SHOW_COMMUNITY_POSTS_IN_FEED ? {} : { type: { $ne: "Community" }, communityId: null };
 
         /* ---------------- COMMON SCORING ---------------- */
         const baseAddFields = (sourceBoost) => ([
@@ -1692,7 +1701,8 @@ exports.getHomeFeed = async (req, res) => {
                         createdAt: {
                             $gte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
                             ...cursorFilter
-                        }
+                        },
+                        ...communityExclusion
                     }
                 },
                 ...baseAddFields(1000),
@@ -1703,7 +1713,8 @@ exports.getHomeFeed = async (req, res) => {
         }
 
         /* ---------------- 2️⃣ COMMUNITY (PAGE 0–1) ---------------- */
-        if (allowCommunity && communityIds.length) {
+        /* ---------------- 2️⃣ COMMUNITY (PAGE 0–1) ---------------- */
+        if (SHOW_COMMUNITY_POSTS_IN_FEED && allowCommunity && communityIds.length) {
             const communityPosts = await Post.aggregate([
                 {
                     $match: {
@@ -1732,7 +1743,8 @@ exports.getHomeFeed = async (req, res) => {
                         createdAt: {
                             $gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
                             ...cursorFilter
-                        }
+                        },
+                        ...communityExclusion
                     }
                 },
                 ...baseAddFields(300),
@@ -1751,7 +1763,8 @@ exports.getHomeFeed = async (req, res) => {
                         createdAt: {
                             $gte: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000),
                             ...cursorFilter
-                        }
+                        },
+                        ...communityExclusion
                     }
                 },
                 ...baseAddFields(100),

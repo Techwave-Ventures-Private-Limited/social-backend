@@ -901,7 +901,11 @@ exports.getPostsForHomeFeed = async (req, res) => {
 
         // For public communities: show posts to followers
         // For private communities: don't show in home feed
-        if (publicCommunityIds.length > 0) {
+        const SHOW_COMMUNITY_POSTS_IN_FEED = process.env.SHOW_COMMUNITY_POSTS_IN_FEED === 'true';
+
+        // For public communities: show posts to followers
+        // For private communities: don't show in home feed
+        if (SHOW_COMMUNITY_POSTS_IN_FEED && publicCommunityIds.length > 0) {
             communityPostsQuery.$or = [
                 {
                     // Public community posts from communities user is member of
@@ -910,7 +914,7 @@ exports.getPostsForHomeFeed = async (req, res) => {
                 }
             ];
         } else {
-            // If user is not in any public communities, return empty for community posts
+            // If user is not in any public communities or feature is disabled, return empty for community posts
             communityPostsQuery = { _id: { $exists: false } };
         }
 
