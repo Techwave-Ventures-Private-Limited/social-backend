@@ -804,7 +804,7 @@ exports.formatPost = async (post, currentUser = null) => {
             email: author.email,
             avatar: author.profileImage || null,
             coverImage: null,
-            headline: about.headline || null,
+            headline: about.headline || author.headline || null,
             bio: author.bio || null,
             location: about.location || null,
             website: about.website || null,
@@ -903,7 +903,7 @@ const formatPost = async (post, currentUser = null) => {
             email: author.email,
             avatar: author.profileImage || null,
             coverImage: null,
-            headline: about.headline || null,
+            headline: about.headline || author.headline || null,
             bio: author.bio || null,
             location: about.location || null,
             website: about.website || null,
@@ -1119,7 +1119,7 @@ exports.getHomeFeedWithCommunities = async (req, res) => {
                 type: { $ne: 'question' }, // Q&A should not appear in home feed
                 isDeleted: { $ne: true }
             })
-                .populate('authorId', 'name profileImage')
+                .populate('authorId', 'name profileImage headline bio')
                 .populate('communityId', 'name logo isPrivate')
                 .populate('likes', 'name')
                 .populate({
@@ -1168,8 +1168,8 @@ exports.getHomeFeedWithCommunities = async (req, res) => {
                     email: author.email || null,
                     avatar: author.profileImage || null,
                     coverImage: null,
-                    headline: null,
-                    bio: null,
+                    headline: author.headline || null,
+                    bio: author.bio || null,
                     location: null,
                     website: null,
                     joinedDate: null,
