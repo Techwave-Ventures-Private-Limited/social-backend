@@ -153,12 +153,45 @@ exports.getUserPosts = async (req, res) => {
             })
         }
 
-        const posts = await Post.find({ userId: userId });
+        const posts = await Post.find({ userId: userId })
+            .sort({ createdAt: -1 })
+            .populate({
+                path: 'userId',
+                model: 'User',
+                populate: [
+                    { path: 'about', model: 'About' },
+                    { path: 'education', model: 'Education' },
+                    { path: 'experience', model: 'Experience' },
+                    { path: 'companyDetails', model: 'CompanyDetails' },
+                ]
+            })
+            .populate('comments')
+            .populate({
+                path: 'originalPostId',
+                populate: {
+                    path: 'userId',
+                    model: 'User',
+                    populate: [
+                        { path: 'about', model: 'About' },
+                        { path: 'education', model: 'Education' },
+                        { path: 'experience', model: 'Experience' }
+                    ]
+                }
+            })
+            .populate({
+                path: 'communityId',
+                model: 'Community',
+                select: 'name logo isPrivate _id'
+            });
+
+        const currentUser = await User.findById(userId);
+
+        const formattedPosts = await Promise.all(posts.map(post => formatPost(post, currentUser)));
 
         return res.status(200).json({
             success: true,
             mesasge: "Post found",
-            body: posts
+            body: formattedPosts
         })
 
     } catch (err) {
@@ -886,10 +919,18 @@ const formatPost = async (post, currentUser = null) => {
     // Poll aggregation: compute total votes from pollOptions if present
     let pollOptions = undefined;
     let totalVotes = 0;
+    let isVoted = false;
+    let selectedOptionId = null;
+
     if (Array.isArray(post.pollOptions) && post.pollOptions.length > 0) {
         pollOptions = post.pollOptions;
         totalVotes = post.pollOptions.reduce((sum, opt) => {
             const votesArr = Array.isArray(opt.votes) ? opt.votes : [];
+            // Check if current user voted for this option
+            if (currentUser && votesArr.some(v => v.toString() === currentUser._id.toString())) {
+                isVoted = true;
+                selectedOptionId = opt._id;
+            }
             return sum + votesArr.length;
         }, 0);
     }
@@ -942,6 +983,8 @@ const formatPost = async (post, currentUser = null) => {
         resourceUrl: post.resourceUrl,
         resourceType: post.resourceType,
         category: post.category,
+        hasVoted: isVoted,
+        userVote: selectedOptionId
     };
 };
 
