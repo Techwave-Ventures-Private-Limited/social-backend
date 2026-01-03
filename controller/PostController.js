@@ -9,6 +9,7 @@ const mongoose = require("mongoose");
 const CompanyDetails = require("../modules/companyDetails");
 const Like = require("../modules/like");
 const { addUserData } = require("../controller/UserController");
+const { generatePostEmbedding } = require("../services/userService");
 
 exports.createPost = async (req, res) => {
     try {
@@ -58,6 +59,8 @@ exports.createPost = async (req, res) => {
         if (pollOptions)
             pollOptions = JSON.parse(pollOptions);
 
+        const embedding = await generatePostEmbedding(category, discription);
+
         const createdPost = await Post.create({
             discription,
             media: mediaUrls,
@@ -69,7 +72,8 @@ exports.createPost = async (req, res) => {
             pollOptions,
             resourceUrl,
             resourceType,
-            category: user.category
+            category: user.category,
+            embedding: embedding
         });
         user.posts.push(createdPost._id);
         await user.save();
@@ -1819,7 +1823,6 @@ exports.getHomeFeed = async (req, res) => {
         return res.status(500).json({ success: false });
     }
 };
-
 
 
 

@@ -145,6 +145,11 @@ const postSchema = new mongoose.Schema({
   commentsCount: {
     type: Number,
     default : 0
+  },
+  embedding: {
+    type: [Number],
+    default: [],
+    index: false // DO NOT CREATE INDEX FOR THIS
   }
 });
 

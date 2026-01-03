@@ -33,3 +33,24 @@ export async function generateEmbedding(text) {
     return Array.from(output.data);
 }
 
+export async function getEmbedder() {
+  if (!embedder) {
+    embedder = await pipeline(
+      "feature-extraction",
+      "Xenova/all-MiniLM-L6-v2" // 384 dims, fast & accurate
+    );
+  }
+  return embedder;
+}
+
+export async function generatePostEmbedding(category, discription) {
+  const text = `${category}. ${discription || ""}`;
+
+  const model = await getEmbedder();
+  const output = await model(text, {
+    pooling: "mean",
+    normalize: true
+  });
+
+  return Array.from(output.data);
+}

@@ -26,4 +26,5 @@ router.post("/homefeed", auth, getHomeFeed);
 router.get("/:postId",auth, getPost);
 router.delete("/:postId", auth, deletePost);
 
+
 module.exports = router;

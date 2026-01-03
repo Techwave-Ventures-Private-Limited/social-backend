@@ -5,9 +5,15 @@ const Otp = require("../modules/otp.js");
 const { listenerCount } = require("../modules/about.js");
 require("dotenv").config();
 const { followQueue } = require('../config/queue');
-const {buildSearchText, generateEmbedding} = require("../services/userService");
+const { buildSearchText, generateEmbedding } = require("../services/userService");
+const { PERSONAL_EMAIL_DOMAINS } = require("../constants/BannedDomain.js")
 
+function isPersonalEmail(email) {
+  if (!email || !email.includes("@")) return false;
 
+  const domain = email.split("@")[1].toLowerCase();
+  return PERSONAL_EMAIL_DOMAINS.includes(domain);
+}
 // Read co-founder IDs from .env
 // It should be stored as a comma-separated string: COFOUNDER_IDS=id1,id2
 const cofounderIdsEnv = process.env.COFOUNDER_IDS || "";
@@ -68,7 +74,7 @@ exports.signup = async (req, res) => {
   try {
     let { name, email, password, confirmPassword, otp, type, category } = req.body;
 
-    if (!email.includes("sbagul") && !otp) {
+    if (!otp) {
       return res.status(400).json({
         success: false,
         message: "OTP required"
@@ -76,14 +82,14 @@ exports.signup = async (req, res) => {
     }
 
     const optDB = await Otp.findOne({ email: email }).sort({ createdAt: -1 });
-    if (!email.includes("sbagul") && !optDB) {
+    if (!optDB) {
       return res.status(400).json({
         success: false,
         message: "OTP not found please resent code."
       })
     }
 
-    if (!email.includes("sbagul") && optDB.otp !== otp) {
+    if (optDB.otp !== otp) {
       return res.status(400).json({
         success: false,
         message: "OTP does not match"
@@ -92,6 +98,13 @@ exports.signup = async (req, res) => {
 
     if (!name || !email || !password || !confirmPassword) {
       return res.status(400).json({ message: "All details are required" });
+    }
+
+    if (type === "Company" && isPersonalEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please use your company email address (personal emails are not allowed)"
+      });
     }
 
     if (!type) {
@@ -121,8 +134,8 @@ exports.signup = async (req, res) => {
 
     const profileImage = `https://ui-avatars.com/api/?name=${initials}&background=random&color=fff`;
 
-    const embedding = await generateEmbedding(name+category);
-    
+    const embedding = await generateEmbedding(name + category);
+
     const savedUser = await User.create({
       name,
       email,

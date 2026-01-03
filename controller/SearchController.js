@@ -2,7 +2,7 @@ const User = require("../modules/user");
 const Post = require("../modules/post");
 const Community = require("../modules/community");
 const { formatPost } = require("./PostController");
-const { generateEmbedding } = require("../services/userService");
+const { generateEmbedding, generatePostEmbedding } = require("../services/userService");
 
 exports.searchAll = async (req, res) => {
   try {
@@ -168,3 +168,43 @@ exports.searchUsers = async (req, res) => {
     });
   }
 };
+
+exports.searchPost = async (req, res) => {
+    try {
+        const { q, category, limit = 20 } = req.query;
+
+        const queryEmbedding = await generatePostEmbedding(
+            category || "",
+            q
+        );
+
+        const pipeline = [
+            {
+                $vectorSearch: {
+                    index: "post_vector_index",
+                    path: "embedding",
+                    queryVector: queryEmbedding,
+                    numCandidates: 100,
+                    limit: Number(limit),
+                    filter: {
+                        isDeleted: false,
+                        ...(category && { category })
+                    }
+                }
+            },
+            {
+                $project: {
+                    embedding: 0
+                }
+            }
+        ];
+
+        const posts = await Post.aggregate(pipeline);
+        res.json({ success: true, posts });
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        })
+    }
+}
