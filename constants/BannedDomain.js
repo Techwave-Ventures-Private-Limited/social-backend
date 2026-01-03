@@ -1,0 +1,20 @@
+export const PERSONAL_EMAIL_DOMAINS = [
+  "gmail.com",
+  "yahoo.com",
+  "yahoo.co.in",
+  "yahoo.in",
+  "outlook.com",
+  "hotmail.com",
+  "live.com",
+  "msn.com",
+  "icloud.com",
+  "me.com",
+  "mac.com",
+  "aol.com",
+  "protonmail.com",
+  "proton.me",
+  "zoho.com",
+  "yandex.com",
+  "rediffmail.com",
+  "gmx.com"
+];
