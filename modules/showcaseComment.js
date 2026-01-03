@@ -3,20 +3,20 @@ const mongoose = require("mongoose");
 const showcaseCommentSchema = new mongoose.Schema({
 
     text: {
-        type:String,
-        default:""
+        type: String,
+        default: ""
     },
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
     },
-    likes : {
-        type:Number,
-        default : 0
+    likes: {
+        type: Number,
+        default: 0
     },
-    showcaseId : {
-        type:String,
+    showcaseId: {
+        type: String,
         required: true
     },
     replyTo: {
@@ -29,13 +29,13 @@ const showcaseCommentSchema = new mongoose.Schema({
         ref: 'ShowcaseComment',
         default: []
     }],
-    createAt:{
-        type:Date,
-        default:Date.now()
+    createAt: {
+        type: Date,
+        default: Date.now
     },
     updatedAt: {
-        type:Date,
-        default:Date.now()
+        type: Date,
+        default: Date.now
     }
 
 })

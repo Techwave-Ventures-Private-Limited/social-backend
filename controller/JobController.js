@@ -7,8 +7,8 @@ exports.createJob = async (req, res) => {
     try {
         const userId = req.userId;
 
-        const { title, description, locations,locationType, openings,type, experienceLevel, salaryRange, 
-            skills, requirements, experienceId, applyMethod, externalApplyLink, customStages 
+        const { title, description, locations, locationType, openings, type, experienceLevel, salaryRange,
+            skills, requirements, experienceId, applyMethod, externalApplyLink, customStages
         } = req.body;
 
         // Normalise salaryRange so we always have a clean object
@@ -56,21 +56,21 @@ exports.createJob = async (req, res) => {
         if (customStages && Array.isArray(customStages) && customStages.length > 0) {
             // Option 1: User provided custom stages
             // customStages example: [{ name: "Assessment" }, { name: "Interview 1" }]
-            
+
             customStages.forEach((stage, index) => {
                 hiringWorkflow.push({
-                    stepName: stage.name, 
+                    stepName: stage.name,
                     stepType: "Custom",
                     // Start ordering from 2 (Applied is 1)
-                    order: index + 4, 
+                    order: index + 4,
                     description: stage.description || ""
                 });
             });
 
         } else {
             // Option 2: Default "Happy Path" if no custom stages provided
-            const defaultStages = [ "Interview" ];
-            
+            const defaultStages = ["Interview"];
+
             defaultStages.forEach((name, index) => {
                 hiringWorkflow.push({
                     stepName: name,
@@ -104,7 +104,7 @@ exports.createJob = async (req, res) => {
             postedBy: userId,
             applyMethod,
             externalApplyLink: applyMethod === "External" ? externalApplyLink : undefined,
-            hiringWorkflow: hiringWorkflow 
+            hiringWorkflow: hiringWorkflow
         });
 
         return res.status(201).json({
@@ -117,7 +117,7 @@ exports.createJob = async (req, res) => {
         console.log(error);
         return res.status(500).json({
             success: false,
-            message: error.message 
+            message: error.message
         });
     }
 };
@@ -126,20 +126,20 @@ exports.createJob = async (req, res) => {
 exports.getAllJobs = async (req, res) => {
     try {
         // 1. Destructure Query Parameters
-        const { 
-            keyword, 
-            location, 
-            locationType, 
+        const {
+            keyword,
+            location,
+            locationType,
             level,      // Experience Level (Intern, Senior, etc.)
             type,       // Job Type (Full-time, Contract)
-            salaryMin, 
-            page = 1, 
-            limit = 10 
+            salaryMin,
+            page = 1,
+            limit = 10
         } = req.query;
 
         // 2. Build the Query Object
         // Default: Only show active jobs that haven't expired
-        const query = { 
+        const query = {
             isActive: true,
             expiresAt: { $gt: new Date() } // Ensure job hasn't expired
         };
@@ -163,7 +163,7 @@ exports.getAllJobs = async (req, res) => {
         if (locationType) {
             query.locationType = locationType; // "Remote", "On-site", "Hybrid"
         }
-        
+
         if (level) {
             query.experienceLevel = level; // "Senior", "Entry Level"
         }
@@ -174,8 +174,31 @@ exports.getAllJobs = async (req, res) => {
 
         // D. Salary Filter (Jobs paying AT LEAST this amount)
         if (salaryMin) {
-            // Check if the job's MAX budget covers the user's requirement
-            query["salaryRange.max"] = { $gte: Number(salaryMin) };
+            const minVal = Number(salaryMin);
+            // We need to handle both Monthly and Yearly salaries.
+            // We'll use an $or query to check:
+            // 1. Yearly jobs where max >= minVal
+            // 2. Monthly jobs where max * 12 >= minVal
+            query.$and = query.$and || [];
+            query.$and.push({
+                $or: [
+                    {
+                        "salaryRange.period": "Yearly",
+                        "salaryRange.max": { $gte: minVal }
+                    },
+                    {
+                        "salaryRange.period": "Monthly",
+                        $expr: {
+                            $gte: [{ $multiply: ["$salaryRange.max", 12] }, minVal]
+                        }
+                    },
+                    // Fallback for legacy data where period might be missing (defaults to Yearly)
+                    {
+                        "salaryRange.period": { $exists: false },
+                        "salaryRange.max": { $gte: minVal }
+                    }
+                ]
+            });
         }
 
         // 3. Pagination Logic
@@ -220,7 +243,7 @@ exports.getJobById = async (req, res) => {
             .populate("postedBy", "name headline profileImage email") // Recruiter info
             .populate({
                 path: "applications", // Optional: Only if you want to show how many applied
-                select: "_id" 
+                select: "_id applicant"
             });
 
         if (!job) {
@@ -257,17 +280,143 @@ exports.jobsByUserId = async (req, res) => {
         const { userId } = req.params;
         const jobs = await Job.find({ postedBy: userId })
             .populate("company", "name logo domain isVerified")
-            .sort({ createdAt: -1 });   
+            .sort({ createdAt: -1 });
         return res.status(200).json({
             success: true,
             count: jobs.length,
             data: jobs
         });
-    }   catch (error) {         
+    } catch (error) {
         console.log(error);
         return res.status(500).json({
             success: false,
             message: "Error fetching user's jobs"
+        });
+    }
+};
+
+// Close Job
+exports.closeJob = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.userId;
+
+        const job = await Job.findById(id);
+
+        if (!job) {
+            return res.status(404).json({
+                success: false,
+                message: "Job not found"
+            });
+        }
+
+        // Check if the user is the owner
+        if (String(job.postedBy) !== String(userId)) {
+            return res.status(403).json({
+                success: false,
+                message: "You are not authorized to close this job"
+            });
+        }
+
+        job.isActive = false;
+        await job.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Job closed successfully",
+            data: job
+        });
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+// Update Job
+exports.updateJob = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.userId;
+
+        const {
+            title, description, locations, locationType, openings, type,
+            experienceLevel, salaryRange, skills, requirements,
+            applyMethod, externalApplyLink, isActive
+        } = req.body;
+
+        const job = await Job.findById(id);
+
+        if (!job) {
+            return res.status(404).json({
+                success: false,
+                message: "Job not found"
+            });
+        }
+
+        // Check if the user is the owner
+        if (String(job.postedBy) !== String(userId)) {
+            return res.status(403).json({
+                success: false,
+                message: "You are not authorized to update this job"
+            });
+        }
+
+        // Normalise salaryRange if provided
+        let normalisedSalaryRange = job.salaryRange;
+        if (salaryRange) {
+            normalisedSalaryRange = {
+                min: typeof salaryRange.min === 'number' ? salaryRange.min : Number(salaryRange.min) || job.salaryRange.min,
+                max: typeof salaryRange.max === 'number' ? salaryRange.max : Number(salaryRange.max) || job.salaryRange.max,
+                currency: salaryRange.currency || job.salaryRange.currency || "INR",
+                isDisclosed: typeof salaryRange.isDisclosed === 'boolean'
+                    ? salaryRange.isDisclosed
+                    : salaryRange.isDisclosed !== undefined
+                        ? Boolean(salaryRange.isDisclosed)
+                        : job.salaryRange.isDisclosed,
+                period: salaryRange.period === 'Monthly' || salaryRange.period === 'Yearly'
+                    ? salaryRange.period
+                    : job.salaryRange.period || 'Yearly',
+            };
+        }
+
+        // Update fields
+        if (title) job.title = title;
+        if (description) job.description = description;
+        if (locations) job.locations = locations;
+        if (locationType) job.locationType = locationType;
+        if (openings) job.openings = openings;
+        if (type) job.type = type;
+        if (experienceLevel) job.experienceLevel = experienceLevel;
+        if (salaryRange) job.salaryRange = normalisedSalaryRange;
+        if (skills) job.skills = skills;
+        if (requirements) job.requirements = requirements;
+        if (applyMethod) job.applyMethod = applyMethod;
+        if (applyMethod === "External") {
+            job.externalApplyLink = externalApplyLink;
+        } else if (applyMethod === "EasyApply") {
+            job.externalApplyLink = undefined;
+        }
+        if (typeof isActive === 'boolean') job.isActive = isActive;
+
+        job.updatedAt = Date.now();
+
+        await job.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Job updated successfully",
+            data: job
+        });
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
+            success: false,
+            message: error.message
         });
     }
 };

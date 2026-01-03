@@ -13,19 +13,19 @@ const { createFollowship } = require('./services/followService'); // The functio
 // --- Connect to Database ---
 database.connect();
 
-console.log(`[Worker] Starting worker for queue: "${QUEUE_NAME}"`);
+// console.log(`[Worker] Starting worker for queue: "${QUEUE_NAME}"`);
 
 // --- Create the Worker ---
 const worker = new Worker(QUEUE_NAME, async (job) => {
     // This function is called for every job
-    console.log(`[Worker] Processing job: ${job.name} (ID: ${job.id})`);
+    // console.log(`[Worker] Processing job: ${job.name} (ID: ${job.id})`);
 
     const { newUserId } = job.data;
 
     try {
         if (job.name === 'new-user-follows-founders') {
             const { usersToFollowIds } = job.data;
-            console.log(`[Worker] Job: ${newUserId} will follow ${usersToFollowIds.length} founders.`);
+            // console.log(`[Worker] Job: ${newUserId} will follow ${usersToFollowIds.length} founders.`);
             for (const cofounderId of usersToFollowIds) {
                 await createFollowship(newUserId, cofounderId);
             }
@@ -35,12 +35,12 @@ const worker = new Worker(QUEUE_NAME, async (job) => {
             // Get the single follower ID from the job data
             const { followerId } = job.data;
             
-            console.log(`[Worker] Job: Founder ${followerId} will follow new user ${newUserId}.`);
+            // console.log(`[Worker] Job: Founder ${followerId} will follow new user ${newUserId}.`);
             
             await createFollowship(followerId, newUserId);
         }
 
-        console.log(`[Worker] Completed job: ${job.name} (ID: ${job.id})`);
+        // console.log(`[Worker] Completed job: ${job.name} (ID: ${job.id})`);
         return { success: true };
 
     } catch (error) {
@@ -54,7 +54,7 @@ const worker = new Worker(QUEUE_NAME, async (job) => {
 
 // --- Worker Event Listeners (for logging) ---
 worker.on('completed', (job, result) => {
-    console.log(`[Worker-Event] Job ${job.id} completed with result:`, result);
+    // console.log(`[Worker-Event] Job ${job.id} completed with result:`, result);
 });
 
 worker.on('failed', (job, err) => {

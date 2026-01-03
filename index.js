@@ -13,9 +13,9 @@ const jwt = require('jsonwebtoken'); // You'll need this for auth
 const { initializeCommunitySocket } = require('./utils/communitySocketHelper');
 const nodemailer = require('nodemailer');
 const fs = require('fs');
-
 // --- Import Redis Connection ---
 const { redisClient, subClient } = require("./config/redis");
+const { startAllBots } = require("./bots");
 
 // --- App Setup ---
 const app = express();
@@ -41,11 +41,12 @@ initializeCommunitySocket(io);
 
 // --- Middleware and Config ---
 const cookieParser = require("cookie-parser");
-const database = require('./config/dbonfig');
+const {connect} = require('./config/dbonfig');
 const cors = require("cors");
 const fileUpload = require("express-fileupload");
 const { cloudinaryConnect } = require("./config/cloudinary");
 const admin = require('firebase-admin');
+
 
 
 // --- Routers ---
@@ -77,7 +78,7 @@ const CommunityPost = require('./modules/communityPost');
 const CommunityComment = require('./modules/communityComment');
 
 // --- Database and Cloudinary Connection ---
-database.connect();
+connect();
 cloudinaryConnect();
 
 // Initialize Firebase Admin (conditional)
@@ -183,9 +184,9 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
 io.use(async (socket, next) => {
     try {
 
-        console.log("Socket handshake auth:", socket.handshake.auth); // ADD THIS
+        // console.log("Socket handshake auth:", socket.handshake.auth); // ADD THIS
         const token = socket.handshake.auth.token;
-        console.log("Extracted JWT Token:", token); // ADD THIS
+        // console.log("Extracted JWT Token:", token); // ADD THIS
 
         if (!token) {
             return next(new Error('Authentication error: Token is required.'));
@@ -201,7 +202,7 @@ io.use(async (socket, next) => {
 });
 
 io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.userId} with socket ID: ${socket.id}`);
+    // console.log(`User connected: ${socket.userId} with socket ID: ${socket.id}`);
     socket.join(socket.userId);
     
     // Join community rooms for real-time updates
@@ -211,7 +212,7 @@ io.on('connection', (socket) => {
             if (Array.isArray(communityIds)) {
                 communityIds.forEach(communityId => {
                     socket.join(`community_${communityId}`);
-                    console.log(`User ${socket.userId} joined community room: community_${communityId}`);
+                    // console.log(`User ${socket.userId} joined community room: community_${communityId}`);
                 });
             }
         } catch (err) {
@@ -224,7 +225,7 @@ io.on('connection', (socket) => {
         try {
             const { communityId } = data;
             socket.leave(`community_${communityId}`);
-            console.log(`User ${socket.userId} left community room: community_${communityId}`);
+            // console.log(`User ${socket.userId} left community room: community_${communityId}`);
         } catch (err) {
             console.error('Error leaving community room:', err);
         }
@@ -281,7 +282,7 @@ io.on('connection', (socket) => {
 
     // Handle user disconnection
     socket.on('disconnect', () => {
-        console.log(`User disconnected: ${socket.userId}`);
+        // console.log(`User disconnected: ${socket.userId}`);
     });
 });
 
@@ -289,6 +290,7 @@ io.on('connection', (socket) => {
 // --- Server Listening ---
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running at ${PORT}`);
+    startAllBots();
     // Non-blocking SMTP connectivity check
     (async function verifySmtpTransport() {
         try {
@@ -348,3 +350,6 @@ function scheduleApiCall() {
 }
 
 scheduleApiCall();
+
+
+

@@ -1,18 +1,23 @@
 const express = require("express");
 const router = express.Router();
 
-const { 
+const {
     createJob,
     getAllJobs,
     getJobById,
-    jobsByUserId
+    jobsByUserId,
+    closeJob,
+    updateJob
 } = require("../controller/JobController");
 
-const {auth}  = require("../middleware/authMiddleware");
+const { auth } = require("../middleware/authMiddleware");
 const job = require("../modules/job");
 
 // @route   POST /job/create
 router.post("/create", auth, createJob);
+
+// @route   PUT /job/update/:id
+router.put("/update/:id", auth, updateJob);
 
 // @route   GET /job/all
 router.get("/all", getAllJobs);
@@ -22,5 +27,8 @@ router.get("/user/:userId", auth, jobsByUserId);
 
 // @route   GET /job/:id
 router.get("/details/:id", auth, getJobById);
+
+// @route   PUT /job/close/:id
+router.put("/close/:id", auth, closeJob);
 
 module.exports = router;

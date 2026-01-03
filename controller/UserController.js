@@ -12,18 +12,19 @@ const bcrypt = require("bcrypt");
 const Portfolio = require("../modules/portfolio");
 const CompanyDetails = require("../modules/companyDetails");
 const { getRecommendations } = require("../services/recommendationService");
+const { buildSearchText, generateEmbedding } = require("../services/userService");
 
 
-exports.getUser = async(req,res) => {
-    try{
+exports.getUser = async (req, res) => {
+    try {
         const userId = req.userId;
 
-        if(!userId) {
+        if (!userId) {
             return res.status(400).json({
-                success:false,
-                message:"Unauthorized request"
+                success: false,
+                message: "Unauthorized request"
             })
-        } 
+        }
 
         let user = await User.findById(userId)
             .populate({
@@ -38,22 +39,22 @@ exports.getUser = async(req,res) => {
             .populate('companyDetails')
             .lean();
 
-        if(!user) {
+        if (!user) {
             return res.status(402).json({
-                success:false,
-                message:"User not found"
+                success: false,
+                message: "User not found"
             })
         }
 
         user = await this.addUserData(user);
 
         return res.status(200).json({
-            success:true,
-            message:"User found",
+            success: true,
+            message: "User found",
             body: user
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
@@ -138,18 +139,18 @@ exports.getAnotherUserPortfolio = async (req, res) => {
     }
 };
 
-exports.getAnotherUser = async(req,res) => {
-    try{
+exports.getAnotherUser = async (req, res) => {
+    try {
         const userId = req.params.userId;
         const currUserId = req.userId;
 
 
-        if(!userId) {
+        if (!userId) {
             return res.status(400).json({
-                success:false,
-                message:"Unauthorized request"
+                success: false,
+                message: "Unauthorized request"
             })
-        } 
+        }
 
         let user = await User.findById(userId)
             .populate({
@@ -164,10 +165,10 @@ exports.getAnotherUser = async(req,res) => {
             .populate('companyDetails')
             .lean();
 
-        if(!user) {
+        if (!user) {
             return res.status(402).json({
-                success:false,
-                message:"User not found"
+                success: false,
+                message: "User not found"
             })
         }
 
@@ -179,12 +180,12 @@ exports.getAnotherUser = async(req,res) => {
         user = await this.addUserData(user);
 
         return res.status(200).json({
-            success:true,
-            message:"User found",
+            success: true,
+            message: "User found",
             body: user
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
@@ -194,103 +195,103 @@ exports.getAnotherUser = async(req,res) => {
 
 
 exports.getRecommendedUsers = async (req, res) => {
-  try {
-    // The 'auth' middleware adds the user's ID to req.user.id
-    const userId = req.userId; 
+    try {
+        // The 'auth' middleware adds the user's ID to req.user.id
+        const userId = req.userId;
 
-    const users = await getRecommendations(userId);
+        const users = await getRecommendations(userId);
 
-    // console.log(`[GetRecommendations] Found ${users.length} users for ${userId}:`, JSON.stringify(users, null, 2));
+        // console.log(`[GetRecommendations] Found ${users.length} users for ${userId}:`, JSON.stringify(users, null, 2));
 
-    res.status(200).json({
-      success: true,
-      message: "Recommendations fetched successfully",
-      users: users,
-    });
-  } catch (error) {
-    console.error("[GetRecommendations Error]", error.message);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch recommendations",
-      error: error.message,
-    });
-  }
+        res.status(200).json({
+            success: true,
+            message: "Recommendations fetched successfully",
+            users: users,
+        });
+    } catch (error) {
+        console.error("[GetRecommendations Error]", error.message);
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch recommendations",
+            error: error.message,
+        });
+    }
 };
 
 
 exports.getSeedProfiles = async (req, res) => {
-//   console.log("[getSeedProfiles] Starting...");
+    // console.log("[getSeedProfiles] Starting...");
 
-  try {
-    const rawIds = process.env.COFOUNDER_IDS;
+    try {
+        const rawIds = process.env.COFOUNDER_IDS;
 
-    if (!rawIds) {
-    //   console.warn("[getSeedProfiles] COFOUNDER_IDS env variable is missing!");
-      return res.status(200).json({
-        success: true,
-        message: "No seed IDs configured",
-        users: [] 
-      });
+        if (!rawIds) {
+            //   console.warn("[getSeedProfiles] COFOUNDER_IDS env variable is missing!");
+            return res.status(200).json({
+                success: true,
+                message: "No seed IDs configured",
+                users: []
+            });
+        }
+
+        // 1. Parse and Explicitly Cast to ObjectId
+        const seedUserIds = rawIds.split(',').map(id => {
+            const trimmed = id.trim();
+            if (mongoose.Types.ObjectId.isValid(trimmed)) {
+                return new mongoose.Types.ObjectId(trimmed);
+            }
+            return null;
+        }).filter(Boolean);
+
+        // console.log(`[getSeedProfiles] Querying for IDs:`, seedUserIds);
+
+        if (seedUserIds.length === 0) {
+            return res.status(200).json({
+                success: true,
+                message: "No valid seed IDs found",
+                users: []
+            });
+        }
+
+        // 2. Fetch users
+        const seedUsers = await User.find({ _id: { $in: seedUserIds } })
+            .select('_id name profileImage headline')
+            .lean()
+            .maxTimeMS(5000);
+
+        // console.log(`[getSeedProfiles] Success. Retrieved ${seedUsers.length} users.`);
+
+        return res.status(200).json({
+            success: true,
+            message: "Seed profiles fetched successfully",
+            users: seedUsers,
+        });
+
+    } catch (error) {
+        console.error("[getSeedProfiles] CRITICAL ERROR:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch seed profiles",
+            error: error.message
+        });
     }
-
-    // 1. Parse and Explicitly Cast to ObjectId
-    const seedUserIds = rawIds.split(',').map(id => {
-      const trimmed = id.trim();
-      if (mongoose.Types.ObjectId.isValid(trimmed)) {
-        return new mongoose.Types.ObjectId(trimmed); 
-      }
-      return null;
-    }).filter(Boolean);
-
-    // console.log(`[getSeedProfiles] Querying for IDs:`, seedUserIds);
-
-    if (seedUserIds.length === 0) {
-      return res.status(200).json({
-        success: true,
-        message: "No valid seed IDs found",
-        users: []
-      });
-    }
-
-    // 2. Fetch users
-    const seedUsers = await User.find({ _id: { $in: seedUserIds } })
-      .select('_id name profileImage headline') 
-      .lean()
-      .maxTimeMS(5000); 
-
-    // console.log(`[getSeedProfiles] Success. Retrieved ${seedUsers.length} users.`);
-    
-    return res.status(200).json({
-      success: true,
-      message: "Seed profiles fetched successfully",
-      users: seedUsers, 
-    });
-
-  } catch (error) {
-    console.error("[getSeedProfiles] CRITICAL ERROR:", error);
-    
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch seed profiles",
-      error: error.message
-    });
-  }
 };
 
 
-exports.updateUser = async(req,res) => {
-    try{
+exports.updateUser = async (req, res) => {
+    try {
         const userId = req.userId;
         const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({
-                success:false,
-                message:`User does not exists with userId : ${userId}`
+                success: false,
+                message: `User does not exists with userId : ${userId}`
             })
         }
 
         const {
-            name, bio, headline, education = [], experience = [],
+            name, bio, headline, category, education = [], experience = [],
             skills = [], location = "", phone = "", website = ""
         } = req.body;
 
@@ -299,7 +300,8 @@ exports.updateUser = async(req,res) => {
         user.name = name || user.name;
         user.bio = bio || user.bio;
         user.headline = headline || user.headline;
-       
+        user.category = category || user.category;
+
         let about = null;
         if (user.about) {
             about = await About.findById(user.about);
@@ -313,10 +315,10 @@ exports.updateUser = async(req,res) => {
         about.phone = phone;
         about.website = website;
 
-        
+
         const educationIds = [];
+        let eduDoc;
         for (const edu of education) {
-            let eduDoc;
             const startDate = edu.startDate ? new Date(edu.startDate) : new Date();
             const endDate = edu.endDate && edu.endDate !== "Present" ? new Date(edu.endDate) : new Date();
             if (edu.id && mongoose.Types.ObjectId.isValid(edu.id)) {
@@ -349,10 +351,10 @@ exports.updateUser = async(req,res) => {
         about.education = educationIds;
         user.education = educationIds;
 
-     
+
         const experienceIds = [];
+        let expDoc;
         for (const exp of experience) {
-            let expDoc;
             const startDate = exp.startDate ? new Date(exp.startDate) : new Date();
             const endDate = exp.endDate && exp.endDate !== "Present" ? new Date(exp.endDate) : new Date();
             if (exp.id && mongoose.Types.ObjectId.isValid(exp.id)) {
@@ -407,15 +409,19 @@ exports.updateUser = async(req,res) => {
             }
         }
 
+        user.searchText = buildSearchText(user, eduDoc, expDoc);
+        const embedding = await generateEmbedding(user.searchText);
+        user.embedding = embedding;
         await user.save();
+
 
         return res.status(200).json({
             success: true,
-            message:'User updated successfully',
+            message: 'User updated successfully',
             body: user
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
@@ -461,8 +467,8 @@ exports.uploadProfileImage = async (req, res) => {
     }
 }
 
-exports.uploadBannerImage = async(req,res) => {
-    try { 
+exports.uploadBannerImage = async (req, res) => {
+    try {
 
         const userId = req.userId;
 
@@ -492,7 +498,7 @@ exports.uploadBannerImage = async(req,res) => {
             body: user
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
@@ -500,11 +506,11 @@ exports.uploadBannerImage = async(req,res) => {
     }
 }
 
-exports.sendForgotPasswordEmail = async(req,res) => {
+exports.sendForgotPasswordEmail = async (req, res) => {
     try {
 
         const email = req.body.email;
-        const user  = await User.find({email:email});
+        const user = await User.find({ email: email });
 
         if (!user) {
             return res.status(400).json({
@@ -525,17 +531,17 @@ exports.sendForgotPasswordEmail = async(req,res) => {
         })
 
         await mailSender(
-			email,
-			"Forgot password OTP",
-			forgotPassowordTemplate(otp)
-		);
+            email,
+            "Forgot password OTP",
+            forgotPassowordTemplate(otp)
+        );
 
         return res.status(200).json({
             success: true,
-            message:"Email sent"
+            message: "Email sent"
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
@@ -543,10 +549,10 @@ exports.sendForgotPasswordEmail = async(req,res) => {
     }
 }
 
-exports.verifyForgotPasswordOtp = async(req,res) => {
+exports.verifyForgotPasswordOtp = async (req, res) => {
     try {
 
-        const {otp, email} = req.body;
+        const { otp, email } = req.body;
 
         if (!otp) {
             return res.status(400).json({
@@ -575,7 +581,7 @@ exports.verifyForgotPasswordOtp = async(req,res) => {
             message: "OTP verified"
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
@@ -583,30 +589,30 @@ exports.verifyForgotPasswordOtp = async(req,res) => {
     }
 }
 
-exports.changePassword = async(req,res) => {
+exports.changePassword = async (req, res) => {
     try {
 
-        const {password, confirmPassword, email} = req.body;
+        const { password, confirmPassword, email } = req.body;
 
-        const user = await User.find({email: email}).findOne();
+        const user = await User.find({ email: email }).findOne();
 
         if (!user) {
             return res.status(400).json({
-                success : false,
-                message : "User does not exists"
+                success: false,
+                message: "User does not exists"
             })
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
         user.password = hashedPassword;
         await user.save();
-        
+
         return res.status(200).json({
             success: true,
             message: "Password updated successfully"
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
@@ -614,12 +620,12 @@ exports.changePassword = async(req,res) => {
     }
 }
 
-exports.addPortfolio = async(req,res) => {
+exports.addPortfolio = async (req, res) => {
     try {
 
         const userId = req.userId;
         const user = await User.findById(userId);
-        
+
         if (!user) {
             return res.status(400).json({
                 success: false,
@@ -631,11 +637,11 @@ exports.addPortfolio = async(req,res) => {
         if (!logo) {
             return res.status(400).json({
                 success: false,
-                message : "Logo is required"
+                message: "Logo is required"
             })
         }
 
-        const {link, description, title} = req.body;
+        const { link, description, title } = req.body;
         if (!link || !title) {
             return res.status(400).json({
                 success: false,
@@ -647,7 +653,7 @@ exports.addPortfolio = async(req,res) => {
         const portfolio = await Portfolio.create({
             logo: uploadedImage.secure_url,
             link,
-            desc : description,
+            desc: description,
             userId,
             title
         })
@@ -657,11 +663,11 @@ exports.addPortfolio = async(req,res) => {
 
         return res.status(200).json({
             success: true,
-            message :"Portfolio created successfully",
-            body : portfolio
+            message: "Portfolio created successfully",
+            body: portfolio
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
@@ -669,7 +675,7 @@ exports.addPortfolio = async(req,res) => {
     }
 }
 
-exports.deletePortfolio = async(req,res) => {
+exports.deletePortfolio = async (req, res) => {
     try {
 
         const id = req.params.id;
@@ -688,7 +694,7 @@ exports.deletePortfolio = async(req,res) => {
         if (!user) {
             return res.status(400).json({
                 success: false,
-                message:" User not found"
+                message: " User not found"
             })
         }
 
@@ -700,7 +706,7 @@ exports.deletePortfolio = async(req,res) => {
             message: "Portfolio deleted"
         })
 
-    } catch(err) {
+    } catch (err) {
         return res.status(500).json({
             success: false,
             message: err.message
@@ -756,38 +762,38 @@ exports.registerDeviceToken = async (req, res) => {
 };
 
 exports.getBulkUsers = async (req, res) => {
-  try {
-    const ids = req.body.ids;
-    // console.log(ids)
-    if (!ids || !Array.isArray(ids)) {
-        return res.status(400).json({
+    try {
+        const ids = req.body.ids;
+        // console.log(ids)
+        if (!ids || !Array.isArray(ids)) {
+            return res.status(400).json({
+                success: false,
+                message: "UserId array required",
+            });
+        }
+
+        //const userIds = ids.split(",");
+
+        const users = await User.find({ _id: { $in: ids } })
+            .populate('companyDetails');
+
+        let usersList = [];
+
+        users.forEach(async (user) => {
+            user = await this.addUserData(user);
+            usersList.push(user);
+        })
+
+        return res.status(200).json({
+            success: true,
+            body: usersList,
+        });
+    } catch (error) {
+        return res.status(500).json({
             success: false,
-            message: "UserId array required",
+            message: error.message
         });
     }
-
-    //const userIds = ids.split(",");
-
-    const users = await User.find({ _id: { $in: ids } })
-      .populate('companyDetails');
-
-    let usersList = [];
-
-    users.forEach(async(user) => {
-        user = await this.addUserData(user);
-        usersList.push(user);
-    })
-
-    return res.status(200).json({
-      success: true,
-      body: usersList,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
 };
 
 
@@ -841,10 +847,10 @@ exports.getSelfFollowers = async (req, res) => {
     try {
         const userId = req.userId;
 
-        // Find all users who are following the current user
-        const followers = await User.find({ following: userId })
-            .select('_id name profileImage bio headline')
-            .populate('companyDetails')
+        // Find all Connection documents where the current user (userId) is the one being FOLLOWED.
+        const followers = await Connection.find({ following: userId })
+            .select("follower") // Only select the 'follower' field (the user who follows)
+            .populate({ path: "follower", select: "_id name profileImage headline" })
             .lean();
 
         return res.status(200).json({
@@ -857,7 +863,7 @@ exports.getSelfFollowers = async (req, res) => {
         console.error("Error in getSelfFollowers controller:", err.message);
         return res.status(500).json({
             success: false,
-            message: "Failed to fetch followers.",
+            message: "Failed to fetch self followers.",
         });
     }
 };
@@ -869,29 +875,23 @@ exports.getSelfFollowing = async (req, res) => {
     try {
         const userId = req.userId;
 
-        const user = await User.findById(userId)
-            .populate({
-                path: 'following',
-                select: '_id name profileImage bio headline',
-                populate: { path: 'companyDetails', model: 'CompanyDetails' }
-            })
+        // Find all Connection documents where the current user (userId) is the FOLLOWER.
+        const followings = await Connection.find({ follower: userId })
+            .select("following")
+            .populate({ path: "following", select: "_id name profileImage headline" })
             .lean();
-
-        if (!user) {
-            return res.status(404).json({ success: false, message: "User not found" });
-        }
 
         return res.status(200).json({
             success: true,
             message: "Following list fetched successfully",
-            body: user.following || [],
+            body: followings || [],
         });
 
     } catch (err) {
         console.error("Error in getSelfFollowing controller:", err.message);
         return res.status(500).json({
             success: false,
-            message: "Failed to fetch following list.",
+            message: "Failed to fetch self following list.",
         });
     }
 };
@@ -909,9 +909,10 @@ exports.getUserFollowers = async (req, res) => {
             .populate('companyDetails')
             .lean();*/
 
-        const followers = await Connection.find({following : userId})
+        const followers = await Connection.find({ following: userId })
             .select("follower")
-            .populate({path : "follower" , select : "_id name profileImage bio headline"}).lean();
+            .populate({ path: "follower", select: "_id name profileImage headline" })
+            .lean();
 
 
         return res.status(200).json({
@@ -936,10 +937,10 @@ exports.getUserFollowing = async (req, res) => {
     try {
         const { userId } = req.params;
 
-        const followings = await Connection.find({follower : userId})
+        const followings = await Connection.find({ follower: userId })
             .select("following")
-            .populate({path : "following", select : "_id name profileImage bio headline", 
-                populate : {path : "companyDetails",  model : 'CompanyDetails'}}).lean();
+            .populate({ path: "following", select: "_id name profileImage headline" })
+            .lean();
 
         return res.status(200).json({
             success: true,
@@ -966,13 +967,15 @@ exports.getConnections = async (req, res) => {
             return res.status(401).json({ success: false, message: 'Authentication error: User ID not found.' });
         }
 
-        const followers = await Connection.find({following : userId})
+        const followers = await Connection.find({ following: userId })
             .select("follower")
-            .populate({path : "follower" , select : "_id name profileImage bio headline"}).lean();
-        const followings = await Connection.find({follower : userId})
+            .populate({ path: "follower", select: "_id name profileImage bio headline" }).lean();
+        const followings = await Connection.find({ follower: userId })
             .select("following")
-            .populate({path : "following", select : "_id name profileImage bio headline", 
-                populate : {path : "companyDetails",  model : 'CompanyDetails'}}).lean();
+            .populate({
+                path: "following", select: "_id name profileImage bio headline",
+                populate: { path: "companyDetails", model: 'CompanyDetails' }
+            }).lean();
 
         // --- Critical Debugging Logs ---
         // console.log(`[CONNECTIONS] Found user: ${user.name}`);
@@ -982,12 +985,12 @@ exports.getConnections = async (req, res) => {
 
         // Use a Map to combine and de-duplicate the lists
         const connectionsMap = new Map();
-        
+
         // Add followers to the map
         followers.forEach(follower => {
             connectionsMap.set(follower.follower._id.toString(), follower);
         });
-        
+
         // Add following to the map (will overwrite duplicates, which is fine)
         followings.forEach(followedUser => {
             connectionsMap.set(followedUser.following._id.toString(), followedUser);
@@ -1007,23 +1010,27 @@ exports.getConnections = async (req, res) => {
 
 // private function to append followers and following details
 // can be resued to add other fields into user object in future
-exports.addUserData = async(user) => {
+exports.addUserData = async (user) => {
     if (!user) {
-        return ;
+        return;
     }
 
     const userId = user._id;
 
-    const followers = await Connection.find({following : userId})
-            .select("follower")
-            .populate({path : "follower" , select : "_id name profileImage bio headline"}).lean();
-    const followings = await Connection.find({follower : userId})
-            .select("following")
-            .populate({path : "following", select : "_id name profileImage bio headline", 
-                populate : {path : "companyDetails",  model : 'CompanyDetails'}}).lean();
+    const followers = await Connection.find({ following: userId })
+        .select("follower")
+        .populate({ path: "follower", select: "_id name profileImage bio headline" }).lean();
+    const followings = await Connection.find({ follower: userId })
+        .select("following")
+        .populate({
+            path: "following", select: "_id name profileImage bio headline",
+            populate: { path: "companyDetails", model: 'CompanyDetails' }
+        }).lean();
 
     user.followers = followers;
     user.following = followings;
 
     return user;
 }
+
+

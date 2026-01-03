@@ -1,16 +1,16 @@
 const express = require("express");
 const router = express.Router();
 
-const {getUser, updateUser, uploadProfileImage, sendForgotPasswordEmail, verifyForgotPasswordOtp, changePassword, uploadBannerImage, getAnotherUser, addPortfolio, registerDeviceToken, deletePortfolio, getBulkUsers, getSelfFollowers, getSelfFollowing, getUserFollowers, getUserFollowing, getConnections, getRecommendedUsers, getSeedProfiles, getUserPortfolio, getAnotherUserPortfolio} = require("../controller/UserController");
-const {createStory, getFollowingStories, getCurrentStory, deleteStory, markStoryAsViewed, markStoriesAsViewed} = require("../controller/StoryController");
-const {auth}  = require("../middleware/authMiddleware");
+const { getUser, updateUser, uploadProfileImage, sendForgotPasswordEmail, verifyForgotPasswordOtp, changePassword, uploadBannerImage, getAnotherUser, addPortfolio, registerDeviceToken, deletePortfolio, getBulkUsers, getSelfFollowers, getSelfFollowing, getUserFollowers, getUserFollowing, getConnections, getRecommendedUsers, getSeedProfiles, getUserPortfolio, getAnotherUserPortfolio } = require("../controller/UserController");
+const { createStory, getFollowingStories, getCurrentStory, deleteStory, markStoryAsViewed, markStoriesAsViewed } = require("../controller/StoryController");
+const { auth } = require("../middleware/authMiddleware");
 const { checkStreak } = require('../middleware/checkStreak');
 const { followUser, unFollowUser } = require("../controller/FollowController");
-const {commentOnStory,getCommentsByStoryId,saveCommentslikeByStoryId} = require("../controller/commentController");
+const { commentOnStory, getCommentsByStoryId, saveCommentslikeByStoryId } = require("../controller/commentController");
 
-router.use(checkStreak);
+// router.use(checkStreak);
 
-router.get("/getUser", auth, getUser);
+router.get("/getUser", auth, checkStreak, getUser);
 router.get("/story", auth, getFollowingStories);
 router.post("/update", auth, updateUser);
 router.post("/follow", auth, followUser);

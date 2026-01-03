@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const CATEGORY = require("../constants/CategoryEnum");
 
 const postSchema = new mongoose.Schema({
   type: {
@@ -110,11 +111,11 @@ const postSchema = new mongoose.Schema({
   },
   // Poll specific fields (for future use)
   pollOptions: [{
-      option: String,
-      votes: [{
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-      }],
+    option: String,
+    votes: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    }],
   }],
   // Resource specific fields (for future use)
   resourceUrl: {
@@ -126,6 +127,35 @@ const postSchema = new mongoose.Schema({
     enum: ["pdf", "link", "video", "document"],
     default: null,
   },
+  category: {
+    type: String,
+    enum: Object.values(CATEGORY),
+    default: "Technology & IT"
+  },
+  engagementScore: {
+    type: Number,
+    default: 0,
+    index: true
+  },
+  lastEngagementAt: {
+    type: Date,
+    default: Date.now,
+    index: true
+  },
+  commentsCount: {
+    type: Number,
+    default : 0
+  }
 });
+
+postSchema.index({ createdAt: -1 });
+postSchema.index({ isDeleted: 1, createdAt: -1 });
+postSchema.index({ category: 1, isDeleted: 1, createdAt: -1 });
+postSchema.index({ authorId: 1, isDeleted: 1, createdAt: -1 });
+postSchema.index({ communityId: 1, isDeleted: 1, createdAt: -1 });
+postSchema.index({ type: 1, category: 1, isDeleted: 1, createdAt: -1 });
+postSchema.index({ originalPostId: 1 });
+postSchema.index({ isPinned: 1, pinnedAt: -1 });
+postSchema.index({ engagementScore: -1, lastEngagementAt: -1 });
 
 module.exports = mongoose.model("Post", postSchema);

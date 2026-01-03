@@ -16,7 +16,7 @@ exports.createFollowship = async (userId, userToFollowId) => {
         return;
     }
 
-    console.log(`[FollowService] User ${userId} is attempting to follow ${userToFollowId}.`);
+    // console.log(`[FollowService] User ${userId} is attempting to follow ${userToFollowId}.`);
 
     // 2. Find both users in parallel
     const [user, userToFollow] = await Promise.all([
@@ -39,9 +39,9 @@ exports.createFollowship = async (userId, userToFollowId) => {
     }*/
 
     const isAlreadyPresent = await Connection.findOne({follower : userId, following: userToFollowId});
-    console.log(isAlreadyPresent);
+    // console.log(isAlreadyPresent);
     if (isAlreadyPresent) {
-        console.log("Already followed");
+        // console.log("Already followed");
         return;
     }
 
@@ -62,5 +62,5 @@ exports.createFollowship = async (userId, userToFollowId) => {
     // 7. Create notification
     await createNotification(userToFollow._id, userId, 'follow');
 
-    console.log(`[FollowService] ${user.name} successfully followed ${userToFollow.name}.`);
+    // console.log(`[FollowService] ${user.name} successfully followed ${userToFollow.name}.`);
 };

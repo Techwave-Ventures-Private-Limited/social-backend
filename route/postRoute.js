@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { createPost, getPost, getUserPosts, likePost, savePost, commentPost, deleteComment, getCommentsForPost, getAllPosts, unlikePost, getSavedPost,replyToComment, deletePost, editPost, getCommentsByUser, getHomeFeedWithCommunities, getPosts, votePoll } = require("../controller/PostController");
+const { createPost, getPost, getUserPosts, likePost, savePost, commentPost, deleteComment, getCommentsForPost, getAllPosts, unlikePost, getSavedPost,replyToComment, deletePost, editPost, getCommentsByUser, getHomeFeedWithCommunities, getTrendingPosts, votePoll, getLatestPosts, getHomeFeed } = require("../controller/PostController");
 const {auth}  = require("../middleware/authMiddleware");
 
 
@@ -18,8 +18,10 @@ router.get("/feed/home", auth, getHomeFeedWithCommunities); // Combined home fee
 router.get("/get/save", auth, getSavedPost);
 router.post("/edit", auth, editPost);
 router.post("/comment/getUser", auth, getCommentsByUser);
-router.post("/getPosts", auth, getPosts);
+router.post("/getPosts", auth, getTrendingPosts);
 router.post("/:postId/poll/vote", auth, votePoll);
+router.post("/getLatestPosts", auth, getLatestPosts);
+router.post("/homefeed", auth, getHomeFeed);
 
 router.get("/:postId",auth, getPost);
 router.delete("/:postId", auth, deletePost);

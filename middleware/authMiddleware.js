@@ -1,40 +1,60 @@
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
+const User = require("../modules/user");
 
-exports.auth = async (req,res,next)=>{
+exports.auth = async (req, res, next) => {
+    try {
+        const authHeader = req.headers.authorization;
+        //console.log("In aouth")
+        if (authHeader && authHeader.startsWith("Bot ")) {
+            const botKey = authHeader.split(" ")[1];
+            //console.log(botKey, authHeader)
+            const botUser = await User.findOne({
+                bk: botKey,
+                ib: true
+            });
 
-    try{
-        //console.log("Flow til here")
-        const token = req.headers.token || req.headers.authorization.split(' ')[1];
-        //console.log(process.env.JWT_SECRET)
-        //console.log("Token:", token);
-        if(!token){
-            return res.status(401).json({
-                success:false,
-                message:"Token is  missing",
-            })
+            if (!botUser) {
+                return res.status(401).json({
+                    success: false,
+                    message: "Invalid bot token"
+                });
+            }
+
+            req.userId = botUser._id;
+            req.ib = true;
+            return next();
         }
 
-        try{
-            const  decode = jwt.verify(token,process.env.JWT_SECRET);
-            //console.log(decode)
+        const token =
+            req.headers.token ||
+            (authHeader && authHeader.startsWith("Bearer ")
+                ? authHeader.split(" ")[1]
+                : null);
+
+        if (!token) {
+            return res.status(401).json({
+                success: false,
+                message: "Token is missing"
+            });
+        }
+
+        try {
+            const decode = jwt.verify(token, process.env.JWT_SECRET);
             req.userId = decode.id;
-        }
-        catch(err){
+            req.ib = false;
+        } catch (err) {
             return res.status(401).json({
-                success:false,
-                message:"Tokine is  invalid"
-            })
+                success: false,
+                message: "Token is invalid"
+            });
         }
-        
+
         next();
-    }
-    catch(err){
+    } catch (err) {
         return res.status(500).json({
-            success:false,
-            message:err.message,
-        })
+            success: false,
+            message: err.message
+        });
     }
-
-}
-
+};
