@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { createPost, getPost, getUserPosts, likePost, savePost, commentPost, deleteComment, getCommentsForPost, getAllPosts, unlikePost, getSavedPost,replyToComment, deletePost, editPost, getCommentsByUser, getHomeFeedWithCommunities, getTrendingPosts, votePoll, getLatestPosts, getHomeFeed } = require("../controller/PostController");
+const { createPost, getPost, getUserPosts, likePost, savePost, commentPost, deleteComment, getCommentsForPost, getAllPosts, unlikePost, getSavedPost,replyToComment, deletePost, editPost, getCommentsByUser, getHomeFeedWithCommunities, getTrendingPosts, votePoll, getLatestPosts, getHomeFeed, findPostsByHashTag } = require("../controller/PostController");
 const {auth}  = require("../middleware/authMiddleware");
 
 
@@ -22,6 +22,7 @@ router.post("/getPosts", auth, getTrendingPosts);
 router.post("/:postId/poll/vote", auth, votePoll);
 router.post("/getLatestPosts", auth, getLatestPosts);
 router.post("/homefeed", auth, getHomeFeed);
+router.get("/hashtag/:tag", auth, findPostsByHashTag);
 
 router.get("/:postId",auth, getPost);
 router.delete("/:postId", auth, deletePost);

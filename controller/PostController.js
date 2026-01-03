@@ -10,6 +10,8 @@ const CompanyDetails = require("../modules/companyDetails");
 const Like = require("../modules/like");
 const { addUserData } = require("../controller/UserController");
 const { generatePostEmbedding } = require("../services/userService");
+const { extractHashtags, processHashtags } = require("../services/hashtagsService");
+const Hashtag = require("../modules/hashtags");
 
 exports.createPost = async (req, res) => {
     try {
@@ -59,7 +61,10 @@ exports.createPost = async (req, res) => {
         if (pollOptions)
             pollOptions = JSON.parse(pollOptions);
 
-        const embedding = await generatePostEmbedding(category, discription);
+        const embedding = await generatePostEmbedding(user?.category, discription);
+
+        const tags = extractHashtags(discription);
+        const hashtagIds = await processHashtags(tags);
 
         const createdPost = await Post.create({
             discription,
@@ -73,8 +78,10 @@ exports.createPost = async (req, res) => {
             resourceUrl,
             resourceType,
             category: user.category,
-            embedding: embedding
+            embedding: embedding,
+            hashtags: hashtagIds
         });
+        createdPost.embedding = [];
         user.posts.push(createdPost._id);
         await user.save();
 
@@ -1824,5 +1831,46 @@ exports.getHomeFeed = async (req, res) => {
     }
 };
 
+exports.findPostsByHashTag = async (req, res) => {
+    try {
+        const tag = req.params.tag.toLowerCase().trim();
+        //console.log("Tag : ",tag)
+
+        const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+        const page = Math.max(parseInt(req.query.page) || 0, 0);
+        const skip = page * limit;
+
+        const hashtag = await Hashtag.findOne({ tag }).select("_id");
+
+        if (!hashtag) {
+            return res.status(200).json({
+                success: true,
+                posts: []
+            });
+        }
+
+        const posts = await Post.find({
+            hashtags: hashtag._id
+        })
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate("authorId", "name avatar");
+
+        return res.status(200).json({
+            success: true,
+            page,
+            limit,
+            count: posts.length,
+            posts
+        });
+
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+};
 
 

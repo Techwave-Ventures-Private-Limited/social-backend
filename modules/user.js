@@ -180,6 +180,7 @@ const userSchema = new mongoose.Schema({
     },
     embedding: {
         type: [Number],
+        select: false,
         default: [] // DO NOT CREATE INDEX FOR THIS
     },
     searchText: {

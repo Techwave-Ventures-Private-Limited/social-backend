@@ -144,13 +144,19 @@ const postSchema = new mongoose.Schema({
   },
   commentsCount: {
     type: Number,
-    default : 0
+    default: 0
   },
   embedding: {
     type: [Number],
     default: [],
+    select: false,
     index: false // DO NOT CREATE INDEX FOR THIS
-  }
+  },
+  hashtags: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Hashtag",
+    index: true
+  }]
 });
 
 postSchema.index({ createdAt: -1 });
