@@ -32,8 +32,7 @@ const EXPERIENCE_DESC_TEMPLATES = [
 
     await User.updateMany({ ib: true }, { bt: "UNKNOWN" });
 
-    const BOT_TYPES = ["POST", "COMMENT", "LIKE", "HYBRID"];
-    const BOTS_PER_TYPE = 20;
+    const BOTS_PER_CATEGORY = 10;
 
     const CATEGORIES = [
       "Business & Entrepreneurship",
@@ -55,11 +54,27 @@ const EXPERIENCE_DESC_TEMPLATES = [
     ];
 
     const INDIAN_NAMES = [
+      // Male names
       "Aarav", "Vivaan", "Aditya", "Vihaan", "Arjun",
       "Rohan", "Kunal", "Siddharth", "Rahul", "Aman",
+      "Akash", "Nikhil", "Saurabh", "Ankit", "Deepak",
+      "Rajat", "Varun", "Harsh", "Manish", "Pankaj",
+      "Vikas", "Mohit", "Abhishek", "Yash", "Rishabh",
+      "Shubham", "Pranav", "Kartik", "Ayush", "Rohit",
+      "Sanket", "Tejas", "Mayur", "Omkar", "Atharva",
+      "Sameer", "Sachin", "Sunil", "Amit", "Rajesh",
+
+      // Female names
       "Neha", "Priya", "Ananya", "Kavya", "Ishita",
-      "Pooja", "Sneha", "Ritika", "Nisha", "Aditi"
+      "Pooja", "Sneha", "Ritika", "Nisha", "Aditi",
+      "Shruti", "Pallavi", "Riya", "Simran", "Swati",
+      "Komal", "Anjali", "Sakshi", "Tanvi", "Shreya",
+      "Isha", "Nandini", "Sonal", "Megha", "Bhavya",
+      "Vaishnavi", "Prachi", "Mansi", "Kritika", "Rupali",
+      "Shivani", "Namrata", "Monika", "Kiran", "Jyoti",
+      "Kajal", "Seema", "Poonam", "Payal", "Rekha"
     ];
+
 
     const CATEGORY_ROLE_MAP = {
       "Business & Entrepreneurship": { name: "Self Employed", role: "Independent Business Operator" },
@@ -85,35 +100,41 @@ const EXPERIENCE_DESC_TEMPLATES = [
 
     let globalCount = 1;
     let nameIndex = 0;
-    let categoryIndex = 0;
 
-    console.log("Creating category-aware bots with diverse bios...");
+    console.log("Creating category-wise bots (10 per category)...");
 
-    for (const type of BOT_TYPES) {
-      for (let i = 0; i < BOTS_PER_TYPE; i++) {
+    for (const category of CATEGORIES) {
+      const roleData = CATEGORY_ROLE_MAP[category];
+
+      for (let i = 0; i < BOTS_PER_CATEGORY; i++) {
         const baseName = INDIAN_NAMES[nameIndex % INDIAN_NAMES.length];
-        const category = CATEGORIES[categoryIndex % CATEGORIES.length];
-        const roleData = CATEGORY_ROLE_MAP[category];
 
-        const username = `${baseName.toLowerCase()}_${type.toLowerCase()}_${globalCount}`;
+        const username = `${baseName.toLowerCase()}_${category
+          .replace(/[^a-zA-Z]/g, "")
+          .toLowerCase()}_${globalCount}`;
+
         const email = `${username}@${EMAIL_DOMAIN}`;
 
-        const bioTemplate = pickRandom(BIO_TEMPLATES)
-          .replace("{{category}}", category.toLowerCase());
+        const bio = pickRandom(BIO_TEMPLATES).replace(
+          "{{category}}",
+          category.toLowerCase()
+        );
 
-        const experienceDesc = pickRandom(EXPERIENCE_DESC_TEMPLATES)
-          .replace("{{role}}", roleData.role.toLowerCase());
+        const experienceDesc = pickRandom(EXPERIENCE_DESC_TEMPLATES).replace(
+          "{{role}}",
+          roleData.role.toLowerCase()
+        );
 
         const user = await User.create({
           name: baseName,
           email,
           password: BOT_PASSWORD,
           category,
-          bio: bioTemplate,
+          bio,
           headline: roleData.role,
           address: "India",
           ib: true,
-          bt: type,
+          bt: "CATEGORY",
           bk: crypto.randomBytes(16).toString("hex")
         });
 
@@ -133,15 +154,14 @@ const EXPERIENCE_DESC_TEMPLATES = [
         await user.save();
 
         nameIndex++;
-        categoryIndex++;
         globalCount++;
       }
     }
 
-    console.log("✅ Bots created with diverse bios & experience descriptions");
+    console.log("Successfully created 10 bots per category");
     process.exit(0);
   } catch (err) {
-    console.error("❌ Error creating bots:", err);
+    console.error("Error creating category bots:", err);
     process.exit(1);
   }
 })();

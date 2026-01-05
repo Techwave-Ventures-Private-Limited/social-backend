@@ -1,27 +1,35 @@
 const BotState = require("../modules/botState");
 
-const COOLDOWN_MS = 3 * 60 * 60 * 1000;   // 3 hours
-const MAX_RUNTIME_MS = 4 * 60 * 60 * 1000; // 4 hours
+const HOUR = 60 * 60 * 1000;
 
-async function acquireLock(botType) {
+const COOLDOWN_MS = 12 * HOUR;     // 12 hours
+const MAX_RUNTIME_MS = 6 * HOUR;  // safety unlock after 6 hours
+
+async function acquireLock(lockKey) {
     const now = new Date();
 
     await BotState.updateOne(
-        { botType },
-        { $setOnInsert: { botType } },
+        { botType: lockKey },
+        { $setOnInsert: { botType: lockKey } },
         { upsert: true }
     );
 
     const result = await BotState.findOneAndUpdate(
         {
-            botType,
-            $or: [
-                { lockedAt: null },
-                { lockedAt: { $lt: new Date(Date.now() - MAX_RUNTIME_MS) } }
-            ],
-            $or: [
-                { lastRunAt: null },
-                { lastRunAt: { $lt: new Date(Date.now() - COOLDOWN_MS) } }
+            botType: lockKey,
+            $and: [
+                {
+                    $or: [
+                        { lockedAt: null },
+                        { lockedAt: { $lt: new Date(Date.now() - MAX_RUNTIME_MS) } }
+                    ]
+                },
+                {
+                    $or: [
+                        { lastRunAt: null },
+                        { lastRunAt: { $lt: new Date(Date.now() - COOLDOWN_MS) } }
+                    ]
+                }
             ]
         },
         {
@@ -36,9 +44,9 @@ async function acquireLock(botType) {
     return !!result;
 }
 
-async function releaseLock(botType) {
+async function releaseLock(lockKey) {
     await BotState.updateOne(
-        { botType },
+        { botType: lockKey },
         { $set: { lockedAt: null } }
     );
 }

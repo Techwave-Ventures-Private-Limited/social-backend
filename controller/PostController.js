@@ -1837,8 +1837,8 @@ exports.findPostsByHashTag = async (req, res) => {
         //console.log("Tag : ",tag)
 
         const limit = Math.min(parseInt(req.query.limit) || 20, 50);
-        const page = Math.max(parseInt(req.query.page) || 0, 0);
-        const skip = page * limit;
+        const page = Math.max(parseInt(req.query.offset) || 0, 0);
+        const skip = page;
 
         const hashtag = await Hashtag.findOne({ tag }).select("_id");
 

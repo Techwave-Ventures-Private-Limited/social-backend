@@ -32,13 +32,15 @@ function buildBotGraph() {
         } else if (state.bot.bt === "LIKE") {
             //console.log("likig post");
             return { bot: state.bot, action: "LIKE" };
+        } else if (state.bot.bt === "CATEGORY") {
+            return { bot: state.bot, action: "ALL" };
         }
 
         return { action: "SKIP" };
     });
 
     graph.addNode("generate", async (state) => {
-        if (state.action === "POST") {
+        if (state.action === "POST" || state.action === "ALL") {
             const res = await model.invoke(postPrompt({
                 category: state.bot.category,
                 headline: state.bot.headline
@@ -50,92 +52,16 @@ function buildBotGraph() {
     graph.addNode("execute", async (state) => {
         if (state.action === "POST") {
             //console.log("Actual posting", state.content)
-            const res = await fetch(`${process.env.BASE_URL}/post/createPost`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bot ${state.bot.bk}`
-                },
-                body: JSON.stringify({
-                    discription: state.content.replace(/^["']|["']$/g, ""),
-                    postType: "public"
-                })
-            });
-
-            if (!res.ok) {
-                let errorBody;
-                errorBody = await res.json();
-                console.log(errorBody)
-            }
+            await createPost(state);
         } else if (state.action === "COMMENT") {
-            const posts = await Post.aggregate([
-                {
-                    $match: {
-                        category: state.bot.category,
-                        createdBy: { $ne: state.bot._id }
-                    }
-                },
-                { $sample: { size: 5 } }
-            ]);
-
-            for (const post of posts) {
-                const commentRes = await model.invoke(
-                    commentPrompt({
-                        post: post.discription,
-                        headline: state.bot.headline
-                    })
-                );
-
-                const commentText = commentRes.content
-                    ?.trim()
-                    ?.replace(/^["']|["']$/g, "");
-
-                const res = await fetch(`${process.env.BASE_URL}/post/comment`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bot ${state.bot.bk}`
-                    },
-                    body: JSON.stringify({
-                        postId: post._id,
-                        text: commentText
-                    })
-                });
-
-                if (!res.ok) {
-                    const errorBody = await res.text();
-                    console.log("Comment error:", errorBody);
-                }
-            }
+            await commentOnPost(state);
         } else if (state.action === "LIKE") {
-            const posts = await Post.aggregate([
-                {
-                    $match: {
-                        category: state.bot.category,
-                        createdBy: { $ne: state.bot._id }
-                    }
-                },
-                { $sample: { size: 5 } }
-            ]);
-
-            for (const post of posts) {
-                const res = await fetch(`${process.env.BASE_URL}/post/like`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bot ${state.bot.bk}`
-                    },
-                    body: JSON.stringify({
-                        postId: post._id,
-                        userId: state.bot._id
-                    })
-                });
-
-                if (!res.ok) {
-                    const errorBody = await res.text();
-                    //console.log("Like error:", errorBody);
-                }
-            }
+            await likePost(state);
+        } else if (state.action === "ALL") {
+            // creating one post per bot user
+            await createPost(state);
+            await commentOnPost(state);
+            await likePost(state);
         }
     });
 
@@ -144,6 +70,100 @@ function buildBotGraph() {
     graph.setEntryPoint("decide");
 
     return graph.compile();
+}
+
+const createPost = async (state) => {
+    //console.log("State Content : ", state.content);
+    const res = await fetch(`${process.env.BASE_URL}/post/createPost`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bot ${state.bot.bk}`
+        },
+        body: JSON.stringify({
+            discription: state?.content.replace(/^["']|["']$/g, ""),
+            postType: "public"
+        })
+    });
+
+    if (!res.ok) {
+        let errorBody;
+        errorBody = await res.json();
+        console.log(errorBody)
+    }
+}
+
+const commentOnPost = async (state) => {
+    const posts = await Post.aggregate([
+        {
+            $match: {
+                category: state.bot.category,
+                createdBy: { $ne: state.bot._id }
+            }
+        },
+        { $sample: { size: 1 } }
+    ]);
+
+    for (const post of posts) {
+        const commentRes = await model.invoke(
+            commentPrompt({
+                post: post.discription,
+                headline: state.bot.headline
+            })
+        );
+
+        const commentText = commentRes.content
+            ?.trim()
+            ?.replace(/^["']|["']$/g, "");
+
+        const res = await fetch(`${process.env.BASE_URL}/post/comment`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bot ${state.bot.bk}`
+            },
+            body: JSON.stringify({
+                postId: post._id,
+                text: commentText
+            })
+        });
+
+        if (!res.ok) {
+            const errorBody = await res.text();
+            console.log("Comment error:", errorBody);
+        }
+    }
+}
+
+const likePost = async (state) => {
+    const posts = await Post.aggregate([
+        {
+            $match: {
+                category: state.bot.category,
+                createdBy: { $ne: state.bot._id }
+            }
+        },
+        { $sample: { size: 1 } }
+    ]);
+
+    for (const post of posts) {
+        const res = await fetch(`${process.env.BASE_URL}/post/like`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bot ${state.bot.bk}`
+            },
+            body: JSON.stringify({
+                postId: post._id,
+                userId: state.bot._id
+            })
+        });
+
+        if (!res.ok) {
+            const errorBody = await res.text();
+            //console.log("Like error:", errorBody);
+        }
+    }
 }
 
 module.exports = { buildBotGraph };
