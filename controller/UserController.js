@@ -961,46 +961,27 @@ exports.getUserFollowing = async (req, res) => {
 exports.getConnections = async (req, res) => {
     try {
         const userId = req.userId;
-        // console.log(`[CONNECTIONS] Fetching connections for authenticated user ID: ${userId}`);
 
         if (!userId) {
             return res.status(401).json({ success: false, message: 'Authentication error: User ID not found.' });
         }
 
-        const followers = await Connection.find({ following: userId })
-            .select("follower")
-            .populate({ path: "follower", select: "_id name profileImage bio headline" }).lean();
+        // Fetch followings (users the current user follows)
         const followings = await Connection.find({ follower: userId })
             .select("following")
             .populate({
-                path: "following", select: "_id name profileImage bio headline",
+                path: "following",
+                select: "_id name profileImage bio headline",
                 populate: { path: "companyDetails", model: 'CompanyDetails' }
-            }).lean();
+            })
+            .lean();
 
-        // --- Critical Debugging Logs ---
-        // console.log(`[CONNECTIONS] Found user: ${user.name}`);
-        // console.log(`[CONNECTIONS] Raw followers array (before populate):`, user.followers.map(f => f._id));
-        // console.log(`[CONNECTIONS] Populated followers count: ${user.followers.length}`);
-        // console.log(`[CONNECTIONS] Populated following count: ${user.following.length}`);
+        // Extract user objects and filter out any nulls
+        const uniqueUsers = followings
+            .map(conn => conn.following)
+            .filter(user => user !== null);
 
-        // Use a Map to combine and de-duplicate the lists
-        const connectionsMap = new Map();
-
-        // Add followers to the map
-        followers.forEach(follower => {
-            connectionsMap.set(follower.follower._id.toString(), follower);
-        });
-
-        // Add following to the map (will overwrite duplicates, which is fine)
-        followings.forEach(followedUser => {
-            connectionsMap.set(followedUser.following._id.toString(), followedUser);
-        });
-
-        // Convert the map values back to an array for the response
-        const uniqueConnections = Array.from(connectionsMap.values());
-        // console.log(`[CONNECTIONS] Total unique connections: ${uniqueConnections.length}`);
-
-        return res.status(200).json({ success: true, body: uniqueConnections });
+        return res.status(200).json({ success: true, body: uniqueUsers });
 
     } catch (error) {
         console.error("💥 [FATAL ERROR] getConnections controller crashed:", error);
