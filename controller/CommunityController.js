@@ -252,7 +252,7 @@ exports.getCommunityById = async (req, res) => {
             .populate({
                 path: 'posts',
                 populate: [
-                    { path: 'authorId', select: 'name profileImage' },
+                    { path: 'authorId', select: 'name profileImage headline bio' },
                     { path: 'likes', select: 'name' },
                     {
                         path: 'comments',
@@ -286,7 +286,22 @@ exports.getCommunityById = async (req, res) => {
         const communityData = {
             ...community.toObject(),
             isUserMember: userId ? community.members.some(member => member._id.toString() === userId) : false,
-            userRole: userId ? getUserRoleInCommunity(community, userId) : null
+            userRole: userId ? getUserRoleInCommunity(community, userId) : null,
+            posts: community.posts.map(post => {
+                const author = post.authorId;
+                return {
+                    ...post.toObject ? post.toObject() : post,
+                    author: {
+                        id: author?._id,
+                        name: author?.name,
+                        username: null,
+                        email: author?.email,
+                        avatar: author?.profileImage || null,
+                        headline: author?.headline || null,
+                        bio: author?.bio || null,
+                    }
+                };
+            })
         };
 
         return res.status(200).json({
@@ -886,7 +901,11 @@ exports.getPostsForHomeFeed = async (req, res) => {
 
         // For public communities: show posts to followers
         // For private communities: don't show in home feed
-        if (publicCommunityIds.length > 0) {
+        const SHOW_COMMUNITY_POSTS_IN_FEED = process.env.SHOW_COMMUNITY_POSTS_IN_FEED === 'true';
+
+        // For public communities: show posts to followers
+        // For private communities: don't show in home feed
+        if (SHOW_COMMUNITY_POSTS_IN_FEED && publicCommunityIds.length > 0) {
             communityPostsQuery.$or = [
                 {
                     // Public community posts from communities user is member of
@@ -895,13 +914,13 @@ exports.getPostsForHomeFeed = async (req, res) => {
                 }
             ];
         } else {
-            // If user is not in any public communities, return empty for community posts
+            // If user is not in any public communities or feature is disabled, return empty for community posts
             communityPostsQuery = { _id: { $exists: false } };
         }
 
         // Get community posts for home feed
         const communityPosts = await CommunityPost.find(communityPostsQuery)
-            .populate('authorId', 'name profileImage')
+            .populate('authorId', 'name profileImage headline bio')
             .populate('communityId', 'name logo isPrivate')
             .populate('likes', 'name')
             .populate({
@@ -926,11 +945,23 @@ exports.getPostsForHomeFeed = async (req, res) => {
 
         // Combine and sort all posts by creation date
         const allPosts = [
-            ...communityPosts.map(post => ({
-                ...post,
-                postSource: 'community',
-                community: post.communityId
-            })),
+            ...communityPosts.map(post => {
+                const author = post.authorId;
+                return {
+                    ...post,
+                    author: {
+                        id: author?._id,
+                        name: author?.name,
+                        username: null,
+                        email: author?.email,
+                        avatar: author?.profileImage || null,
+                        headline: author?.headline || null,
+                        bio: author?.bio || null,
+                    },
+                    postSource: 'community',
+                    community: post.communityId
+                };
+            }),
             ...regularPosts.map(post => ({
                 ...post,
                 postSource: 'user',
@@ -1031,7 +1062,7 @@ exports.getCommunityPosts = async (req, res) => {
         }
 
         const posts = await CommunityPost.find(query)
-            .populate('authorId', 'name profileImage')
+            .populate('authorId', 'name profileImage headline bio')
             // .populate('likes', 'name') // likes is a number now
             .populate({
                 path: 'comments',
@@ -1063,8 +1094,18 @@ exports.getCommunityPosts = async (req, res) => {
 
                 const isLiked = likedPostIds.has(post._id.toString());
 
+                const author = post.authorId;
                 return {
                     ...post, // lean() returns plain object
+                    author: {
+                        id: author?._id,
+                        name: author?.name,
+                        username: null,
+                        email: author?.email,
+                        avatar: author?.profileImage || null,
+                        headline: author?.headline || null,
+                        bio: author?.bio || null,
+                    },
                     isLiked,
                     isBookmarked,
                     likesCount: post.likes || 0 // Ensure likesCount is available

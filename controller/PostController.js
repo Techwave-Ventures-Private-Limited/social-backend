@@ -164,12 +164,45 @@ exports.getUserPosts = async (req, res) => {
             })
         }
 
-        const posts = await Post.find({ userId: userId });
+        const posts = await Post.find({ userId: userId })
+            .sort({ createdAt: -1 })
+            .populate({
+                path: 'userId',
+                model: 'User',
+                populate: [
+                    { path: 'about', model: 'About' },
+                    { path: 'education', model: 'Education' },
+                    { path: 'experience', model: 'Experience' },
+                    { path: 'companyDetails', model: 'CompanyDetails' },
+                ]
+            })
+            .populate('comments')
+            .populate({
+                path: 'originalPostId',
+                populate: {
+                    path: 'userId',
+                    model: 'User',
+                    populate: [
+                        { path: 'about', model: 'About' },
+                        { path: 'education', model: 'Education' },
+                        { path: 'experience', model: 'Experience' }
+                    ]
+                }
+            })
+            .populate({
+                path: 'communityId',
+                model: 'Community',
+                select: 'name logo isPrivate _id'
+            });
+
+        const currentUser = await User.findById(userId);
+
+        const formattedPosts = await Promise.all(posts.map(post => formatPost(post, currentUser)));
 
         return res.status(200).json({
             success: true,
             mesasge: "Post found",
-            body: posts
+            body: formattedPosts
         })
 
     } catch (err) {
@@ -815,7 +848,7 @@ exports.formatPost = async (post, currentUser = null) => {
             email: author.email,
             avatar: author.profileImage || null,
             coverImage: null,
-            headline: about.headline || null,
+            headline: about.headline || author.headline || null,
             bio: author.bio || null,
             location: about.location || null,
             website: about.website || null,
@@ -897,10 +930,18 @@ const formatPost = async (post, currentUser = null) => {
     // Poll aggregation: compute total votes from pollOptions if present
     let pollOptions = undefined;
     let totalVotes = 0;
+    let isVoted = false;
+    let selectedOptionId = null;
+
     if (Array.isArray(post.pollOptions) && post.pollOptions.length > 0) {
         pollOptions = post.pollOptions;
         totalVotes = post.pollOptions.reduce((sum, opt) => {
             const votesArr = Array.isArray(opt.votes) ? opt.votes : [];
+            // Check if current user voted for this option
+            if (currentUser && votesArr.some(v => v.toString() === currentUser._id.toString())) {
+                isVoted = true;
+                selectedOptionId = opt._id;
+            }
             return sum + votesArr.length;
         }, 0);
     }
@@ -914,7 +955,7 @@ const formatPost = async (post, currentUser = null) => {
             email: author.email,
             avatar: author.profileImage || null,
             coverImage: null,
-            headline: about.headline || null,
+            headline: about.headline || author.headline || null,
             bio: author.bio || null,
             location: about.location || null,
             website: about.website || null,
@@ -953,6 +994,8 @@ const formatPost = async (post, currentUser = null) => {
         resourceUrl: post.resourceUrl,
         resourceType: post.resourceType,
         category: post.category,
+        hasVoted: isVoted,
+        userVote: selectedOptionId
     };
 };
 
@@ -1101,7 +1144,9 @@ exports.getHomeFeedWithCommunities = async (req, res) => {
         // Get regular posts from following users
         const regularPostsQuery = {
             userId: { $in: followingIds },
-            postType: 'public'
+            postType: 'public',
+            type: { $ne: 'Community' },
+            communityId: null
         };
 
         const regularPosts = await Post.find(regularPostsQuery)
@@ -1130,7 +1175,7 @@ exports.getHomeFeedWithCommunities = async (req, res) => {
                 type: { $ne: 'question' }, // Q&A should not appear in home feed
                 isDeleted: { $ne: true }
             })
-                .populate('authorId', 'name profileImage')
+                .populate('authorId', 'name profileImage headline bio')
                 .populate('communityId', 'name logo isPrivate')
                 .populate('likes', 'name')
                 .populate({
@@ -1179,8 +1224,8 @@ exports.getHomeFeedWithCommunities = async (req, res) => {
                     email: author.email || null,
                     avatar: author.profileImage || null,
                     coverImage: null,
-                    headline: null,
-                    bio: null,
+                    headline: author.headline || null,
+                    bio: author.bio || null,
                     location: null,
                     website: null,
                     joinedDate: null,
@@ -1422,6 +1467,7 @@ exports.getTrendingPosts = async (req, res) => {
             : null;
 
         const now = new Date();
+        const SHOW_COMMUNITY_POSTS_IN_FEED = process.env.SHOW_COMMUNITY_POSTS_IN_FEED === 'true';
 
 
         const cursorQuery = cursor
@@ -1441,7 +1487,9 @@ exports.getTrendingPosts = async (req, res) => {
                 $match: {
                     isDeleted: false,
                     engagementScore: { $gt: 0 },
-                    lastEngagementAt: { $exists: true }
+                    lastEngagementAt: { $exists: true },
+                    lastEngagementAt: { $exists: true },
+                    ...(SHOW_COMMUNITY_POSTS_IN_FEED ? {} : { type: { $ne: "Community" }, communityId: null })
                 }
             },
 
@@ -1563,9 +1611,11 @@ exports.getLatestPosts = async (req, res) => {
             })
         }
 
-        const query = lastCreatedAt
-            ? { createdAt: { $lt: new Date(lastCreatedAt) } }
-            : {};
+        const SHOW_COMMUNITY_POSTS_IN_FEED = process.env.SHOW_COMMUNITY_POSTS_IN_FEED === 'true';
+        const query = {
+            ...(lastCreatedAt ? { createdAt: { $lt: new Date(lastCreatedAt) } } : {}),
+            ...(SHOW_COMMUNITY_POSTS_IN_FEED ? {} : { type: { $ne: "Community" }, communityId: null })
+        };
 
         let posts = await Post.find(query)
             .sort({ createdAt: -1 })
@@ -1638,6 +1688,8 @@ exports.getHomeFeed = async (req, res) => {
         const userCategory = user.category;
 
         const now = new Date();
+        const SHOW_COMMUNITY_POSTS_IN_FEED = process.env.SHOW_COMMUNITY_POSTS_IN_FEED === 'true';
+        const communityExclusion = SHOW_COMMUNITY_POSTS_IN_FEED ? {} : { type: { $ne: "Community" }, communityId: null };
 
         /* ---------------- COMMON SCORING ---------------- */
         const baseAddFields = (sourceBoost) => ([
@@ -1703,7 +1755,8 @@ exports.getHomeFeed = async (req, res) => {
                         createdAt: {
                             $gte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
                             ...cursorFilter
-                        }
+                        },
+                        ...communityExclusion
                     }
                 },
                 ...baseAddFields(1000),
@@ -1714,7 +1767,8 @@ exports.getHomeFeed = async (req, res) => {
         }
 
         /* ---------------- 2️⃣ COMMUNITY (PAGE 0–1) ---------------- */
-        if (allowCommunity && communityIds.length) {
+        /* ---------------- 2️⃣ COMMUNITY (PAGE 0–1) ---------------- */
+        if (SHOW_COMMUNITY_POSTS_IN_FEED && allowCommunity && communityIds.length) {
             const communityPosts = await Post.aggregate([
                 {
                     $match: {
@@ -1743,7 +1797,8 @@ exports.getHomeFeed = async (req, res) => {
                         createdAt: {
                             $gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
                             ...cursorFilter
-                        }
+                        },
+                        ...communityExclusion
                     }
                 },
                 ...baseAddFields(300),
@@ -1762,7 +1817,8 @@ exports.getHomeFeed = async (req, res) => {
                         createdAt: {
                             $gte: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000),
                             ...cursorFilter
-                        }
+                        },
+                        ...communityExclusion
                     }
                 },
                 ...baseAddFields(100),
