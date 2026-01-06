@@ -8,6 +8,9 @@ const User = require("../modules/user");
 const mailSender = require("../utils/mailSender");
 const { paymentSuccessEmail } = require("../mail/templates/paymentSuccessEmail");
 
+const REQUIRED_POINTS = 100;
+const BASIC_PLAN_NAME = "Basic Monthly";
+
 // create razorpay order
 exports.capturePayment = async (req, res) => {
     try {
@@ -53,7 +56,6 @@ exports.capturePayment = async (req, res) => {
         });
     }
 };
-
 
 // verify payment and create purchase for the user
 exports.verifyPayment = async (req, res) => {
@@ -151,7 +153,6 @@ exports.verifyPayment = async (req, res) => {
     }
 };
 
-
 exports.getMyActivePlan = async (req, res) => {
     try {
         const userId = req.userId;
@@ -181,7 +182,6 @@ exports.getMyActivePlan = async (req, res) => {
         });
     }
 };
-
 
 exports.cancelMyPlan = async (req, res) => {
     try {
@@ -223,3 +223,80 @@ exports.cancelMyPlan = async (req, res) => {
         });
     }
 };
+
+exports.redeemPlanWithPoints = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    if (user.activePurchase) {
+      return res.status(409).json({
+        success: false,
+        message: "You already have an active plan",
+      });
+    }
+
+    if (user.points < REQUIRED_POINTS) {
+      return res.status(403).json({
+        success: false,
+        message: "Insufficient points",
+      });
+    }
+
+    const plan = await Plan.findOne({
+      name: BASIC_PLAN_NAME,
+      isActive: true,
+      durationInDays: 30,
+    });
+
+    if (!plan) {
+      return res.status(500).json({
+        success: false,
+        message: "Basic plan not available",
+      });
+    }
+
+    const startDate = new Date();
+    const endDate = new Date(
+      startDate.getTime() + plan.durationInDays * 24 * 60 * 60 * 1000
+    );
+
+    const purchase = await Purchase.create({
+      userId,
+      planId: plan._id,
+      amountPaid: 0,
+      currency: "INR",
+      status: "active",
+      startDate,
+      endDate,
+      paymentProvider: "points",
+      paymentId: `points_${Date.now()}`,
+    });
+
+    await User.findByIdAndUpdate(userId, {
+      $inc: { points: -REQUIRED_POINTS },
+      $set: { activePurchase: purchase._id },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Plan redeemed successfully using points",
+      purchase,
+    });
+
+  } catch (error) {
+    console.error("Redeem plan error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to redeem plan",
+    });
+  }
+};
+
