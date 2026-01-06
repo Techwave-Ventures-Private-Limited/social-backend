@@ -8,3 +8,4 @@ Dockerfile
 firebase-service-account.json
 Tools/
 settings.json
+scripts/paymentTest.js

@@ -16,10 +16,14 @@ const fs = require('fs');
 // --- Import Redis Connection ---
 const { redisClient, subClient } = require("./config/redis");
 const { startAllBots } = require("./bots");
+const startJobs = require("./cleanupJobs/setup");
 
 // --- App Setup ---
 const app = express();
 const server = http.createServer(app);
+
+// --- System Upgrade Tasks ---
+const createPlans = require("./upgradeTask/systemUpgrade");
 
 
 // --- Socket.IO Initialization ---
@@ -41,7 +45,7 @@ initializeCommunitySocket(io);
 
 // --- Middleware and Config ---
 const cookieParser = require("cookie-parser");
-const {connect} = require('./config/dbonfig');
+const { connect } = require('./config/dbonfig');
 const cors = require("cors");
 const fileUpload = require("express-fileupload");
 const { cloudinaryConnect } = require("./config/cloudinary");
@@ -67,6 +71,7 @@ const experienceRouter = require("./route/expVerifyRoute");
 const jobRouter = require("./route/jobRoute");
 const applicationRouter = require("./route/applicationRoute");
 const shareRouter = require("./route/shareRoute");
+const paymentRouter = require("./route/paymentRoute");
 
 
 // --- Models (needed for socket logic) ---
@@ -77,9 +82,15 @@ const Community = require('./modules/community');
 const CommunityPost = require('./modules/communityPost');
 const CommunityComment = require('./modules/communityComment');
 
-// --- Database and Cloudinary Connection ---
-connect();
-cloudinaryConnect();
+async function bootstrap() {
+    // --- Database and Cloudinary Connection ---
+    await connect();
+    cloudinaryConnect();
+
+    // --- Seed Plans (IDEMPOTENT & ATOMIC) ---
+    await createPlans();
+    await startJobs();
+}
 
 // Initialize Firebase Admin (conditional)
 const path = require('path');
@@ -102,8 +113,8 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(
     cors({
-        origin:"*",
- 		credentials:true,
+        origin: "*",
+        credentials: true,
     })
 )
 
@@ -120,7 +131,7 @@ app.use((req, res, next) => {
     if (req.originalUrl.startsWith('/application')) {
         return next();
     }
-    
+
     // For all other routes (posts, user profile, etc.), use express-fileupload
     return fileUploadMiddleware(req, res, next);
 });
@@ -144,7 +155,7 @@ app.use("/showcase", showcaseRouter);
 app.use("/news", newsRouter);
 app.use("/search", searchRouter);
 app.use("/notification", notificationRouter);
-app.use("/conversations", conversationRouter); 
+app.use("/conversations", conversationRouter);
 app.use("/comment", commentRouter);
 app.use("/community", communityRouter);
 app.use("/scrapper", scrapperRouter);
@@ -153,28 +164,31 @@ app.use("/experience", experienceRouter);
 app.use("/job", jobRouter);
 app.use("/application", applicationRouter);
 app.use("/share", shareRouter);
+app.use("/payment", paymentRouter);
 
 // --- Health Check and Root Routes ---
-app.use("/hailing",(req,res)=>{
+app.use("/hailing", (req, res) => {
     return res.status(200).json({
-        success:true,
-        message:"hailing route",
+        success: true,
+        message: "hailing route",
     })
 })
 
-app.get("/",(req, res)=>{
+app.get("/", (req, res) => {
     return res.send(`<h1>Working..</h1>`)
 })
 
 app.get('/.well-known/assetlinks.json', (req, res) => {
     const filePath = path.join(__dirname, '.well-known', 'assetlinks.json');
-    
+
     // Check if the file exists before trying to read it
     if (fs.existsSync(filePath)) {
-        res.sendFile(filePath, { headers: { 
-            // Crucial: Set the content type explicitly
-            'Content-Type': 'application/json' 
-        }});
+        res.sendFile(filePath, {
+            headers: {
+                // Crucial: Set the content type explicitly
+                'Content-Type': 'application/json'
+            }
+        });
     } else {
         res.status(404).send('Not Found');
     }
@@ -204,7 +218,7 @@ io.use(async (socket, next) => {
 io.on('connection', (socket) => {
     // console.log(`User connected: ${socket.userId} with socket ID: ${socket.id}`);
     socket.join(socket.userId);
-    
+
     // Join community rooms for real-time updates
     socket.on('joinCommunityRooms', async (data) => {
         try {
@@ -219,7 +233,7 @@ io.on('connection', (socket) => {
             console.error('Error joining community rooms:', err);
         }
     });
-    
+
     // Leave community room
     socket.on('leaveCommunityRoom', (data) => {
         try {
@@ -236,7 +250,7 @@ io.on('connection', (socket) => {
     //     try {
     //         // 1. Destructure the temporary ID from the client payload
     //         const { conversationId, content, sharedPost, sharedNews, tempId } = data;
-            
+
     //         // Basic validation
     //         if (!conversationId || (!content && !sharedPost && !sharedNews)) {
     //             return socket.emit('error', { message: 'Missing required message data.' });
@@ -260,7 +274,7 @@ io.on('connection', (socket) => {
     //         // Update the conversation's last message
     //         conversation.lastMessage = newMessage._id;
     //         await conversation.save();
-            
+
     //         const populatedMessage = await Message.findById(newMessage._id).populate('sender', 'name profileImage');
 
     //         // 2. Add the tempId to the message object before broadcasting
@@ -273,7 +287,7 @@ io.on('connection', (socket) => {
     //                 io.to(participantId.toString()).emit('newMessage', messageToSend);
     //             }
     //     });
-        
+
     // } catch (err) {
     //     console.error("Error in sendMessage event:", err);
     //     socket.emit('error', { message: 'An error occurred while sending the message.' });
@@ -288,32 +302,40 @@ io.on('connection', (socket) => {
 
 
 // --- Server Listening ---
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server is running at ${PORT}`);
-    startAllBots();
-    // Non-blocking SMTP connectivity check
-    (async function verifySmtpTransport() {
-        try {
-            const { MAIL_HOST, MAIL_PORT, MAIL_USER, MAIL_PASS, MAIL_SECURE } = process.env;
-            if (!MAIL_HOST || !MAIL_USER || !MAIL_PASS) {
-                console.warn('[SMTP] MAIL_HOST/MAIL_USER/MAIL_PASS not fully set; OTP emails will fail until configured.');
-                return;
-            }
-            const port = MAIL_PORT ? parseInt(MAIL_PORT, 10) : 587;
-            const secure = MAIL_SECURE ? /^true|1$/i.test(MAIL_SECURE) : (port === 465);
-            const transporter = nodemailer.createTransport({
-                host: MAIL_HOST,
-                port,
-                secure,
-                auth: { user: MAIL_USER, pass: MAIL_PASS },
-            });
-            await transporter.verify();
-            console.log(`[SMTP] Transport verified: host=${MAIL_HOST} port=${port} secure=${secure}`);
-        } catch (err) {
-            console.warn('[SMTP] Transport verification failed:', err.message);
-        }
-    })();
-});
+(async () => {
+    try {
+        await bootstrap();
+        server.listen(PORT, '0.0.0.0', () => {
+            console.log(`Server is running at ${PORT}`);
+            startAllBots();
+            // Non-blocking SMTP connectivity check
+            (async function verifySmtpTransport() {
+                try {
+                    const { MAIL_HOST, MAIL_PORT, MAIL_USER, MAIL_PASS, MAIL_SECURE } = process.env;
+                    if (!MAIL_HOST || !MAIL_USER || !MAIL_PASS) {
+                        console.warn('[SMTP] MAIL_HOST/MAIL_USER/MAIL_PASS not fully set; OTP emails will fail until configured.');
+                        return;
+                    }
+                    const port = MAIL_PORT ? parseInt(MAIL_PORT, 10) : 587;
+                    const secure = MAIL_SECURE ? /^true|1$/i.test(MAIL_SECURE) : (port === 465);
+                    const transporter = nodemailer.createTransport({
+                        host: MAIL_HOST,
+                        port,
+                        secure,
+                        auth: { user: MAIL_USER, pass: MAIL_PASS },
+                    });
+                    await transporter.verify();
+                    console.log(`[SMTP] Transport verified: host=${MAIL_HOST} port=${port} secure=${secure}`);
+                } catch (err) {
+                    console.warn('[SMTP] Transport verification failed:', err.message);
+                }
+            })();
+        });
+    } catch (err) {
+        console.error("❌ Server startup failed:", err);
+        process.exit(1);
+    }
+})();
 
 
 // The keep-alive service remains unchanged
@@ -345,7 +367,7 @@ function callSelfApi() {
 }
 
 function scheduleApiCall() {
-    callSelfApi(); 
+    callSelfApi();
     setInterval(callSelfApi, 14 * 60 * 1000);
 }
 

@@ -186,6 +186,11 @@ const userSchema = new mongoose.Schema({
     searchText: {
         type: String,
         default: ""
+    },
+    activePurchase: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Purchase",
+        default: null,
     }
 })
 
