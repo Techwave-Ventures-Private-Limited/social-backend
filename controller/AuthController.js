@@ -7,6 +7,8 @@ require("dotenv").config();
 const { followQueue } = require('../config/queue');
 const { buildSearchText, generateEmbedding } = require("../services/userService");
 const { PERSONAL_EMAIL_DOMAINS } = require("../constants/BannedDomain.js")
+const generateReferralCode = require("../utils/generateCode");
+const { applyReferral } = require("./referralController.js");
 
 function isPersonalEmail(email) {
   if (!email || !email.includes("@")) return false;
@@ -72,7 +74,7 @@ exports.sendEmailVerificationOTP = async (req, res) => {
 
 exports.signup = async (req, res) => {
   try {
-    let { name, email, password, confirmPassword, otp, type, category } = req.body;
+    let { name, email, password, confirmPassword, otp, type, category, referralCode } = req.body;
 
     if (!otp) {
       return res.status(400).json({
@@ -144,8 +146,11 @@ exports.signup = async (req, res) => {
       type,
       category,
       searchText: name + category,
-      embedding: embedding
+      embedding: embedding,
+      referralCode: generateReferralCode(),
     });
+
+    await applyReferral(savedUser._id, referralCode);
 
     const token = jwt.sign({
       email: email, id: savedUser._id, role: savedUser.role

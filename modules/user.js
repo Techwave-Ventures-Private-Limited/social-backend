@@ -191,7 +191,21 @@ const userSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "Purchase",
         default: null,
-    }
+    },
+    referralCode: {
+        type: String,
+        unique: true,
+        index: true,
+    },
+    referredBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
+    },
+    points: {
+        type: Number,
+        default: 0,
+    },
 })
 
 module.exports = mongoose.model("User", userSchema);

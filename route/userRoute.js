@@ -7,6 +7,7 @@ const { auth } = require("../middleware/authMiddleware");
 const { checkStreak } = require('../middleware/checkStreak');
 const { followUser, unFollowUser } = require("../controller/FollowController");
 const { commentOnStory, getCommentsByStoryId, saveCommentslikeByStoryId } = require("../controller/commentController");
+const { checkReferralCode } = require("../controller/referralController");
 
 // router.use(checkStreak);
 
@@ -58,5 +59,7 @@ router.get("/recommendations", auth, getRecommendedUsers);
 router.get("/seed-profiles", auth, getSeedProfiles);
 
 router.get("/:userId", auth, getAnotherUser);
+router.post("/checkcode", checkReferralCode);
+
 
 module.exports = router;
