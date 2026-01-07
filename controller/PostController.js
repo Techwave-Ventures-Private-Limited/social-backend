@@ -12,6 +12,8 @@ const { addUserData } = require("../controller/UserController");
 const { generatePostEmbedding } = require("../services/userService");
 const { extractHashtags, processHashtags } = require("../services/hashtagsService");
 const Hashtag = require("../modules/hashtags");
+const { redisClient } = require("../config/redis");
+
 
 exports.createPost = async (req, res) => {
     try {
@@ -1929,4 +1931,42 @@ exports.findPostsByHashTag = async (req, res) => {
     }
 };
 
+exports.suggestHashtags = async (req, res) => {
+    let { q } = req.query;
+    if (!q || q.length < 2) return res.json([]);
 
+    q = q.toLowerCase().replace('#', '');
+
+    const cachePrefix = q.slice(0, 4);
+    const cacheKey = `hashtag:ac:${cachePrefix}`;
+
+    const cached = await redisClient.get(cacheKey);
+    let list;
+
+    //console.log("Query : ", q, "cahceKey : ", cacheKey);
+
+    if (cached) {
+        list = JSON.parse(cached);
+    } else {
+        const hashtags = await Hashtag.find({
+            tag: { $regex: `^${q}`, $options: 'i' }
+        })
+            .sort({ usageCount: -1 })
+            .limit(50)
+            .lean();
+
+        list = hashtags.map(h => h.tag);
+
+        await redisClient.setex(
+            cacheKey,
+            60 * 60 * 6,
+            JSON.stringify(list)
+        );
+    }
+
+    const result = list
+        .filter(tag => tag.startsWith(q))
+        .slice(0, 10);
+
+    res.json(result);
+};
