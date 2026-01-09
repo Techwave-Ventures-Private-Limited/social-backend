@@ -151,20 +151,6 @@ exports.createEvent = async (req, res) => {
         }
 
         eventObject.tags = eventObject.tags || [];
-        eventObject.speakers = eventObject.speakers || [];
-
-        // Convert boolean strings to actual booleans
-        if (typeof eventObject.isPaid === 'string') {
-            eventObject.isPaid = eventObject.isPaid === 'true';
-        }
-        if (typeof eventObject.isOnline === 'string') {
-            eventObject.isOnline = eventObject.isOnline === 'true';
-        }
-
-        // Convert maxAttendees to number if it's a string
-        if (eventObject.maxAttendees && typeof eventObject.maxAttendees === 'string') {
-            eventObject.maxAttendees = parseInt(eventObject.maxAttendees);
-        }
 
         eventObject.userId = userId;
 
